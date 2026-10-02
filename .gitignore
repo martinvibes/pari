@@ -1,0 +1,32 @@
+# OS and editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+tokens.json
+*.pem
+*.key
+
+# Daml build output
+.daml/
+log/
+*.log
+
+# Node, Next.js and Cloudflare
+node_modules/
+.next/
+out/
+.open-next/
+.wrangler/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local working notes
+/notes/

@@ -1,0 +1,11 @@
+Pari
+Copyright 2026 The Pari authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It includes or is derived from the following third-party work:
+
+* daml/dars/ — Splice token-standard API packages and the Splice test token
+  (Splice 0.6.13), Copyright Digital Asset (Switzerland) GmbH and/or its
+  affiliates, licensed under the Apache License, Version 2.0.
+  https://github.com/hyperledger-labs/splice

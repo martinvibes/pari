@@ -1,0 +1,197 @@
+-- | Secondary trading: delivery against payment, interest split on the trade
+-- date, DQ screening, and what each party can see.
+module Pari.Test.Trading where
+
+import DA.Assert ((===))
+import DA.Map qualified as Map
+import DA.Optional (fromSome, isNone)
+import DA.Time (time)
+import Daml.Script
+
+import Pari.Desk
+import Pari.Facility
+import Pari.Interest (Entry(..))
+import Pari.Position
+import Pari.Screening
+import Pari.Settlement
+import Pari.Trade
+
+import Pari.Test.Setup
+
+-- | A seller offers, the buyer accepts.
+agreeTrade : Env -> Party -> Party -> Decimal -> Decimal -> Script (ContractId TradeTicket)
+agreeTrade env seller buyer amount price = do
+  (_, settleBefore) <- deadlines
+  offer <- submit seller $ createCmd TradeOffer with
+    seller
+    buyer
+    agent = env.agent
+    facilityId = dealId
+    amount
+    price
+    tradeDate = midPeriod
+    instrumentId = env.usd
+    settleBefore
+  submit buyer $ exerciseCmd offer TradeOffer_Accept
+
+-- | The agent screens the buyer, the buyer funds the cash leg, and the
+-- agent's desk settles everything in one transaction.
+settleTrade : Env -> ContractId Facility -> ContractId TradeTicket -> Script SettledTrade
+settleTrade env facility ticketCid = do
+  ticket <- fromSome <$> queryContractId env.agent ticketCid
+  screeningCid <- submit env.agent $ exerciseCmd env.dqList DqList_Screen with candidate = ticket.buyer
+  allocation <- allocate env ticket.settlement tradeLegId (mkLeg ticket.buyer ticket.seller ticket.cash env.usd)
+  (sellerPositionCid, _) <- positionOf ticket.seller
+  buyerPositions <- filter (\(_, p) -> p.lender == ticket.buyer) <$> query @Position ticket.buyer
+  submit env.agent $ exerciseCmd env.desk Desk_SettleTrade with
+    facilityCid = facility
+    ticketCid
+    screeningCid
+    sellerPositionCid
+    buyerPositionCid = fst <$> headOptional buyerPositions
+    allocation
+
+headOptional : [a] -> Optional a
+headOptional (x :: _) = Some x
+headOptional [] = None
+
+test_trade_settles_delivery_versus_payment : Script ()
+test_trade_settles_delivery_versus_payment = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+  ticket <- agreeTrade env env.alder env.buyer 10_000_000.0 0.995
+  settled <- settleTrade env facility ticket
+
+  -- Cash: $10m at 99.5 moved from Delta to Alder.
+  alderCash <- balanceOf env env.alder
+  alderCash === 9_950_000.0
+  deltaCash <- balanceOf env env.buyer
+  deltaCash === 10_050_000.0
+
+  -- Positions moved with it.
+  (_, alder) <- positionOf env.alder
+  alder.principal === 40_000_000.0
+  (_, delta) <- positionOf env.buyer
+  delta.principal === 10_000_000.0
+
+  -- Alder keeps the 30 days of interest it earned: 50m * 7.80% * 30/360.
+  state <- facilityOf env settled.facilityCid
+  Map.lookup env.alder state.register ===
+    Some Entry with principal = 40_000_000.0; accrualStart = midPeriod; carried = 325_000.0
+  Map.lookup env.buyer state.register ===
+    Some Entry with principal = 10_000_000.0; accrualStart = midPeriod; carried = 0.0
+  outstanding state === 100_000_000.0
+
+test_interest_is_split_on_the_trade_date : Script ()
+test_interest_is_split_on_the_trade_date = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+  ticket <- agreeTrade env env.alder env.buyer 10_000_000.0 0.995
+  settled <- settleTrade env facility ticket
+
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env settled.facilityCid
+  _ <- pay env facility 1.0
+
+  -- Alder: 325,000.00 for 30 days on 50m, plus 528,666.66 for 61 days on 40m.
+  alderCash <- balanceOf env env.alder
+  alderCash === 9_950_000.0 + 853_666.66
+  -- Delta: 61 days on 10m.
+  deltaCash <- balanceOf env env.buyer
+  deltaCash === 10_050_000.0 + 132_166.66
+
+test_full_exit_keeps_earned_interest : Script ()
+test_full_exit_keeps_earned_interest = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+  ticket <- agreeTrade env env.cedar env.buyer 20_000_000.0 1.0
+  settled <- settleTrade env facility ticket
+
+  -- Cedar sold everything but is still owed 30 days of interest.
+  (_, cedar) <- positionOf env.cedar
+  cedar.principal === 0.0
+
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env settled.facilityCid
+  facility <- pay env facility 1.0
+
+  cedarCash <- balanceOf env env.cedar
+  cedarCash === 20_000_000.0 + 130_000.0
+  -- Once paid, Cedar leaves the register and its position is archived.
+  state <- facilityOf env facility
+  Map.member env.cedar state.register === False
+  cedarPositions <- query @Position env.cedar
+  cedarPositions === []
+
+test_dq_listed_buyer_is_refused : Script ()
+test_dq_listed_buyer_is_refused = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+  (_, settleBefore) <- deadlines
+  offer <- submit env.alder $ createCmd TradeOffer with
+    seller = env.alder
+    buyer = env.rival
+    agent = env.agent
+    facilityId = dealId
+    amount = 10_000_000.0
+    price = 0.995
+    tradeDate = midPeriod
+    instrumentId = env.usd
+    settleBefore
+  ticketCid <- submit env.rival $ exerciseCmd offer TradeOffer_Accept
+  ticket <- fromSome <$> queryContractId env.rival ticketCid
+  screeningCid <- submit env.agent $ exerciseCmd env.dqList DqList_Screen with candidate = env.rival
+  allocation <- allocate env ticket.settlement tradeLegId (mkLeg env.rival env.alder ticket.cash env.usd)
+  (alderPosition, _) <- positionOf env.alder
+
+  submitMustFail env.agent $ exerciseCmd env.desk Desk_SettleTrade with
+    facilityCid = facility
+    ticketCid
+    screeningCid
+    sellerPositionCid = alderPosition
+    buyerPositionCid = None
+    allocation
+
+  rivalCash <- balanceOf env env.rival
+  rivalCash === 10_050_000.0  -- the rest is still locked in its own allocation
+  rivalPositions <- query @Position env.rival
+  rivalPositions === []
+
+  -- The rival never sees the list or the screening outcome.
+  lists <- query @DqList env.rival
+  lists === []
+  results <- query @ScreeningResult env.rival
+  results === []
+
+test_trade_privacy : Script ()
+test_trade_privacy = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+  ticket <- agreeTrade env env.alder env.buyer 10_000_000.0 0.995
+  settled <- settleTrade env facility ticket
+
+  -- The borrower never sees the ticket, so the price stays private.
+  borrowerTickets <- query @TradeTicket env.borrower
+  borrowerTickets === []
+
+  -- The buyer cannot see what the seller still holds, and vice versa.
+  (alderPosition, _) <- positionOf env.alder
+  buyerView <- queryContractId env.buyer alderPosition
+  isNone buyerView === True
+  sellerView <- queryContractId env.alder settled.buyerPosition
+  isNone sellerView === True
+
+  -- Lenders outside the trade see nothing of it.
+  birchTickets <- query @TradeTicket env.birch
+  birchTickets === []
+  birchPositions <- query @Position env.birch
+  map (\(_, p) -> p.lender) birchPositions === [env.birch]
+
+  -- The buyer never learns the DQ list.
+  lists <- query @DqList env.buyer
+  lists === []

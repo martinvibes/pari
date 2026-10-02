@@ -1,0 +1,88 @@
+-- | Information walls: borrower documents reach lenders according to each
+-- lender's public-side or private-side election.
+module Pari.Disclosure
+  ( Side(..)
+  , InfoElection(..)
+  , InfoElection_Change(..)
+  , Document(..)
+  , Document_Share(..)
+  , DocumentAccess(..)
+  ) where
+
+import Pari.Util
+
+-- | A private-side lender receives material non-public information (MNPI)
+-- and is restricted from trading the borrower's public securities. A
+-- public-side lender receives only public information.
+data Side = PublicSide | PrivateSide
+  deriving (Eq, Show)
+
+-- | A lender's own election. Only the lender can make or change it.
+template InfoElection
+  with
+    lender : Party
+    agent : Party
+    facilityId : Text
+    side : Side
+  where
+    signatory lender
+    observer agent
+
+    choice InfoElection_Change : ContractId InfoElection
+      with
+        newSide : Side
+      controller lender
+      do create this with side = newSide
+
+-- | A document the borrower posts for distribution. The borrower classifies
+-- it; the agent distributes it.
+template Document
+  with
+    borrower : Party
+    agent : Party
+    facilityId : Text
+    docId : Text
+    title : Text
+    uri : Text
+    sha256 : Text
+    mnpi : Bool
+  where
+    signatory borrower
+    observer agent
+
+    -- | Share with one lender. MNPI reaches private-side lenders only.
+    nonconsuming choice Document_Share : ContractId DocumentAccess
+      with
+        electionCid : ContractId InfoElection
+      controller agent
+      do
+        election <- fetch electionCid
+        require "election is for this facility and agent"
+          (election.facilityId == facilityId && election.agent == agent)
+        require "MNPI reaches private-side lenders only" (not mnpi || election.side == PrivateSide)
+        create DocumentAccess with
+          borrower
+          agent
+          lender = election.lender
+          facilityId
+          docId
+          title
+          uri
+          sha256
+          mnpi
+
+-- | A lender's access to one document.
+template DocumentAccess
+  with
+    borrower : Party
+    agent : Party
+    lender : Party
+    facilityId : Text
+    docId : Text
+    title : Text
+    uri : Text
+    sha256 : Text
+    mnpi : Bool
+  where
+    signatory borrower, agent
+    observer lender

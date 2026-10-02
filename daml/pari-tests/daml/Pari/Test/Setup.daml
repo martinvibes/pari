@@ -1,0 +1,213 @@
+-- | Shared test fixture: a test-token registry, the deal parties, and a
+-- closed $100m facility syndicated across three lenders.
+module Pari.Test.Setup where
+
+import DA.Date (Month(..), date)
+import DA.Foldable (forA_)
+import DA.Map (Map)
+import DA.Map qualified as Map
+import DA.Optional (fromSomeNote)
+import DA.Set qualified as Set
+import DA.TextMap qualified as TextMap
+import DA.Time (days, time, addRelTime)
+import Daml.Script
+
+import Splice.Api.Token.MetadataV1 (ExtraArgs(..), emptyChoiceContext, emptyMetadata)
+import Splice.Api.Token.HoldingV1 (HoldingView(..), InstrumentId(..))
+import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.AllocationInstructionV1
+import Splice.Testing.Tokens.TestTokenV1 (Token(..), TokenRules(..))
+
+import Pari.Desk
+import Pari.Facility
+import Pari.Payment
+import Pari.Position
+import Pari.Screening
+import Pari.Settlement
+import Pari.Syndication
+import Pari.Util
+
+data Env = Env with
+    registry : Party
+      -- ^ Admin of the test USD token.
+    agent : Party
+    borrower : Party
+    alder : Party
+    birch : Party
+    cedar : Party
+      -- ^ The original syndicate.
+    buyer : Party
+      -- ^ A fund buying into the loan.
+    rival : Party
+      -- ^ A competitor on the borrower's DQ list.
+    usd : InstrumentId
+    rules : ContractId TokenRules
+    desk : ContractId AgentDesk
+    dqList : ContractId DqList
+
+-- Dates used across the suite.
+closing, firstPeriodEnd, midPeriod, maturity : Date
+closing = date 2026 Sep 15
+firstPeriodEnd = date 2026 Dec 15  -- 91 days after closing
+midPeriod = date 2026 Oct 15       -- 30 days after closing
+maturity = date 2031 Sep 15
+
+dealId : Text
+dealId = "NORTHWIND-TLB-2026"
+
+-- | 4.30% base + 350 bp margin = 7.80% all-in.
+sofr : Decimal
+sofr = 0.0430
+
+dealTerms : Env -> Terms
+dealTerms env = Terms with
+  facilityId = dealId
+  name = "Northwind Logistics Term Loan B"
+  instrumentId = env.usd
+  commitment = 100_000_000.0
+  marginBps = 350
+  closingDate = closing
+  maturityDate = maturity
+
+syndicate : Env -> [(Party, Decimal)]
+syndicate env = [(env.alder, 50_000_000.0), (env.birch, 30_000_000.0), (env.cedar, 20_000_000.0)]
+
+setup : Script Env
+setup = do
+  setTime (time closing 9 0 0)
+  [registry, agent, borrower, alder, birch, cedar, buyer, rival] <-
+    mapA allocateParty ["Registry", "Agent", "Northwind", "Alder", "Birch", "Cedar", "Delta", "Rival"]
+  let usd = InstrumentId with admin = registry; id = "USD"
+  rules <- submit registry $ createCmd TokenRules with admin = registry
+  desk <- submit agent $ createCmd AgentDesk with agent
+  dqList <- submit borrower $ createCmd DqList with
+    borrower
+    agent
+    facilityId = dealId
+    disqualified = Set.fromList [rival]
+  let env = Env with ..
+  mint env borrower 5_000_000.0
+  forA_ (syndicate env) \(lender, amount) -> mint env lender amount
+  mint env buyer 20_000_000.0
+  mint env rival 20_000_000.0
+  pure env
+
+-- Tokens --------------------------------------------------------------------
+
+mint : Env -> Party -> Decimal -> Script ()
+mint env owner amount = do
+  submit (actAs [owner, env.registry]) $ createCmd Token with
+    holding = HoldingView with
+      owner
+      instrumentId = env.usd
+      amount
+      lock = None
+      meta = emptyMetadata
+  pure ()
+
+holdingsOf : Env -> Party -> Script [(ContractId Token, Token)]
+holdingsOf env owner =
+  filter (\(_, t) -> t.holding.owner == owner && t.holding.instrumentId == env.usd) <$> query @Token owner
+
+balanceOf : Env -> Party -> Script Decimal
+balanceOf env owner = sum . map (\(_, t) -> t.holding.amount) <$> holdingsOf env owner
+
+noExtraArgs : ExtraArgs
+noExtraArgs = ExtraArgs with context = emptyChoiceContext; meta = emptyMetadata
+
+-- | The sender allocates its own holdings to one settlement leg through the
+-- registry's standard allocation factory, as a CIP-56 wallet would.
+allocate : Env -> SettlementInfo -> Text -> TransferLeg -> Script AllocationInput
+allocate env settlement transferLegId transferLeg = do
+  holdings <- holdingsOf env transferLeg.sender
+  now <- getTime
+  result <- submit (actAs transferLeg.sender <> readAs env.registry) $
+    exerciseCmd (toInterfaceContractId @AllocationFactory env.rules) AllocationFactory_Allocate with
+      expectedAdmin = env.registry
+      allocation = AllocationSpecification with settlement; transferLegId; transferLeg
+      requestedAt = now
+      inputHoldingCids = map (toInterfaceContractId . fst) holdings
+      extraArgs = noExtraArgs
+  case result.output of
+    AllocationInstructionResult_Completed {allocationCid} -> pure (allocationCid, noExtraArgs)
+    _ -> fail "allocation did not complete"
+
+-- Facility lifecycle --------------------------------------------------------
+
+deadlines : Script (Time, Time)
+deadlines = do
+  now <- getTime
+  pure (addRelTime now (days 2), addRelTime now (days 3))
+
+-- | Propose and accept the facility, collect the three commitments with
+-- their funding allocations, but do not close yet.
+syndicateFacility : Env -> Script (ContractId Facility, [(ContractId Commitment, AllocationInput)])
+syndicateFacility env = do
+  proposal <- submit env.agent $ createCmd FacilityProposal with
+    agent = env.agent
+    borrower = env.borrower
+    terms = dealTerms env
+  facility <- submit env.borrower $ exerciseCmd proposal FacilityProposal_Accept
+  (allocateBefore, settleBefore) <- deadlines
+  commitments <- forA (syndicate env) \(lender, amount) -> do
+    offer <- submit env.agent $ exerciseCmd facility Facility_Invite with
+      lender; amount; allocateBefore; settleBefore
+    commitmentCid <- submit lender $ exerciseCmd offer CommitmentOffer_Accept
+    commitment <- fromSomeNote "commitment" <$> queryContractId lender commitmentCid
+    allocation <- allocate env commitment.settlement (legIdFor lender)
+      (mkLeg lender env.borrower amount env.usd)
+    pure (commitmentCid, allocation)
+  pure (facility, commitments)
+
+closeFacility : Env -> Script (ContractId Facility)
+closeFacility env = do
+  (facility, commitments) <- syndicateFacility env
+  submit env.agent $ exerciseCmd facility Facility_Close with commitments
+
+-- | A closed facility with the first period's rate fixed.
+activeFacility : Env -> Script (ContractId Facility)
+activeFacility env = do
+  facility <- closeFacility env
+  submit env.agent $ exerciseCmd facility Facility_FixRate with
+    baseRate = sofr
+    periodEnd = firstPeriodEnd
+
+positionOf : Party -> Script (ContractId Position, Position)
+positionOf lender = do
+  positions <- filter (\(_, p) -> p.lender == lender && p.facilityId == dealId) <$> query @Position lender
+  case positions of
+    [position] -> pure position
+    _ -> fail ("expected exactly one position for " <> show lender)
+
+positionsOf : [Party] -> Script (Map Party (ContractId Position))
+positionsOf lenders = Map.fromList <$> forA lenders \lender -> do
+  (cid, _) <- positionOf lender
+  pure (lender, cid)
+
+facilityOf : Env -> ContractId Facility -> Script Facility
+facilityOf env cid = fromSomeNote "facility" <$> queryContractId env.agent cid
+
+-- | The borrower funds every leg of the open request at `fraction` of what is
+-- due, and the agent settles.
+pay : Env -> ContractId Facility -> Decimal -> Script (ContractId Facility)
+pay env facilityCid fraction = do
+  facility <- facilityOf env facilityCid
+  let requestCid = fromSomeNote "no open request" facility.pending
+  request <- fromSomeNote "request" <$> queryContractId env.borrower requestCid
+  legs <- forA (legsOf request) \(legId, leg) -> do
+    let amount = floorCents (leg.amount * fraction)
+    allocation <- allocate env request.settlement legId leg with amount
+    pure (leg.receiver, allocation)
+  positions <- positionsOf (map fst legs)
+  submit env.agent $ exerciseCmd facilityCid Facility_Settle with
+    fraction
+    positions
+    allocations = Map.fromList legs
+
+legsOf : PaymentRequest -> [(Text, TransferLeg)]
+legsOf request = TextMap.toList request.legs
+
+requestInterest : Env -> ContractId Facility -> Script (ContractId Facility, ContractId PaymentRequest)
+requestInterest env facility = do
+  (allocateBefore, settleBefore) <- deadlines
+  submit env.agent $ exerciseCmd facility Facility_RequestInterest with allocateBefore; settleBefore

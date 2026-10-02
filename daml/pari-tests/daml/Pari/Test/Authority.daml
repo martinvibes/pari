@@ -1,0 +1,91 @@
+-- | Authority: the agent administers the loan but can never create, move or
+-- shrink a lender's position, or move anyone's tokens, on its own.
+module Pari.Test.Authority where
+
+import DA.Assert ((===))
+import DA.Optional (fromSome)
+import DA.Time (time)
+import Daml.Script
+
+import Splice.Api.Token.AllocationV1 (Allocation_ExecuteTransfer(..))
+
+import Pari.Position
+import Pari.Screening
+
+import Pari.Test.Setup
+
+test_agent_cannot_create_a_position : Script ()
+test_agent_cannot_create_a_position = do
+  env <- setup
+  _ <- closeFacility env
+  submitMustFail env.agent $ createCmd Position with
+    agent = env.agent
+    lender = env.buyer
+    facilityId = dealId
+    principal = 10_000_000.0
+
+test_agent_cannot_move_a_position : Script ()
+test_agent_cannot_move_a_position = do
+  env <- setup
+  _ <- closeFacility env
+  (alderPosition, _) <- positionOf env.alder
+  submitMustFail env.agent $ exerciseCmd alderPosition Position_Reduce with
+    amount = 50_000_000.0; retain = False
+  submitMustFail env.agent $ exerciseCmd alderPosition Archive
+  (_, alder) <- positionOf env.alder
+  alder.principal === 50_000_000.0
+
+test_lender_cannot_inflate_its_position : Script ()
+test_lender_cannot_inflate_its_position = do
+  env <- setup
+  _ <- closeFacility env
+  (alderPosition, _) <- positionOf env.alder
+  submitMustFail env.alder $ exerciseCmd alderPosition Position_Increase with
+    amount = 1_000_000.0
+
+test_agent_cannot_pay_out_without_the_borrower : Script ()
+test_agent_cannot_pay_out_without_the_borrower = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (_, requestCid) <- requestInterest env facility
+  request <- fromSome <$> queryContractId env.borrower requestCid
+  [(legId, leg)] <- pure (filter (\(_, l) -> l.receiver == env.alder) (legsOf request))
+  (allocationCid, extraArgs) <- allocate env request.settlement legId leg
+  (position, _) <- positionOf leg.receiver
+
+  -- The allocation needs the executor, sender and receiver together.
+  submitMustFail env.agent $ exerciseCmd allocationCid Allocation_ExecuteTransfer with extraArgs
+  -- And the agent cannot drive a position's settlement without the borrower.
+  submitMustFail env.agent $ exerciseCmd position Position_Settle with
+    borrower = env.borrower
+    expectedPrincipal = 50_000_000.0
+    principalReduction = 0.0
+    retain = True
+    kind = request.kind
+    due = leg.amount
+    settlement = request.settlement
+    legId
+    leg
+    allocation = (allocationCid, extraArgs)
+
+test_agent_cannot_clear_a_buyer_itself : Script ()
+test_agent_cannot_clear_a_buyer_itself = do
+  env <- setup
+  _ <- activeFacility env
+  -- A clearance must be co-signed by the borrower, via the DQ list.
+  now <- getTime
+  submitMustFail env.agent $ createCmd ScreeningResult with
+    borrower = env.borrower
+    agent = env.agent
+    facilityId = dealId
+    candidate = env.rival
+    cleared = True
+    screenedAt = now
+
+test_only_the_borrower_edits_the_dq_list : Script ()
+test_only_the_borrower_edits_the_dq_list = do
+  env <- setup
+  submitMustFail env.agent $ exerciseCmd env.dqList DqList_Update with newList = mempty
+  pure ()
+

@@ -1,0 +1,62 @@
+-- | The agent's settlement desk.
+module Pari.Desk
+  ( AgentDesk(..)
+  , Desk_SettleTrade(..)
+  , SettledTrade(..)
+  ) where
+
+import DA.Optional (isSome)
+
+import Pari.Facility
+import Pari.Position
+import Pari.Screening
+import Pari.Settlement
+import Pari.Trade
+import Pari.Util
+
+-- | The agent's own contract. Its choices are seen by the agent alone, which
+-- lets one atomic transaction touch the register (agent and borrower), the
+-- ticket (seller and buyer) and each side's position, while each party sees
+-- only its own part:
+--
+-- * the borrower sees the register update and DQ check, not the price;
+-- * the seller and buyer see the cash leg, not each other's positions;
+-- * other lenders see nothing at all.
+template AgentDesk
+  with
+    agent : Party
+  where
+    signatory agent
+
+    nonconsuming choice Desk_SettleTrade : SettledTrade
+      with
+        facilityCid : ContractId Facility
+        ticketCid : ContractId TradeTicket
+        screeningCid : ContractId ScreeningResult
+        sellerPositionCid : ContractId Position
+        buyerPositionCid : Optional (ContractId Position)
+        allocation : AllocationInput
+      controller agent
+      do
+        ticket <- fetch ticketCid
+        require "ticket is for this agent" (ticket.agent == agent)
+        (facilityCid', assignment) <- exercise facilityCid Facility_RecordAssignment with
+          seller = ticket.seller
+          buyer = ticket.buyer
+          amount = ticket.amount
+          tradeDate = ticket.tradeDate
+          screeningCid
+        require "buyer's existing position is supplied exactly when it holds one"
+          (isSome buyerPositionCid == assignment.buyerExisting)
+        (sellDownCid, buyInCid) <- exercise ticketCid TradeTicket_Settle with allocation
+        sellerPosition <- exercise sellDownCid SellDown_Apply with
+          positionCid = sellerPositionCid
+          retain = assignment.sellerRetained
+        buyerPosition <- exercise buyInCid BuyIn_Apply with existing = buyerPositionCid
+        pure SettledTrade with facilityCid = facilityCid'; sellerPosition; buyerPosition
+
+data SettledTrade = SettledTrade with
+    facilityCid : ContractId Facility
+    sellerPosition : Optional (ContractId Position)
+    buyerPosition : ContractId Position
+  deriving (Eq, Show)

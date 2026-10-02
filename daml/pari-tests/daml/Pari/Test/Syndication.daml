@@ -1,0 +1,72 @@
+-- | Closing: every lender funds in one transaction, and each lender sees only
+-- its own position.
+module Pari.Test.Syndication where
+
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.Map qualified as Map
+import Daml.Script
+
+import Pari.Facility
+import Pari.Interest (Entry(..))
+import Pari.Payment
+import Pari.Position
+
+import Pari.Test.Setup
+
+test_closing_funds_borrower_atomically : Script ()
+test_closing_funds_borrower_atomically = do
+  env <- setup
+  facilityCid <- closeFacility env
+
+  -- The borrower holds the full commitment on top of its starting cash.
+  balance <- balanceOf env env.borrower
+  balance === 105_000_000.0
+  forA_ (syndicate env) \(lender, _) -> do
+    lenderCash <- balanceOf env lender
+    lenderCash === 0.0
+
+  facility <- facilityOf env facilityCid
+  facility.status === Active
+  Map.toList facility.register ===
+    [ (lender, Entry with principal = amount; accrualStart = closing; carried = 0.0)
+    | (lender, amount) <- syndicate env ]
+  outstanding facility === 100_000_000.0
+
+  forA_ (syndicate env) \(lender, amount) -> do
+    (_, position) <- positionOf lender
+    position.principal === amount
+
+test_closing_fails_unless_fully_committed : Script ()
+test_closing_fails_unless_fully_committed = do
+  env <- setup
+  (facilityCid, commitments) <- syndicateFacility env
+  -- Without Cedar's $20m the facility is under-subscribed: nothing moves.
+  submitMustFail env.agent $ exerciseCmd facilityCid Facility_Close with
+    commitments = take 2 commitments
+  balance <- balanceOf env env.borrower
+  balance === 5_000_000.0
+  facility <- facilityOf env facilityCid
+  facility.status === Syndicating
+  -- Alder's funds stay in its own allocation, which it can withdraw.
+  alderPositions <- query @Position env.alder
+  alderPositions === []
+
+test_lenders_see_only_their_own_position : Script ()
+test_lenders_see_only_their_own_position = do
+  env <- setup
+  _ <- closeFacility env
+  (birchPosition, _) <- positionOf env.birch
+
+  -- Alder sees exactly one position: its own.
+  alderView <- query @Position env.alder
+  map (\(_, p) -> p.lender) alderView === [env.alder]
+  hidden <- queryContractId env.alder birchPosition
+  hidden === None
+
+  -- The register is shared by the agent and borrower only.
+  forA_ [env.alder, env.birch, env.cedar] \lender -> do
+    facilities <- query @Facility lender
+    facilities === []
+    requests <- query @PaymentRequest lender
+    requests === []

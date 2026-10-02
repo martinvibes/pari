@@ -1,0 +1,344 @@
+-- | The facility: terms, the lender register and the payment lifecycle.
+module Pari.Facility
+  ( Terms(..)
+  , Status(..)
+  , Assignment(..)
+  , FacilityProposal(..)
+  , FacilityProposal_Accept(..)
+  , FacilityProposal_Reject(..)
+  , Facility(..)
+  , Facility_Invite(..)
+  , Facility_Close(..)
+  , Facility_FixRate(..)
+  , Facility_RequestInterest(..)
+  , Facility_AcceptPrepayment(..)
+  , Facility_Settle(..)
+  , Facility_CancelRequest(..)
+  , Facility_RecordAssignment(..)
+  , outstanding
+  ) where
+
+import DA.Foldable (forA_)
+import DA.List (unique)
+import DA.Map (Map)
+import DA.Map qualified as Map
+import DA.Optional (fromOptional, fromSomeNote, isNone, isSome, optionalToList)
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+
+import Pari.Interest
+import Pari.Payment
+import Pari.Position
+import Pari.Screening
+import Pari.Settlement
+import Pari.Syndication
+import Pari.Util
+
+data Terms = Terms with
+    facilityId : Text
+    name : Text
+    instrumentId : InstrumentId
+      -- ^ The CIP-56 instrument the loan is funded and repaid in.
+    commitment : Decimal
+    marginBps : Int
+    closingDate : Date
+    maturityDate : Date
+  deriving (Eq, Show)
+
+data Status = Syndicating | Active | Repaid
+  deriving (Eq, Show)
+
+-- | What a trade did to the register, returned to the agent's desk so it can
+-- restate both positions consistently.
+data Assignment = Assignment with
+    sellerRetained : Bool
+      -- ^ The seller keeps an entry: principal left, or interest still owed.
+    buyerExisting : Bool
+      -- ^ The buyer held a position before this trade.
+  deriving (Eq, Show)
+
+template FacilityProposal
+  with
+    agent : Party
+    borrower : Party
+    terms : Terms
+  where
+    signatory agent
+    observer borrower
+    ensure validTerms terms
+
+    choice FacilityProposal_Accept : ContractId Facility
+      controller borrower
+      do
+        create Facility with
+          agent
+          borrower
+          terms
+          status = Syndicating
+          register = Map.empty
+          paidThrough = terms.closingDate
+          period = None
+          pending = None
+          nextRef = 1
+
+    choice FacilityProposal_Reject : ()
+      controller borrower
+      do pure ()
+
+-- | The credit agreement between the agent (acting for the lenders) and the
+-- borrower. It holds the lender register, which only the agent and the
+-- borrower can see: each lender sees its own position and nothing else.
+template Facility
+  with
+    agent : Party
+    borrower : Party
+    terms : Terms
+    status : Status
+    register : Map Party Entry
+    paidThrough : Date
+      -- ^ Interest is settled up to this date.
+    period : Optional Period
+      -- ^ The current interest period, once its rate is fixed.
+    pending : Optional (ContractId PaymentRequest)
+      -- ^ The open payment request. The register is frozen while one is open.
+    nextRef : Int
+      -- ^ Sequence number for settlement references.
+  where
+    signatory agent, borrower
+    ensure validTerms terms
+
+    -- Syndication -------------------------------------------------------------
+
+    nonconsuming choice Facility_Invite : ContractId CommitmentOffer
+      with
+        lender : Party
+        amount : Decimal
+        allocateBefore : Time
+        settleBefore : Time
+      controller agent
+      do
+        require "facility is syndicating" (status == Syndicating)
+        now <- getTime
+        create CommitmentOffer with
+          agent
+          borrower
+          lender
+          facilityId = terms.facilityId
+          amount
+          instrumentId = terms.instrumentId
+          settlement = settlementInfo agent (terms.facilityId <> ":closing") now allocateBefore settleBefore
+
+    -- | Close the facility by executing every lender's funding leg in one
+    -- transaction: the borrower receives the full commitment or nothing.
+    choice Facility_Close : ContractId Facility
+      with
+        commitments : [(ContractId Commitment, AllocationInput)]
+      controller agent
+      do
+        require "facility is syndicating" (status == Syndicating)
+        funded <- forA commitments \(commitmentCid, allocation) ->
+          exercise commitmentCid Commitment_Fund with allocation
+        require "commitments belong to this facility" (all (\f -> f.facilityId == terms.facilityId) funded)
+        require "one commitment per lender" (unique (map (.lender) funded))
+        require "commitments add up to the facility size" (sum (map (.amount) funded) == terms.commitment)
+        create this with
+          status = Active
+          register = Map.fromList
+            [ (f.lender, Entry with principal = f.amount; accrualStart = terms.closingDate; carried = 0.0)
+            | f <- funded ]
+
+    -- Interest ----------------------------------------------------------------
+
+    -- | Fix the base rate for the next interest period.
+    choice Facility_FixRate : ContractId Facility
+      with
+        baseRate : Decimal
+        periodEnd : Date
+      controller agent
+      do
+        require "facility is active" (status == Active)
+        require "no period or request is open" (isNone period && isNone pending)
+        require "base rate is not negative" (baseRate >= 0.0)
+        require "period ends after it starts and no later than maturity"
+          (paidThrough < periodEnd && periodEnd <= terms.maturityDate)
+        create this with period = Some Period with start = paidThrough; end = periodEnd; baseRate
+
+    -- | Ask the borrower to fund the period's interest: one leg per lender,
+    -- each computed from that lender's register entry.
+    choice Facility_RequestInterest : (ContractId Facility, ContractId PaymentRequest)
+      with
+        allocateBefore : Time
+        settleBefore : Time
+      controller agent
+      do
+        require "facility is active" (status == Active)
+        require "no request is open" (isNone pending)
+        let p = fromSomeNote "Pari: fix the rate before requesting interest" period
+            rate = allInRate terms.marginBps p.baseRate
+            dues = Map.filter (> 0.0) (fmap (interestDue rate p.end) register)
+        require "there is interest to pay" (not (Map.null dues))
+        openRequest this (InterestPayment p) dues allocateBefore settleBefore
+
+    -- Principal ---------------------------------------------------------------
+
+    -- | Turn the borrower's prepayment notice into a request for pro-rata
+    -- principal legs. Allowed only between interest periods.
+    choice Facility_AcceptPrepayment : (ContractId Facility, ContractId PaymentRequest)
+      with
+        noticeCid : ContractId PrepaymentNotice
+        allocateBefore : Time
+        settleBefore : Time
+      controller agent
+      do
+        notice <- exercise noticeCid PrepaymentNotice_Accept
+        require "notice is from this facility's borrower"
+          (notice.borrower == borrower && notice.facilityId == terms.facilityId)
+        require "facility is active" (status == Active)
+        require "no period or request is open" (isNone period && isNone pending)
+        require "notice does not exceed principal outstanding" (notice.amount <= outstanding this)
+        let holdings = Map.filter (> 0.0) (fmap (.principal) register)
+            shares = Map.filter (> 0.0) (proRata notice.amount holdings)
+        openRequest this PrincipalPayment shares allocateBefore settleBefore
+
+    -- Settlement --------------------------------------------------------------
+
+    -- | Settle the open request; every leg executes in this one transaction.
+    -- Interest may be paid short, but only pro rata: each lender receives the
+    -- same fraction of what it is owed and the rest stays owed to it.
+    choice Facility_Settle : ContractId Facility
+      with
+        fraction : Decimal
+        positions : Map Party (ContractId Position)
+        allocations : Map Party AllocationInput
+      controller agent
+      do
+        let requestCid = fromSomeNote "Pari: no payment request is open" pending
+        request <- fetch requestCid
+        archive requestCid
+        case request.kind of
+          InterestPayment _ -> require "paid fraction is in (0, 1]" (fraction > 0.0 && fraction <= 1.0)
+          PrincipalPayment -> require "principal is paid in full" (fraction == 1.0)
+        let dues = Map.fromList [(leg.receiver, leg.amount) | (_, leg) <- TextMap.toList request.legs]
+            paid = Map.filter (> 0.0) (fmap (\due -> floorCents (due * fraction)) dues)
+            register' = settledRegister request.kind dues paid register
+        require "a position and an allocation for every lender paid"
+          (Map.keys positions == Map.keys paid && Map.keys allocations == Map.keys paid)
+        forA_ (Map.toList paid) \(lender, amount) -> do
+          let entry = lookupNote "lender is not in the register" lender register
+              due = lookupNote "lender has no leg" lender dues
+          exercise (lookupNote "missing position" lender positions) Position_Settle with
+            borrower
+            expectedPrincipal = entry.principal
+            principalReduction = if request.kind == PrincipalPayment then amount else 0.0
+            retain = Map.member lender register'
+            kind = request.kind
+            due
+            settlement = request.settlement
+            legId = legIdFor lender
+            leg = mkLeg borrower lender amount terms.instrumentId
+            allocation = lookupNote "missing allocation" lender allocations
+        create this with
+          register = register'
+          pending = None
+          period = case request.kind of
+            InterestPayment _ -> None
+            PrincipalPayment -> period
+          paidThrough = case request.kind of
+            InterestPayment p -> p.end
+            PrincipalPayment -> paidThrough
+          status = if Map.null register' then Repaid else status
+
+    -- | Withdraw the open request, e.g. after its deadline passed. The
+    -- borrower then withdraws its own allocations.
+    choice Facility_CancelRequest : ContractId Facility
+      controller agent
+      do
+        let requestCid = fromSomeNote "Pari: no payment request is open" pending
+        archive requestCid
+        create this with pending = None
+
+    -- Trading -----------------------------------------------------------------
+
+    -- | Record a settled trade in the register. It consumes a clearance of the
+    -- buyer against the borrower's DQ list, and splits interest on the trade
+    -- date: the seller keeps exactly what it earned while it held the loan.
+    choice Facility_RecordAssignment : (ContractId Facility, Assignment)
+      with
+        seller : Party
+        buyer : Party
+        amount : Decimal
+        tradeDate : Date
+        screeningCid : ContractId ScreeningResult
+      controller agent
+      do
+        require "facility is active" (status == Active)
+        require "the register is not frozen by an open request" (isNone pending)
+        screening <- fetch screeningCid
+        archive screeningCid
+        require "buyer is cleared against the borrower's DQ list"
+          (screening.cleared && screening.candidate == buyer
+            && screening.borrower == borrower && screening.facilityId == terms.facilityId)
+        let p = fromSomeNote "Pari: trades settle within a fixed interest period" period
+            rate = allInRate terms.marginBps p.baseRate
+            sellerEntry = lookupNote "seller holds no position" seller register
+            buyerEntry = Map.lookup buyer register
+        require "trade date falls in the current period" (p.start <= tradeDate && tradeDate <= p.end)
+        require "seller holds the amount sold" (amount > 0.0 && amount <= sellerEntry.principal)
+        require "trade date is not before either side's accrual start"
+          (all (\e -> e.accrualStart <= tradeDate) (sellerEntry :: optionalToList buyerEntry))
+        let seller' = (accrueTo rate tradeDate sellerEntry) with principal = sellerEntry.principal - amount
+            buyer' = case buyerEntry of
+              None -> Entry with principal = amount; accrualStart = tradeDate; carried = 0.0
+              Some e -> (accrueTo rate tradeDate e) with principal = e.principal + amount
+            sellerRetained = isLive seller'
+            register' = Map.insert buyer buyer' $
+              if sellerRetained then Map.insert seller seller' register else Map.delete seller register
+        facilityCid <- create this with register = register'
+        pure (facilityCid, Assignment with sellerRetained; buyerExisting = isSome buyerEntry)
+
+-- | Principal outstanding across all lenders.
+outstanding : Facility -> Decimal
+outstanding f = sum (map (.principal) (Map.values f.register))
+
+validTerms : Terms -> Bool
+validTerms t =
+  t.commitment > 0.0 && isCents t.commitment && t.marginBps >= 0 && t.closingDate < t.maturityDate
+
+-- | Create a payment request for `dues` and freeze the register until it settles.
+openRequest : Facility -> PaymentKind -> Map Party Decimal -> Time -> Time
+  -> Update (ContractId Facility, ContractId PaymentRequest)
+openRequest f kind dues allocateBefore settleBefore = do
+  now <- getTime
+  let ref = f.terms.facilityId <> ":" <> show f.nextRef
+      legs = TextMap.fromList
+        [ (legIdFor lender, mkLeg f.borrower lender due f.terms.instrumentId)
+        | (lender, due) <- Map.toList dues ]
+  requestCid <- create PaymentRequest with
+    agent = f.agent
+    borrower = f.borrower
+    facilityId = f.terms.facilityId
+    kind
+    settlement = settlementInfo f.agent ref now allocateBefore settleBefore
+    legs
+  facilityCid <- create f with pending = Some requestCid; nextRef = f.nextRef + 1
+  pure (facilityCid, requestCid)
+
+-- | The register after a payment settles. Interest left unpaid by a short
+-- payment stays owed as `carried`; entries with nothing left are dropped.
+settledRegister : PaymentKind -> Map Party Decimal -> Map Party Decimal -> Map Party Entry -> Map Party Entry
+settledRegister kind dues paid register = Map.filter isLive (Map.fromList (map settle (Map.toList register)))
+  where
+    amountIn : Map Party Decimal -> Party -> Decimal
+    amountIn m lender = fromOptional 0.0 (Map.lookup lender m)
+    settle (lender, e) = (lender,) $ case kind of
+      InterestPayment p -> e with
+        carried = amountIn dues lender - amountIn paid lender
+        accrualStart = p.end
+      PrincipalPayment -> e with principal = e.principal - amountIn paid lender
+
+isLive : Entry -> Bool
+isLive e = e.principal > 0.0 || e.carried > 0.0
+
+lookupNote : Text -> Party -> Map Party a -> a
+lookupNote msg k m = fromSomeNote ("Pari: " <> msg) (Map.lookup k m)

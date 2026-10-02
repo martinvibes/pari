@@ -1,0 +1,57 @@
+-- | Settlement through the CIP-56 allocation API. Pari never creates or moves
+-- tokens itself: the paying party allocates its own holdings to a leg, and
+-- Pari executes that allocation only after checking it funds exactly the
+-- expected leg, to the cent.
+module Pari.Settlement
+  ( AllocationInput
+  , settlementInfo
+  , mkLeg
+  , settleLeg
+  , requestView
+  ) where
+
+import DA.TextMap (TextMap)
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+import Splice.Api.Token.AllocationV1
+import Splice.Api.Token.AllocationRequestV1 (AllocationRequestView(..))
+
+import Pari.Util
+
+-- | An allocation plus the registry context needed to execute it.
+type AllocationInput = (ContractId Allocation, ExtraArgs)
+
+settlementInfo : Party -> Text -> Time -> Time -> Time -> SettlementInfo
+settlementInfo executor ref requestedAt allocateBefore settleBefore = SettlementInfo with
+  executor
+  settlementRef = Reference with id = ref; cid = None
+  requestedAt
+  allocateBefore
+  settleBefore
+  meta = emptyMetadata
+
+mkLeg : Party -> Party -> Decimal -> InstrumentId -> TransferLeg
+mkLeg sender receiver amount instrumentId = TransferLeg with
+  sender
+  receiver
+  amount
+  instrumentId
+  meta = emptyMetadata
+
+-- | Execute an allocation after checking it funds exactly `leg` for `settlement`.
+-- The allocation's controllers (executor, sender and receiver) must all be
+-- authorizing at the call site.
+settleLeg : SettlementInfo -> Text -> TransferLeg -> AllocationInput -> Update Allocation_ExecuteTransferResult
+settleLeg settlement transferLegId leg (allocationCid, extraArgs) = do
+  allocation <- fetch allocationCid
+  let expected = AllocationSpecification with settlement; transferLegId; transferLeg = leg
+  require "allocation funds exactly the expected leg" ((view allocation).allocation == expected)
+  exercise allocationCid Allocation_ExecuteTransfer with extraArgs
+
+-- | Standard view used by every Pari contract that asks a party to allocate.
+requestView : SettlementInfo -> TextMap TransferLeg -> AllocationRequestView
+requestView settlement transferLegs = AllocationRequestView with
+  settlement
+  transferLegs
+  meta = emptyMetadata

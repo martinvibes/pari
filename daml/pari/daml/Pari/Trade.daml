@@ -1,0 +1,163 @@
+-- | Secondary trading: a lender sells part of its position to a buyer,
+-- delivery against payment.
+module Pari.Trade
+  ( TradeOffer(..)
+  , TradeOffer_Accept(..)
+  , TradeOffer_Reject(..)
+  , TradeOffer_Withdraw(..)
+  , TradeTicket(..)
+  , TradeTicket_Settle(..)
+  , SellDown(..)
+  , SellDown_Apply(..)
+  , BuyIn(..)
+  , BuyIn_Apply(..)
+  , tradeLegId
+  ) where
+
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1 (ChoiceExecutionMetadata(..), emptyMetadata)
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+import Splice.Api.Token.AllocationV1 (SettlementInfo, TransferLeg)
+import Splice.Api.Token.AllocationRequestV1
+
+import Pari.Position
+import Pari.Settlement
+import Pari.Util
+
+-- | A lender's offer to sell `amount` of principal to a named buyer at
+-- `price` (a fraction of par, e.g. 0.985). Seen only by the two of them.
+template TradeOffer
+  with
+    seller : Party
+    buyer : Party
+    agent : Party
+    facilityId : Text
+    amount : Decimal
+    price : Decimal
+    tradeDate : Date
+      -- ^ Date the position changes hands; interest is split to the day here.
+    instrumentId : InstrumentId
+    settleBefore : Time
+  where
+    signatory seller
+    observer buyer
+    ensure amount > 0.0 && isCents amount && price > 0.0 && seller /= buyer
+
+    choice TradeOffer_Accept : ContractId TradeTicket
+      controller buyer
+      do
+        now <- getTime
+        create TradeTicket with
+          seller
+          buyer
+          agent
+          facilityId
+          amount
+          price
+          cash = floorCents (amount * price)
+          tradeDate
+          instrumentId
+          settlement = settlementInfo agent (facilityId <> ":trade:" <> show tradeDate) now settleBefore settleBefore
+
+    choice TradeOffer_Reject : ()
+      controller buyer
+      do pure ()
+
+    choice TradeOffer_Withdraw : ()
+      controller seller
+      do pure ()
+
+-- | An agreed trade awaiting the buyer's cash allocation and settlement by
+-- the agent. The borrower never sees it, so the price stays between the
+-- two counterparties and the agent.
+template TradeTicket
+  with
+    seller : Party
+    buyer : Party
+    agent : Party
+    facilityId : Text
+    amount : Decimal
+    price : Decimal
+    cash : Decimal
+    tradeDate : Date
+    instrumentId : InstrumentId
+    settlement : SettlementInfo
+  where
+    signatory seller, buyer
+    observer agent
+
+    -- | Execute the buyer's cash leg and hand each side the authority to
+    -- restate its own position. The agent's desk applies both in the same
+    -- transaction, so delivery and payment are atomic.
+    choice TradeTicket_Settle : (ContractId SellDown, ContractId BuyIn)
+      with
+        allocation : AllocationInput
+      controller agent
+      do
+        settleLeg settlement tradeLegId (cashLeg this) allocation
+        sellDown <- create SellDown with agent; seller; facilityId; amount
+        buyIn <- create BuyIn with agent; buyer; facilityId; amount
+        pure (sellDown, buyIn)
+
+    interface instance AllocationRequest for TradeTicket where
+      view = requestView settlement (TextMap.fromList [(tradeLegId, cashLeg this)])
+
+      allocationRequest_RejectImpl _self AllocationRequest_Reject{actor} = do
+        require "only the buyer can back out" (actor == buyer)
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+      allocationRequest_WithdrawImpl _self _arg =
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+-- | The seller's authority to reduce its position for a settled trade. Kept
+-- separate from the ticket so that applying it is invisible to the buyer.
+template SellDown
+  with
+    agent : Party
+    seller : Party
+    facilityId : Text
+    amount : Decimal
+  where
+    signatory agent, seller
+
+    choice SellDown_Apply : Optional (ContractId Position)
+      with
+        positionCid : ContractId Position
+        retain : Bool
+      controller agent
+      do
+        position <- fetch positionCid
+        require "position is the seller's in this facility"
+          (position.lender == seller && position.facilityId == facilityId)
+        exercise positionCid Position_Reduce with amount; retain
+
+-- | The buyer's authority to receive the purchased principal. Kept separate
+-- from the ticket so that applying it is invisible to the seller.
+template BuyIn
+  with
+    agent : Party
+    buyer : Party
+    facilityId : Text
+    amount : Decimal
+  where
+    signatory agent, buyer
+
+    choice BuyIn_Apply : ContractId Position
+      with
+        existing : Optional (ContractId Position)
+      controller agent
+      do
+        case existing of
+          None -> create Position with agent; lender = buyer; facilityId; principal = amount
+          Some positionCid -> do
+            position <- fetch positionCid
+            require "position is the buyer's in this facility"
+              (position.lender == buyer && position.facilityId == facilityId)
+            exercise positionCid Position_Increase with amount
+
+tradeLegId : Text
+tradeLegId = "cash"
+
+cashLeg : TradeTicket -> TransferLeg
+cashLeg t = mkLeg t.buyer t.seller t.cash t.instrumentId
