@@ -30,3 +30,6 @@ next-env.d.ts
 
 # Local working notes
 /notes/
+
+# Demo cast written by `make seed` (local party ids)
+.pari/

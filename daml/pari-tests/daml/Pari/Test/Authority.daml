@@ -13,6 +13,7 @@ import Pari.Position
 import Pari.Screening
 
 import Pari.Test.Setup
+import Pari.Test.Trading (agreeTrade, settleTrade)
 
 test_agent_cannot_create_a_position : Script ()
 test_agent_cannot_create_a_position = do
@@ -68,6 +69,25 @@ test_agent_cannot_pay_out_without_the_borrower = do
     legId
     leg
     allocation = (allocationCid, extraArgs)
+
+-- | The agent executes every closing, payment and trade, yet never holds a
+-- cent: money moves straight from the payer's holdings to the payee's.
+test_agent_never_holds_the_money : Script ()
+test_agent_never_holds_the_money = do
+  env <- setup
+  let agentHoldsNothing = do
+        cash <- holdingsOf env env.agent
+        cash === []
+  facility <- activeFacility env
+  agentHoldsNothing
+  setTime (time midPeriod 9 0 0)
+  ticket <- agreeTrade env env.alder env.buyer 10_000_000.0 0.995
+  settled <- settleTrade env facility ticket
+  agentHoldsNothing
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env settled.facilityCid
+  _ <- pay env facility 1.0
+  agentHoldsNothing
 
 test_agent_cannot_clear_a_buyer_itself : Script ()
 test_agent_cannot_clear_a_buyer_itself = do

@@ -15,6 +15,7 @@ Each line is enforced by the ledger and covered by a test in
 | create a position for anyone | `Position` is co-signed by the lender | `Authority: test_agent_cannot_create_a_position` |
 | shrink, move or archive a lender's position | every position choice needs the lender, or the borrower for payments | `Authority: test_agent_cannot_move_a_position` |
 | move tokens on its own | allocations need executor, sender and receiver | `Authority: test_agent_cannot_pay_out_without_the_borrower` |
+| hold the money in transit | every allocation pays its receiver directly from the payer's holdings | `Authority: test_agent_never_holds_the_money` |
 | start a principal repayment | principal moves only against a borrower-signed `PrepaymentNotice` | `Principal: test_agent_cannot_originate_a_principal_payment` |
 | pay any lender more than its leg | each allocation must equal the expected leg to the cent | `Principal: test_settlement_cannot_pay_more_than_requested` |
 | pay some lenders and not others | all legs settle in one transaction or none do | `Interest: test_every_lender_is_paid_or_none_is` |

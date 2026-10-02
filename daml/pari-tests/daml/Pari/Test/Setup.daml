@@ -72,11 +72,28 @@ dealTerms env = Terms with
 syndicate : Env -> [(Party, Decimal)]
 syndicate env = [(env.alder, 50_000_000.0), (env.birch, 30_000_000.0), (env.cedar, 20_000_000.0)]
 
-setup : Script Env
-setup = do
-  setTime (time closing 9 0 0)
+-- | The deal's parties, before any contract exists.
+data Cast = Cast with
+    registry : Party
+    agent : Party
+    borrower : Party
+    alder : Party
+    birch : Party
+    cedar : Party
+    buyer : Party
+    rival : Party
+  deriving (Eq, Show)
+
+allocateCast : Script Cast
+allocateCast = do
   [registry, agent, borrower, alder, birch, cedar, buyer, rival] <-
     mapA allocateParty ["Registry", "Agent", "Northwind", "Alder", "Birch", "Cedar", "Delta", "Rival"]
+  pure Cast with ..
+
+-- | The token registry, the agent's desk, the borrower's DQ list (naming the
+-- rival), and cash for the borrower, the syndicate and both buyers.
+prepare : Cast -> Script Env
+prepare Cast{..} = do
   let usd = InstrumentId with admin = registry; id = "USD"
   rules <- submit registry $ createCmd TokenRules with admin = registry
   desk <- submit agent $ createCmd AgentDesk with agent
@@ -91,6 +108,11 @@ setup = do
   mint env buyer 20_000_000.0
   mint env rival 20_000_000.0
   pure env
+
+setup : Script Env
+setup = do
+  setTime (time closing 9 0 0)
+  allocateCast >>= prepare
 
 -- Tokens --------------------------------------------------------------------
 

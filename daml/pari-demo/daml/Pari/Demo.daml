@@ -1,0 +1,57 @@
+-- | Seeds a running ledger with the demo deal the web app drives.
+--
+-- Run `sandbox` against a local ledger to allocate fresh parties, or `seed`
+-- with an input file of existing parties (e.g. ones created on DevNet). Both
+-- write the cast to the output file for the web app.
+module Pari.Demo
+  ( sandbox
+  , seed
+  ) where
+
+import DA.Foldable (forA_)
+import Daml.Script
+
+import Pari.Disclosure
+import Pari.Test.Setup
+
+sandbox : Script Cast
+sandbox = allocateCast >>= seed
+
+-- | Leaves the Northwind deal closed with its first period's rate fixed, cash
+-- with the borrower and both buyers, each lender's information election, and
+-- two borrower documents not yet shared. Every later step (interest, trades,
+-- prepayment, document distribution) is driven from the web app.
+seed : Cast -> Script Cast
+seed cast = do
+  env <- prepare cast
+  _ <- activeFacility env
+  forA_ [(cast.alder, PrivateSide), (cast.birch, PublicSide), (cast.cedar, PublicSide)] \(lender, side) ->
+    submit lender $ createCmd InfoElection with
+      lender
+      agent = cast.agent
+      facilityId = dealId
+      side
+  forA_ documents \(docId, title, mnpi, sha256) ->
+    submit cast.borrower $ createCmd Document with
+      borrower = cast.borrower
+      agent = cast.agent
+      facilityId = dealId
+      docId
+      title
+      uri = "https://dataroom.northwind.example/" <> docId
+      sha256
+      mnpi
+  pure cast
+
+-- | Placeholder data-room documents, each identified by the SHA-256 of its title.
+documents : [(Text, Text, Bool, Text)]
+documents =
+  [ ( "credit-agreement"
+    , "Northwind Logistics credit agreement"
+    , False
+    , "3955dd896f2d12fa22a2e3103f821be8a08d3d808e285ca500a35990bc91854e" )
+  , ( "q3-2026-management-accounts"
+    , "Northwind Logistics Q3 2026 management accounts"
+    , True
+    , "02c3a6e84c481110fb8f23dd9a9d9425bbf678f25233854ae5b17b1aa1bbccea" )
+  ]
