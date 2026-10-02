@@ -43,6 +43,7 @@ Every claim below is a Daml Script test in
 | The borrower never sees the trade price; buyer and seller never see each other's positions | `Trading: test_trade_privacy` |
 | Principal moves only on the borrower's own notice, pro rata | `Principal: test_agent_cannot_originate_a_principal_payment`, `test_prepayment_is_shared_pro_rata` |
 | No settlement can pay a lender more than its leg (the Revlon guard) | `Principal: test_settlement_cannot_pay_more_than_requested` |
+| The agent never holds the money: every payment moves from payer to payee directly | `Authority: test_agent_never_holds_the_money` |
 | The agent cannot create, move or shrink a lender's position, or move tokens alone | `Authority` |
 | MNPI reaches private-side lenders only, and only the lender can cross the wall | `Disclosure` |
 
@@ -52,18 +53,37 @@ party's view private is in [architecture](docs/architecture.md).
 
 ## Run it
 
-Prerequisites: [dpm](https://docs.digitalasset.com) with SDK 3.5.12, and a
-Java 17+ runtime for the test runner.
+Prerequisites: [dpm](https://docs.digitalasset.com) with SDK 3.5.12, a Java
+17+ runtime, and Node.js 20.
 
 ```bash
-make test
+make test        # build and run every Daml Script test
 ```
+
+To run the app against a local Canton ledger:
+
+```bash
+make sandbox     # terminal 1: a Canton sandbox with Pari loaded
+make seed        # terminal 2: the demo deal, party ids to web/.pari/cast.json
+cd web && npm install && npm run dev
+```
+
+Then open `http://localhost:3000/agent`. There is a screen for the agent, the
+borrower and each lender or buyer, plus `/visibility`, which runs every
+party's own ledger query side by side. The walkthrough is in the docs
+Quickstart.
+
+The demo server signs as every party so one browser can play the whole deal.
+Each screen still reads the ledger as its own party, and every action is
+submitted as the one party entitled to it, so the ledger enforces the same
+authority it would with each party on its own node.
 
 ## Repo layout
 
 ```
 daml/pari/         The Pari model
 daml/pari-tests/   Daml Script tests for every guarantee above
+daml/pari-demo/    Seed script for the demo deal on a local ledger
 daml/dars/         Vendored Splice token-standard packages (see its README)
 docs/              Architecture and authority matrix
 web/               Website, docs and app (Next.js)
@@ -74,7 +94,7 @@ web/               Website, docs and app (Next.js)
 | | |
 |---|---|
 | Daml model and test suite | Done |
-| Web app for agent, lenders, borrower and buyers | In progress |
+| Web app for agent, lenders, borrower and buyers, on a local Canton sandbox | Done |
 | Deployment on the HackCanton DevNet, settling in Canton Coin | In progress |
 | Agent hosted as a decentralized party across independent operators | Planned |
 

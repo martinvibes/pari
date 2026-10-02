@@ -12,7 +12,7 @@ export default function QuickstartPage() {
       <DocsHeader
         kicker="Overview"
         title="Quickstart"
-        summary="Build the Daml model, run the test suite that backs every guarantee, and start the web app locally."
+        summary="Run the test suite that backs every guarantee, then start a local Canton ledger and walk a whole deal in the app."
       />
 
       <div className="docs-prose mt-8">
@@ -43,22 +43,71 @@ make test`}</code>
           limit on the agent.
         </p>
 
-        <h2>Run the web app</h2>
+        <h2>Run the demo</h2>
+        <p>The app reads a live Canton ledger. Start a local sandbox in one terminal:</p>
         <pre>
-          <code>{`cd web
+          <code>{`make sandbox`}</code>
+        </pre>
+        <p>Once it reports ready, seed the demo deal and start the web app in another:</p>
+        <pre>
+          <code>{`make seed
+cd web
 npm install
 npm run dev`}</code>
         </pre>
         <p>
-          The app serves on <code>http://localhost:3000</code>.
+          <code>make seed</code> allocates the cast (agent, Northwind as borrower, lenders Alder,
+          Birch and Cedar, buyers Delta and Rival), closes a 100m facility from all three lenders in
+          one transaction, fixes the first period at 4.30% plus 350 bp, and posts two documents. It
+          writes the party ids to <code>web/.pari/cast.json</code>, which the app reads. The app
+          serves on <code>http://localhost:3000</code>; open <Link href="/agent">/agent</Link>.
+        </p>
+
+        <h2>Walk the deal</h2>
+        <ol>
+          <li>
+            <strong>Trade.</strong> As Alder, offer 10m to Delta at 99.50. As Delta, accept and fund.
+            As the agent, screen Delta and settle: cash, register and both positions move in one
+            transaction.
+          </li>
+          <li>
+            <strong>Refuse a buyer.</strong> As Cedar, offer to Rival, who is on the borrower&rsquo;s
+            DQ list. Rival accepts and funds, the screening comes back disqualified, and the ledger
+            refuses to settle.
+          </li>
+          <li>
+            <strong>Pay interest.</strong> As the agent, request interest. As Northwind, fund every
+            leg, at 100% or less. As the agent, settle: every lender is paid in one transaction, and
+            Alder&rsquo;s interest splits on the trade date.
+          </li>
+          <li>
+            <strong>Hold the wall.</strong> As the agent, share the MNPI accounts with a public-side
+            lender and the ledger refuses; share them with Alder, on the private side, and it goes
+            through.
+          </li>
+          <li>
+            <strong>Check privacy.</strong> <Link href="/visibility">/visibility</Link> runs every
+            party&rsquo;s own ledger query side by side and evaluates the privacy claims live.
+          </li>
+        </ol>
+        <p>
+          To start over, stop the sandbox and run <code>make sandbox</code> and{" "}
+          <code>make seed</code> again.
         </p>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-4">
+        <Callout label="Demo mode">
+          The demo server signs as every party so one browser can play the whole deal. Each screen
+          still reads the ledger as its own party, and every action is submitted as the one party
+          entitled to it, so the ledger enforces the same authority it would with each party on its
+          own node.
+        </Callout>
         <Callout label="Settlement asset">
-          The test suite settles in a reference CIP-56 token registry vendored from Splice. On
-          Canton networks Pari settles in Canton Coin or any other CIP-56 instrument through the
-          same allocation interfaces. See <Link href="/docs/settlement">CIP-56 settlement</Link>.
+          The tests and the demo settle in a reference CIP-56 test token vendored from Splice. Pari
+          uses only the standard CIP-56 allocation interfaces, so it is not tied to that token;
+          settlement in Canton Coin on DevNet is in progress. See{" "}
+          <Link href="/docs/settlement">CIP-56 settlement</Link>.
         </Callout>
       </div>
 

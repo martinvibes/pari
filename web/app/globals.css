@@ -89,6 +89,29 @@ body {
       text-ink transition hover:bg-smoke disabled:cursor-not-allowed
       disabled:bg-white/20 disabled:text-ash;
   }
+
+  /* Secondary action: hairline pill for row-level actions in tables. */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill
+      border border-white/20 px-3.5 py-1.5 text-[12px] font-semibold uppercase
+      tracking-[0.1em] text-paper transition hover:border-paper
+      disabled:cursor-not-allowed disabled:border-white/10 disabled:text-ash;
+  }
+
+  /* Ledger tables: tracked labels over hairline rows, tabular figures. */
+  .table-data {
+    @apply w-full text-left text-sm tabular-nums;
+  }
+  .table-data th {
+    @apply whitespace-nowrap pb-3 pr-6 text-[12px] font-normal uppercase tracking-[0.12em] text-ash;
+  }
+  .table-data td {
+    @apply whitespace-nowrap border-t border-white/10 py-3 pr-6 align-middle text-paper;
+  }
+  .table-data th:last-child,
+  .table-data td:last-child {
+    @apply pr-0;
+  }
 }
 
 /* ---- Motion layer (Path A: monochrome darkroom, animated) ------------------
