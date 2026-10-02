@@ -9,3 +9,10 @@ It includes or is derived from the following third-party work:
   (Splice 0.6.13), Copyright Digital Asset (Switzerland) GmbH and/or its
   affiliates, licensed under the Apache License, Version 2.0.
   https://github.com/hyperledger-labs/splice
+
+* web/ — the visual layer of the web app (design system, landing-page
+  components, 3D scene and docs chrome) is derived from the sidereal-hedera
+  web app, Copyright 2026 The sidereal contributors (Rahul Guha and Poulav
+  Bhowmick), licensed under the Apache License, Version 2.0. The derived files
+  have been modified for Pari: copy, branding, routes and data have changed.
+  https://github.com/guha-rahul/sidereal-hedera

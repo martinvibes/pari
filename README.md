@@ -66,6 +66,7 @@ daml/pari/         The Pari model
 daml/pari-tests/   Daml Script tests for every guarantee above
 daml/dars/         Vendored Splice token-standard packages (see its README)
 docs/              Architecture and authority matrix
+web/               Website, docs and app (Next.js)
 ```
 
 ## Status
@@ -79,9 +80,11 @@ docs/              Architecture and authority matrix
 
 ## Disclosure
 
-Pari was designed and built from scratch during HackCanton Season 3. It
-depends on the unmodified Splice token-standard packages (Apache-2.0),
-vendored in `daml/dars/`. See [NOTICE](NOTICE).
+The Pari model, tests and docs were designed and written from scratch during
+HackCanton Season 3. Pari depends on the unmodified Splice token-standard
+packages (Apache-2.0), vendored in `daml/dars/`. The web app's visual layer is
+derived from the [sidereal-hedera](https://github.com/guha-rahul/sidereal-hedera)
+web app (Apache-2.0), with credit to its authors. See [NOTICE](NOTICE).
 
 ## License
 
