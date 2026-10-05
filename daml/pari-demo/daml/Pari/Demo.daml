@@ -8,14 +8,34 @@ module Pari.Demo
   , seed
   ) where
 
+import DA.Date (Month(..), date)
 import DA.Foldable (forA_)
+import DA.Text qualified as Text
+import DA.Time (convertRelTimeToMicroseconds, subTime, time)
 import Daml.Script
 
 import Pari.Disclosure
 import Pari.Test.Setup
 
+-- | A new deal with new parties, so the same ledger can be seeded again for
+-- a fresh start. Party ids are tagged with the time of the run.
 sandbox : Script Cast
-sandbox = allocateCast >>= seed
+sandbox = do
+  tag <- runTag
+  cast <- allocateCastWith \name -> allocatePartyByHint (PartyIdHint (name <> "-" <> tag))
+  seed cast
+
+-- | Seconds since the epoch, in base 36.
+runTag : Script Text
+runTag = do
+  now <- getTime
+  pure (base36 (convertRelTimeToMicroseconds (subTime now (time (date 1970 Jan 1) 0 0 0)) / 1_000_000))
+
+base36 : Int -> Text
+base36 n
+  | n < 36 = digit
+  | otherwise = base36 (n / 36) <> digit
+  where digit = Text.substring (n % 36) 1 "0123456789abcdefghijklmnopqrstuvwxyz"
 
 -- | Leaves the Northwind deal closed with its first period's rate fixed, cash
 -- with the borrower and both buyers, each lender's information election, and

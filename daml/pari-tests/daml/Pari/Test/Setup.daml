@@ -85,9 +85,13 @@ data Cast = Cast with
   deriving (Eq, Show)
 
 allocateCast : Script Cast
-allocateCast = do
+allocateCast = allocateCastWith allocateParty
+
+-- | Allocates the cast with `allocate`, given each party's name.
+allocateCastWith : (Text -> Script Party) -> Script Cast
+allocateCastWith allocate = do
   [registry, agent, borrower, alder, birch, cedar, buyer, rival] <-
-    mapA allocateParty ["Registry", "Agent", "Northwind", "Alder", "Birch", "Cedar", "Delta", "Rival"]
+    mapA allocate ["Registry", "Agent", "Northwind", "Alder", "Birch", "Cedar", "Delta", "Rival"]
   pure Cast with ..
 
 -- | The token registry, the agent's desk, the borrower's DQ list (naming the

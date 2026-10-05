@@ -3,8 +3,11 @@ LEDGER_PORT ?= 6865
 JSON_PORT ?= 7575
 DEMO_DAR := daml/pari-demo/.daml/dist/pari-demo-0.1.0.dar
 CAST := web/.pari/cast.json
+SMOKE_CAST := web/.pari/smoke-cast.json
+SEED := $(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:sandbox \
+	--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file
 
-.PHONY: build test sandbox seed
+.PHONY: build test sandbox seed smoke
 
 # Build the Pari model, its tests and the demo package.
 build:
@@ -18,8 +21,15 @@ test: build
 sandbox: build
 	$(DPM) sandbox --ledger-api-port $(LEDGER_PORT) --json-api-port $(JSON_PORT) --dar $(DEMO_DAR)
 
-# Seed the running sandbox with the demo deal and write its party ids for the web app.
+# Seed the running sandbox with a fresh demo deal and write its party ids for
+# the web app. Run it again at any time to start the demo over.
 seed:
 	@mkdir -p $(dir $(CAST))
-	$(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:sandbox \
-		--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file $(CAST)
+	$(SEED) $(CAST)
+
+# Seed a deal of its own and drive it through every write the app offers,
+# checking the ledger's figures and every privacy claim.
+smoke:
+	@mkdir -p $(dir $(SMOKE_CAST))
+	$(SEED) $(SMOKE_CAST)
+	cd web && PARI_CAST_FILE=.pari/smoke-cast.json npm run --silent smoke

@@ -16,6 +16,7 @@ Each line is enforced by the ledger and covered by a test in
 | shrink, move or archive a lender's position | every position choice needs the lender, or the borrower for payments | `Authority: test_agent_cannot_move_a_position` |
 | move tokens on its own | allocations need executor, sender and receiver | `Authority: test_agent_cannot_pay_out_without_the_borrower` |
 | hold the money in transit | every allocation pays its receiver directly from the payer's holdings | `Authority: test_agent_never_holds_the_money` |
+| keep cash funded for a payment or trade it calls off | cancelling or declining moves nothing; only the payer can withdraw its allocation | `Authority: test_cancelled_request_returns_the_borrowers_cash`, `test_declined_trade_returns_the_buyers_cash` |
 | start a principal repayment | principal moves only against a borrower-signed `PrepaymentNotice` | `Principal: test_agent_cannot_originate_a_principal_payment` |
 | pay any lender more than its leg | each allocation must equal the expected leg to the cent | `Principal: test_settlement_cannot_pay_more_than_requested` |
 | pay some lenders and not others | all legs settle in one transaction or none do | `Interest: test_every_lender_is_paid_or_none_is` |
@@ -52,6 +53,7 @@ A lender cannot inflate its own position either
 | | `Withdraw` | seller | nothing | |
 | `TradeTicket` (seller, buyer) | `TradeTicket_Settle` | agent | the buyer's cash allocation to the seller | allocation equals the price |
 | | CIP-56 `Reject` | buyer | nothing | buyer backs out |
+| | CIP-56 `Withdraw` | agent | nothing | agent declines a trade it will not settle |
 | `SellDown` (agent, seller) | `SellDown_Apply` | agent | seller's principal, by the traded amount only | issued only by a settled ticket |
 | `BuyIn` (agent, buyer) | `BuyIn_Apply` | agent | buyer's principal, by the traded amount only | issued only by a settled ticket |
 | `AgentDesk` (agent) | `Desk_SettleTrade` | agent | composes the four steps above atomically | each step's own guards |
@@ -62,9 +64,10 @@ A lender cannot inflate its own position either
 
 ## Limits, stated plainly
 
-- **The agent is trusted for liveness.** It can decline to settle. Allocations
-  carry deadlines, after which senders withdraw their own funds through the
-  standard CIP-56 `Allocation_Withdraw`.
+- **The agent is trusted for liveness.** It can decline to settle. It cannot
+  keep anyone's cash by doing so: a sender can withdraw its own allocation at
+  any time through the standard CIP-56 `Allocation_Withdraw`, and the app
+  offers this whenever a payment is cancelled or a trade declined.
 - **The agent and the borrower see the register.** That matches syndicated
   lending practice: the agent keeps the register and the borrower may inspect
   it. Lenders see only their own position.

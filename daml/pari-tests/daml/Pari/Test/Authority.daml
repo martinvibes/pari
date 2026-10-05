@@ -3,14 +3,19 @@
 module Pari.Test.Authority where
 
 import DA.Assert ((===))
+import DA.Foldable (forA_)
 import DA.Optional (fromSome)
 import DA.Time (time)
 import Daml.Script
 
-import Splice.Api.Token.AllocationV1 (Allocation_ExecuteTransfer(..))
+import Splice.Api.Token.AllocationRequestV1 (AllocationRequest, AllocationRequest_Withdraw(..))
+import Splice.Api.Token.AllocationV1 (Allocation_ExecuteTransfer(..), Allocation_Withdraw(..))
 
+import Pari.Facility
 import Pari.Position
 import Pari.Screening
+import Pari.Settlement (mkLeg)
+import Pari.Trade (tradeLegId)
 
 import Pari.Test.Setup
 import Pari.Test.Trading (agreeTrade, settleTrade)
@@ -88,6 +93,50 @@ test_agent_never_holds_the_money = do
   (facility, _) <- requestInterest env settled.facilityCid
   _ <- pay env facility 1.0
   agentHoldsNothing
+
+-- | Calling off a payment moves nothing: the borrower's funded legs stay its
+-- own until it takes them back, and the agent can simply ask again.
+test_cancelled_request_returns_the_borrowers_cash : Script ()
+test_cancelled_request_returns_the_borrowers_cash = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  before <- balanceOf env env.borrower
+  (facility, requestCid) <- requestInterest env facility
+  request <- fromSome <$> queryContractId env.borrower requestCid
+  allocations <- forA (legsOf request) \(legId, leg) -> allocate env request.settlement legId leg
+  funded <- balanceOf env env.borrower
+  funded === before - sum (map ((.amount) . snd) (legsOf request))
+
+  facility <- submit env.agent $ exerciseCmd facility Facility_CancelRequest
+  forA_ allocations \(allocationCid, extraArgs) ->
+    submitMustFail env.agent $ exerciseCmd allocationCid Allocation_ExecuteTransfer with extraArgs
+  forA_ allocations \(allocationCid, extraArgs) ->
+    submit env.borrower $ exerciseCmd allocationCid Allocation_Withdraw with extraArgs
+  after <- balanceOf env env.borrower
+  after === before
+  _ <- requestInterest env facility
+  pure ()
+
+-- | The agent can decline a trade it will not settle, but that moves nothing
+-- either: the buyer withdraws its own cash, in full.
+test_declined_trade_returns_the_buyers_cash : Script ()
+test_declined_trade_returns_the_buyers_cash = do
+  env <- setup
+  _ <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+  ticketCid <- agreeTrade env env.alder env.rival 10_000_000.0 0.995
+  ticket <- fromSome <$> queryContractId env.rival ticketCid
+  (allocationCid, extraArgs) <- allocate env ticket.settlement tradeLegId (mkLeg env.rival env.alder ticket.cash env.usd)
+
+  submit env.agent $ exerciseCmd (toInterfaceContractId @AllocationRequest ticketCid) AllocationRequest_Withdraw with
+    extraArgs = noExtraArgs
+  submitMustFail env.agent $ exerciseCmd allocationCid Allocation_ExecuteTransfer with extraArgs
+  submit env.rival $ exerciseCmd allocationCid Allocation_Withdraw with extraArgs
+  rivalCash <- balanceOf env env.rival
+  rivalCash === 20_000_000.0
+  (_, alder) <- positionOf env.alder
+  alder.principal === 50_000_000.0
 
 test_agent_cannot_clear_a_buyer_itself : Script ()
 test_agent_cannot_clear_a_buyer_itself = do
