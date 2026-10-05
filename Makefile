@@ -7,7 +7,7 @@ SMOKE_CAST := web/.pari/smoke-cast.json
 SEED := $(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:sandbox \
 	--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file
 
-.PHONY: build test sandbox seed smoke
+.PHONY: build test sandbox seed smoke devnet-login devnet-seed devnet-web devnet-smoke
 
 # Build the Pari model, its tests and the demo package.
 build:
@@ -33,3 +33,17 @@ smoke:
 	@mkdir -p $(dir $(SMOKE_CAST))
 	$(SEED) $(SMOKE_CAST)
 	cd web && PARI_CAST_FILE=.pari/smoke-cast.json npm run --silent smoke
+
+# HackCanton DevNet. Create the parties and upload $(DEMO_DAR) in the node's
+# Console first (docs/devnet.md), then sign in, seed and run the app.
+devnet-login:
+	scripts/devnet.sh login
+
+devnet-seed:
+	scripts/devnet.sh seed
+
+devnet-web:
+	scripts/devnet.sh web
+
+devnet-smoke:
+	scripts/devnet.sh smoke

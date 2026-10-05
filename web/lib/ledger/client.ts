@@ -2,7 +2,9 @@
 
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { bearerToken, ledgerUser } from "@/lib/ledger/auth";
 import { LEDGER } from "@/lib/ledger/config";
+import { LedgerError } from "@/lib/ledger/errors";
 
 // A thin client for the Canton JSON Ledger API v2: read the active contract
 // set as one party, and submit commands as one or more parties. Templates and
@@ -40,15 +42,7 @@ export type Command =
       };
     };
 
-export class LedgerError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = "LedgerError";
-  }
-}
+export { LedgerError };
 
 type CreatedEvent = {
   contractId: string;
@@ -67,7 +61,8 @@ type ActiveContractEntry = {
 
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (LEDGER.token) headers.authorization = `Bearer ${LEDGER.token}`;
+  const token = await bearerToken();
+  if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(`${LEDGER.url}${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers,
@@ -165,7 +160,7 @@ export async function submit({ actAs, readAs = [], commands, disclosedContracts 
     commands: {
       commands,
       commandId: randomUUID(),
-      userId: LEDGER.userId,
+      userId: await ledgerUser(),
       actAs,
       readAs,
       disclosedContracts,
