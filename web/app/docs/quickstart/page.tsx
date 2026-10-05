@@ -73,7 +73,8 @@ npm run dev`}</code>
           <li>
             <strong>Refuse a buyer.</strong> As Cedar, offer to Rival, who is on the borrower&rsquo;s
             DQ list. Rival accepts and funds, the screening comes back disqualified, and the ledger
-            refuses to settle.
+            refuses to settle. Decline the trade as the agent; nothing moves, and Rival withdraws its
+            own cash from its screen.
           </li>
           <li>
             <strong>Pay interest.</strong> As the agent, request interest. As Northwind, fund every
@@ -91,8 +92,21 @@ npm run dev`}</code>
           </li>
         </ol>
         <p>
-          To start over, stop the sandbox and run <code>make sandbox</code> and{" "}
-          <code>make seed</code> again.
+          To start over, run <code>make seed</code> again: it allocates fresh parties and a fresh deal
+          on the same ledger, and the app switches to them.
+        </p>
+
+        <h2>Check it end to end</h2>
+        <pre>
+          <code>{`make smoke`}</code>
+        </pre>
+        <p>
+          With the sandbox up, <code>make smoke</code> seeds a deal of its own and drives it through
+          every write the app offers, each as the party entitled to it: trades, a refused and declined
+          trade, a cancelled request, a short payment, a prepayment and the next period, the
+          information wall and the DQ list. It checks the ledger&rsquo;s figures against the Daml
+          tests, that no money is created or lost, and every privacy claim against each party&rsquo;s
+          own view.
         </p>
       </div>
 

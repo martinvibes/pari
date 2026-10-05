@@ -3,13 +3,12 @@
 import type { Metadata } from "next";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
 import { PageHeader, Panel, TableScroll, Tag } from "@/components/app/ui";
-import { PERSONAS, type Persona } from "@/lib/pari/personas";
+import { PRIVACY_CHECKS } from "@/lib/pari/checks";
+import { PERSONAS } from "@/lib/pari/personas";
 import { isUnavailable, viewAs, type View } from "@/lib/pari/session";
 import type { Snapshot } from "@/lib/pari/snapshot";
 
 export const metadata: Metadata = { title: "Visibility" };
-
-type Seen = { persona: Persona; view: View };
 
 // What each kind of contract is, in one line, and how many of them a party's
 // own ledger query returns.
@@ -27,57 +26,6 @@ const ROWS: Array<{ label: string; note: string; count: (s: Snapshot) => number 
   { label: "Cash holdings", note: "Owned, or locked to a settlement", count: (s) => s.holdings.length },
   { label: "Cash allocations", note: "Funded legs awaiting settlement", count: (s) => s.allocations.length },
 ];
-
-// Privacy claims, evaluated live against the snapshots above. Each is also a
-// Daml Script test in daml/pari-tests.
-const CHECKS: Array<{ claim: string; test: string; holds: (seen: Seen[]) => boolean }> = [
-  {
-    claim: "Each lender sees its own position and no other",
-    test: "Syndication: test_lenders_see_only_their_own_position",
-    holds: (seen) =>
-      lenders(seen).every(({ view }) => view.s.positions.every((p) => p.payload.lender === view.party)),
-  },
-  {
-    claim: "Only the agent and the borrower see the register",
-    test: "Syndication: test_lenders_see_only_their_own_position",
-    holds: (seen) => lenders(seen).every(({ view }) => view.s.facilities.length === 0),
-  },
-  {
-    claim: "The borrower never sees a trade price",
-    test: "Trading: test_trade_privacy",
-    holds: (seen) =>
-      seen
-        .filter(({ persona }) => persona.role === "borrower")
-        .every(({ view }) => view.s.offers.length === 0 && view.s.tickets.length === 0),
-  },
-  {
-    claim: "No lender or buyer sees the DQ list or a screening",
-    test: "Trading: test_dq_listed_buyer_is_refused",
-    holds: (seen) =>
-      lenders(seen).every(({ view }) => view.s.dqLists.length === 0 && view.s.screenings.length === 0),
-  },
-  {
-    claim: "A lender holds only the documents shared with it",
-    test: "Disclosure: test_mnpi_reaches_private_side_only",
-    holds: (seen) =>
-      lenders(seen).every(
-        ({ view }) =>
-          view.s.documents.length === 0 && view.s.accesses.every((a) => a.payload.lender === view.party),
-      ),
-  },
-  {
-    claim: "The agent holds no money",
-    test: "Authority: test_agent_never_holds_the_money",
-    holds: (seen) =>
-      seen
-        .filter(({ persona }) => persona.role === "agent")
-        .every(({ view }) => view.s.holdings.every((h) => h.payload.owner !== view.party)),
-  },
-];
-
-function lenders(seen: Seen[]) {
-  return seen.filter(({ persona }) => persona.role === "lender");
-}
 
 export default async function VisibilityPage() {
   const views = await Promise.all(PERSONAS.map((persona) => viewAs(persona)));
@@ -133,7 +81,7 @@ export default async function VisibilityPage() {
         note="Each claim is evaluated against the snapshots above on every load, and is also a Daml Script test."
       >
         <ul>
-          {CHECKS.map((check) => {
+          {PRIVACY_CHECKS.map((check) => {
             const holds = check.holds(seen);
             return (
               <li

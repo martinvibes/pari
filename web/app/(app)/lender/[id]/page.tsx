@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { ReleaseCash } from "@/components/app/ReleaseCash";
 import { Empty, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { clampDate, formatDate, formatTime, todayIso } from "@/lib/pari/dates";
 import { balanceCents, paymentLabel, positionOf, tradeAllocation } from "@/lib/pari/deal";
@@ -64,6 +65,8 @@ export default async function LenderPage({ params }: Params) {
       </div>
 
       <Trades view={view} persona={persona} />
+
+      <ReleaseCash view={view} persona={persona} />
 
       <Wall view={view} persona={persona} election={election?.payload ?? null} />
     </div>

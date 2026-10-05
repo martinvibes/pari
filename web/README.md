@@ -23,6 +23,7 @@ The app screens read a running Canton ledger. From the repo root, run
 | `lib/ledger/` | JSON Ledger API v2 client and the demo cast |
 | `lib/pari/` | Pari contracts as the app reads and writes them |
 | `lib/world/` | The 3D scene behind the landing page (see `lib/world/WORLD.md`) |
+| `scripts/smoke.ts` | End-to-end check against a live ledger (`npm run smoke`, or `make smoke` from the root) |
 
 ## Configuration
 

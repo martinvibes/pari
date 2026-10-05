@@ -10,6 +10,7 @@ import {
   latestScreening,
   positionOf,
   requestState,
+  strandedAllocations,
   tradeAllocation,
 } from "@/lib/pari/deal";
 import { CIP56, T, TEST_TOKEN_RULES } from "@/lib/pari/ids";
@@ -163,6 +164,15 @@ export async function settleTrade(cast: Cast, ticketCid: string) {
   );
 }
 
+/** Call off a trade the agent will not settle, e.g. one whose buyer is
+ *  disqualified. Nothing moves: the buyer withdraws its own cash. */
+export async function declineTrade(cast: Cast, ticketCid: string) {
+  await one(
+    cast.agent,
+    exercise(CIP56.AllocationRequest, ticketCid, "AllocationRequest_Withdraw", { extraArgs: NO_EXTRA_ARGS }),
+  );
+}
+
 export async function shareDocument(cast: Cast, documentCid: string, electionCid: string) {
   await one(cast.agent, exercise(T.Document, documentCid, "Document_Share", { electionCid }));
 }
@@ -209,6 +219,20 @@ export async function updateDqList(cast: Cast, disqualified: string[]) {
       newList: { map: disqualified.map((p) => [p, {}]) },
     }),
   );
+}
+
+// Any payer -------------------------------------------------------------------
+
+/** Take back cash allocated to settlements that were called off, as its owner. */
+export async function releaseCash(owner: string) {
+  const stranded = strandedAllocations(await snapshot(owner), owner);
+  if (stranded.length === 0) throw new Error("No cash is held for a called-off settlement.");
+  await submit({
+    actAs: [owner],
+    commands: stranded.map((a) =>
+      exercise(CIP56.Allocation, a.contractId, "Allocation_Withdraw", { extraArgs: NO_EXTRA_ARGS }),
+    ),
+  });
 }
 
 // Lenders and buyers ------------------------------------------------------------

@@ -24,6 +24,7 @@ export const T = {
 export const CIP56 = {
   Holding: "#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding",
   Allocation: "#splice-api-token-allocation-v1:Splice.Api.Token.AllocationV1:Allocation",
+  AllocationRequest: "#splice-api-token-allocation-request-v1:Splice.Api.Token.AllocationRequestV1:AllocationRequest",
   AllocationFactory:
     "#splice-api-token-allocation-instruction-v1:Splice.Api.Token.AllocationInstructionV1:AllocationFactory",
 } as const;

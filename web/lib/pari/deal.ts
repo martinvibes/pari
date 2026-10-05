@@ -20,11 +20,15 @@ export function outstandingCents(facility: P.Facility): bigint {
   return facility.register.reduce((sum, [, entry]) => sum + toCents(entry.principal), 0n);
 }
 
-export function allocationFor(s: Snapshot, settlementRef: string, legId: string) {
+/** One settlement: the same reference, requested at the same moment. Trades
+ *  on one date share a reference, so the reference alone is not enough. */
+function sameSettlement(a: P.SettlementInfo, b: P.SettlementInfo): boolean {
+  return a.settlementRef.id === b.settlementRef.id && a.requestedAt === b.requestedAt;
+}
+
+export function allocationFor(s: Snapshot, settlement: P.SettlementInfo, legId: string) {
   return s.allocations.find(
-    (a) =>
-      a.payload.allocation.settlement.settlementRef.id === settlementRef &&
-      a.payload.allocation.transferLegId === legId,
+    (a) => sameSettlement(a.payload.allocation.settlement, settlement) && a.payload.allocation.transferLegId === legId,
   );
 }
 
@@ -50,7 +54,7 @@ export function requestState(s: Snapshot, facility: P.Facility): RequestState | 
       legId,
       lender: leg.receiver,
       due: toCents(leg.amount),
-      allocation: allocationFor(s, request.payload.settlement.settlementRef.id, legId),
+      allocation: allocationFor(s, request.payload.settlement, legId),
     }))
     .sort((a, b) => (a.due > b.due ? -1 : 1));
   const funded = legs.filter((l) => l.allocation);
@@ -66,14 +70,20 @@ export function requestState(s: Snapshot, facility: P.Facility): RequestState | 
 /** The trade ticket's cash leg id, as the model names it. */
 export const TRADE_LEG_ID = "cash";
 
-/** The buyer's cash allocation for a trade ticket, once funded. Tickets with
- *  the same trade date share a settlement reference, so match the sender too. */
+/** The buyer's cash allocation for a trade ticket, once funded. */
 export function tradeAllocation(s: Snapshot, ticket: P.TradeTicket) {
-  return s.allocations.find(
+  return allocationFor(s, ticket.settlement, TRADE_LEG_ID);
+}
+
+/** Cash `sender` allocated to a settlement that was called off: a cancelled
+ *  payment request or a declined trade. It stays locked until the sender,
+ *  and only the sender, withdraws it. */
+export function strandedAllocations(s: Snapshot, sender: string) {
+  const live = [...s.requests, ...s.tickets].map((c) => c.payload.settlement);
+  return s.allocations.filter(
     (a) =>
-      a.payload.allocation.settlement.settlementRef.id === ticket.settlement.settlementRef.id &&
-      a.payload.allocation.transferLegId === TRADE_LEG_ID &&
-      a.payload.allocation.transferLeg.sender === ticket.buyer,
+      a.payload.allocation.transferLeg.sender === sender &&
+      !live.some((settlement) => sameSettlement(settlement, a.payload.allocation.settlement)),
   );
 }
 

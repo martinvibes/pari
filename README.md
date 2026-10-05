@@ -44,6 +44,7 @@ Every claim below is a Daml Script test in
 | Principal moves only on the borrower's own notice, pro rata | `Principal: test_agent_cannot_originate_a_principal_payment`, `test_prepayment_is_shared_pro_rata` |
 | No settlement can pay a lender more than its leg (the Revlon guard) | `Principal: test_settlement_cannot_pay_more_than_requested` |
 | The agent never holds the money: every payment moves from payer to payee directly | `Authority: test_agent_never_holds_the_money` |
+| A payment the agent cancels, or a trade it declines, moves nothing: the payer takes its own cash back | `Authority: test_cancelled_request_returns_the_borrowers_cash`, `test_declined_trade_returns_the_buyers_cash` |
 | The agent cannot create, move or shrink a lender's position, or move tokens alone | `Authority` |
 | MNPI reaches private-side lenders only, and only the lender can cross the wall | `Disclosure` |
 
@@ -71,7 +72,14 @@ cd web && npm install && npm run dev
 Then open `http://localhost:3000/agent`. There is a screen for the agent, the
 borrower and each lender or buyer, plus `/visibility`, which runs every
 party's own ledger query side by side. The walkthrough is in the docs
-Quickstart.
+Quickstart. Run `make seed` again at any time to start over with a fresh deal
+and fresh parties on the same ledger.
+
+With the sandbox up, `make smoke` seeds a deal of its own and drives it
+through every write the app offers (trades, a refused and declined trade,
+cancelled, short and full payments, a prepayment, the next period, the
+information wall and the DQ list), checking the ledger's figures against the
+Daml tests and every privacy claim against each party's own view.
 
 The demo server signs as every party so one browser can play the whole deal.
 Each screen still reads the ledger as its own party, and every action is

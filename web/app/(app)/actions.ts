@@ -4,6 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 import { loadCast, partyOf, type Cast } from "@/lib/ledger/cast";
+import { formatDate } from "@/lib/pari/dates";
 import * as ops from "@/lib/pari/operations";
 import { personaById } from "@/lib/pari/personas";
 import type { Side } from "@/lib/pari/types";
@@ -49,7 +50,7 @@ export const fixRate: Action = async (_, form) =>
     const rate = field(form, "rate");
     const end = field(form, "end");
     await ops.fixRate(cast, rate, end);
-    return `Base rate fixed at ${rate}% to ${end}.`;
+    return `Base rate fixed at ${rate}% to ${formatDate(end)}.`;
   });
 
 export const requestInterest: Action = async () =>
@@ -67,7 +68,7 @@ export const acceptPrepayment: Action = async (_, form) =>
 export const cancelRequest: Action = async () =>
   run(async (cast) => {
     await ops.cancelRequest(cast);
-    return "Request cancelled.";
+    return "Request cancelled. Nothing moved: any cash Northwind allocated is still its own to take back.";
   });
 
 export const settlePayment: Action = async () =>
@@ -86,6 +87,12 @@ export const settleTrade: Action = async (_, form) =>
   run(async (cast) => {
     await ops.settleTrade(cast, field(form, "ticket"));
     return "Trade settled. Cash, register and both positions moved in one transaction.";
+  });
+
+export const declineTrade: Action = async (_, form) =>
+  run(async (cast) => {
+    await ops.declineTrade(cast, field(form, "ticket"));
+    return "Trade declined. Nothing moved: the buyer takes its cash back from its own screen.";
   });
 
 export const shareDocument: Action = async (_, form) =>
@@ -121,6 +128,14 @@ export const updateDqList: Action = async (_, form) =>
     });
     await ops.updateDqList(cast, parties);
     return "DQ list updated. Only Northwind and the agent can see it.";
+  });
+
+// Any payer ---------------------------------------------------------------------
+
+export const releaseCash: Action = async (_, form) =>
+  run(async (cast) => {
+    await ops.releaseCash(partyField(cast, form, "persona"));
+    return "Cash released back to your own holdings.";
   });
 
 // Lenders and buyers --------------------------------------------------------------

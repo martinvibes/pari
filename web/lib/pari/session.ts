@@ -22,9 +22,9 @@ export type View = {
 
 export type Unavailable = { unavailable: "cast" | "ledger"; detail: string };
 
-/** A party id without its namespace: `Alder-1a2b…::1220…` → `Alder`. */
+/** A party id without its namespace or seed tag: `Alder-tmg4jo::1220…` → `Alder`. */
 export function shortParty(party: string): string {
-  return party.split("::")[0]!.replace(/-[0-9a-f]{8}$/, "");
+  return party.split("::")[0]!.replace(/-[0-9a-z]+$/, "");
 }
 
 export function namer(cast: Cast) {

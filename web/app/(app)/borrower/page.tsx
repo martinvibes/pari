@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { ReleaseCash } from "@/components/app/ReleaseCash";
 import { Empty, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { formatDate, formatTime } from "@/lib/pari/dates";
 import { balanceCents, facilityOf, outstandingCents, paymentLabel, requestState } from "@/lib/pari/deal";
@@ -15,7 +16,8 @@ import type * as P from "@/lib/pari/types";
 export const metadata: Metadata = { title: "Borrower" };
 
 export default async function BorrowerPage() {
-  const view = await viewAs(persona("northwind"));
+  const northwind = persona("northwind");
+  const view = await viewAs(northwind);
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
   const facility = facilityOf(view.s);
   if (!facility) {
@@ -54,6 +56,8 @@ export default async function BorrowerPage() {
         <ToPay view={view} facility={f} rate={rate} />
         <Prepay view={view} />
       </div>
+
+      <ReleaseCash view={view} persona={northwind} />
 
       <div className="grid gap-6 lg:grid-cols-12">
         <DqList view={view} />

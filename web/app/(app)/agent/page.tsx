@@ -273,7 +273,7 @@ function Trades({ view }: { view: View }) {
   return (
     <Panel
       title="Trades to settle"
-      note="An agreed trade settles delivery-versus-payment in one transaction: the register records the assignment, the buyer's cash reaches the seller and both positions move. The buyer is screened against the borrower's DQ list first, and never sees the list or the result."
+      note="An agreed trade settles delivery-versus-payment in one transaction: the register records the assignment, the buyer's cash reaches the seller and both positions move. The buyer is screened against the borrower's DQ list first, and never sees the list or the result. Declining a trade moves nothing; the buyer takes its own cash back."
     >
       {s.tickets.length === 0 ? (
         <Empty>No agreed trades. A lender offers one from its own screen, and the buyer accepts and funds it.</Empty>
@@ -325,6 +325,12 @@ function Trades({ view }: { view: View }) {
                           variant="ghost"
                           hidden={{ ticket: ticket.contractId }}
                           disabled={!funded || !screening}
+                        />
+                        <ActionForm
+                          action={act.declineTrade}
+                          label="Decline"
+                          variant="ghost"
+                          hidden={{ ticket: ticket.contractId }}
                         />
                       </div>
                     </td>
