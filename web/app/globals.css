@@ -10,9 +10,11 @@
 }
 
 /* The functional app canvas is the dark carbon/ink darkroom. The marketing
-   route group overrides per section where it needs a paper-white block. */
+   route group overrides per section where it needs a paper-white block.
+   Default (not `antialiased`) smoothing: on macOS it keeps light-on-dark
+   strokes at full weight instead of thinning them. */
 body {
-  @apply bg-ink text-paper antialiased;
+  @apply bg-ink text-paper subpixel-antialiased;
 }
 
 ::selection {
@@ -60,12 +62,12 @@ body {
      field labels and metadata. Uppercasing is CSS only, never in the literal
      strings, so copy stays searchable as written. */
   .label-data {
-    @apply text-[13px] uppercase tracking-[0.12em] text-ash;
+    @apply text-[13px] font-medium uppercase tracking-[0.12em] text-ash;
   }
 
-  /* Sharp carbon panel with a hairline border. Depth via tonal contrast. */
+  /* Sharp carbon panel with a hairline border and a lit top edge. */
   .card {
-    @apply rounded-none border border-white/10 bg-carbon;
+    @apply rounded-none border border-white/[0.09] bg-carbon shadow-[inset_0_1px_0_rgba(255,255,255,0.05)];
   }
 
   /* Inset, secondary panel: a hairline frame over the base, no fill jump. */
@@ -73,12 +75,12 @@ body {
     @apply rounded-none border border-white/10 bg-white/[0.02];
   }
 
-  /* Text input: sharp, transparent over carbon, hairline that brightens to
-     paper on focus. No amber on borders (single-accent rule). */
+  /* Text input: sharp, a shade raised over carbon, hairline that brightens to
+     paper on focus. Signal colours stay off inputs: they mark states, not fields. */
   .field {
-    @apply mt-2 w-full rounded-none border border-white/15 bg-transparent px-3 py-2.5
-      text-lg tabular-nums text-paper outline-none transition
-      placeholder:text-ash focus:border-paper;
+    @apply mt-2 w-full rounded-none border border-white/15 bg-coal px-3 py-2.5
+      text-lg font-medium tabular-nums text-paper outline-none transition
+      placeholder:text-graphite focus:border-paper;
   }
 
   /* Primary action: solid monochrome pill, paper fill on ink text. Never amber
@@ -87,7 +89,7 @@ body {
     @apply inline-flex w-full items-center justify-center gap-2 rounded-pill
       bg-paper px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em]
       text-ink transition hover:bg-smoke disabled:cursor-not-allowed
-      disabled:bg-white/20 disabled:text-ash;
+      disabled:bg-white/10 disabled:text-ash;
   }
 
   /* Secondary action: hairline pill for row-level actions in tables. */
@@ -100,13 +102,16 @@ body {
 
   /* Ledger tables: tracked labels over hairline rows, tabular figures. */
   .table-data {
-    @apply w-full text-left text-sm tabular-nums;
+    @apply w-full text-left text-[15px] tabular-nums;
   }
   .table-data th {
-    @apply whitespace-nowrap pb-3 pr-6 text-[12px] font-normal uppercase tracking-[0.12em] text-ash;
+    @apply whitespace-nowrap pb-3 pr-6 text-[12px] font-semibold uppercase tracking-[0.12em] text-ash;
   }
   .table-data td {
-    @apply whitespace-nowrap border-t border-white/10 py-3 pr-6 align-middle text-paper;
+    @apply whitespace-nowrap border-t border-white/[0.08] py-3.5 pr-6 align-middle font-medium text-paper;
+  }
+  .table-data tbody tr {
+    @apply transition-colors hover:bg-white/[0.025];
   }
   .table-data th:last-child,
   .table-data td:last-child {
@@ -310,20 +315,23 @@ body {
 }
 
 /* Skeleton shimmer for values still loading. Sharp edges per the binary-radius
-   rule; width is a default, override with a width utility. */
-.skeleton {
-  display: inline-block;
-  height: 1em;
-  width: 4rem;
-  vertical-align: middle;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.06) 25%,
-    rgba(255, 255, 255, 0.16) 50%,
-    rgba(255, 255, 255, 0.06) 75%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-sheen 1.4s linear infinite;
+   rule; size is a default, override with width and height utilities (it sits
+   in the components layer so they win). */
+@layer components {
+  .skeleton {
+    display: inline-block;
+    height: 1em;
+    width: 4rem;
+    vertical-align: middle;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.06) 25%,
+      rgba(255, 255, 255, 0.16) 50%,
+      rgba(255, 255, 255, 0.06) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-sheen 1.4s linear infinite;
+  }
 }
 @keyframes skeleton-sheen {
   to {
@@ -360,13 +368,13 @@ body {
 .atmosphere-nebula-white {
   left: -28rem;
   top: 18%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.055), transparent 68%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.03), transparent 68%);
   animation: atmosphere-drift-white 48s ease-in-out infinite;
 }
 .atmosphere-nebula-blue {
   bottom: -28rem;
   right: -24rem;
-  background: radial-gradient(circle, rgba(120, 140, 180, 0.08), transparent 68%);
+  background: radial-gradient(circle, rgba(120, 140, 180, 0.035), transparent 68%);
   animation: atmosphere-drift-blue 57s ease-in-out infinite;
 }
 
@@ -497,7 +505,89 @@ body {
   clip-path: inset(0 100% 0 0);
 }
 
+/* Progress tracks. A beam is a bright segment sweeping its track: work in
+   progress whose length nobody knows (a ledger round trip, a page read). A
+   drain is a track emptying: the time left before a notice dismisses itself.
+   It pauses while the pointer is over the notice, and the notice listens for
+   its animationend, so the bar and the dismissal can never disagree. */
+.beam {
+  position: relative;
+  overflow: hidden;
+}
+.beam::after {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  content: "";
+  animation: beam-sweep 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes beam-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+.drain {
+  transform-origin: left;
+  animation: drain-out var(--drain, 6s) linear forwards;
+}
+.group:hover .drain {
+  animation-play-state: paused;
+}
+@keyframes drain-out {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* The receipt's pending glyph: three ledger blocks written in turn. */
+.ledger-blocks > span {
+  animation: block-write 1.2s ease-in-out infinite;
+}
+.ledger-blocks > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ledger-blocks > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes block-write {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* The receipt card rises in from the corner and its status icon draws on. */
+.receipt-enter {
+  animation: receipt-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes receipt-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+}
+.draw-on {
+  stroke-dasharray: 24;
+  animation: draw-on 0.5s ease-out 0.1s backwards;
+}
+@keyframes draw-on {
+  from {
+    stroke-dashoffset: 24;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .beam::after,
+  .ledger-blocks > span,
+  .receipt-enter,
+  .draw-on,
   .hero-shimmer,
   .diagram-anim *,
   .page-enter > * > *,
@@ -534,58 +624,59 @@ body {
 
 /* ---- Docs prose ------------------------------------------------------------
    Long-form reading voice for /docs. Same darkroom system: paper on ink,
-   hairline dividers, sharp panels, amber reserved for live signals (never
-   used decoratively here). Semantic HTML in, typography out, so docs pages
-   stay plain markup instead of restating classes on every element. */
+   hairline dividers, sharp panels. Sky marks what leads elsewhere (links,
+   code), amber only live-network caveats. Semantic HTML in, typography out,
+   so docs pages stay plain markup instead of restating classes on every
+   element. */
 @layer components {
   .docs-prose {
-    @apply text-[15px] leading-7 text-smoke;
+    @apply text-[17px] leading-8 text-smoke;
   }
   .docs-prose > * + * {
     @apply mt-5;
   }
   .docs-prose h2 {
-    @apply mt-12 border-t border-white/10 pt-8 text-xl font-semibold tracking-tight text-paper;
+    @apply mt-14 border-t border-white/10 pt-10 text-2xl font-semibold tracking-tight text-paper;
   }
   .docs-prose h2:first-child {
     @apply mt-0 border-t-0 pt-0;
   }
   .docs-prose h3 {
-    @apply mt-8 text-base font-semibold text-paper;
+    @apply mt-9 text-lg font-semibold text-paper;
   }
   .docs-prose strong {
     @apply font-semibold text-paper;
   }
   .docs-prose a {
-    @apply text-paper underline decoration-white/30 underline-offset-4 transition hover:decoration-paper;
+    @apply font-medium text-sky underline decoration-sky/40 underline-offset-4 transition hover:decoration-sky;
   }
   .docs-prose ul,
   .docs-prose ol {
     @apply space-y-2 pl-5;
   }
   .docs-prose ul {
-    @apply list-disc marker:text-graphite;
+    @apply list-disc marker:text-ash;
   }
   .docs-prose ol {
-    @apply list-decimal marker:text-graphite;
+    @apply list-decimal marker:font-semibold marker:text-ash;
   }
   .docs-prose code {
-    @apply rounded-none border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[13px] text-paper;
+    @apply rounded-none border border-white/10 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[14px] text-paper;
   }
   .docs-prose pre {
-    @apply overflow-x-auto border border-white/10 bg-carbon p-4 font-mono text-[13px] leading-6 text-smoke;
+    @apply overflow-x-auto border border-white/10 border-l-2 border-l-sky/60 bg-carbon p-5 font-mono text-[14px] leading-6 text-smoke;
   }
   .docs-prose pre code {
     @apply border-0 bg-transparent p-0 text-inherit;
   }
   .docs-prose table {
-    @apply w-full border-collapse text-[14px];
+    @apply w-full border-collapse text-[15px];
   }
   .docs-prose th {
-    @apply border-b border-white/15 py-2 pr-4 text-left align-top font-medium text-paper;
+    @apply border-b border-white/20 py-2.5 pr-4 text-left align-top font-semibold text-paper;
   }
   .docs-prose td {
-    @apply border-b border-white/10 py-2 pr-4 align-top;
+    @apply border-b border-white/10 py-2.5 pr-4 align-top;
   }
   .docs-prose hr {
     @apply border-white/10;

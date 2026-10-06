@@ -18,22 +18,25 @@ export const metadata: Metadata = {
 };
 
 // Docs chrome: the marketing route's star-chart atmosphere (gradient sky,
-// star speckle, chart rings, nebulae) fixed at z-0, with the reading surface
-// at z-10 above it. A quiet persistent top bar and a sticky section rail
-// carry the navigation; the content column is capped for measure.
+// star speckle, chart rings, nebulae) fixed at z-0 and dimmed well down, so
+// it reads as depth behind long text rather than texture under it. The
+// reading surface sits at z-10 above it. A quiet persistent top bar and a
+// sticky section rail carry the navigation; the content column is capped for
+// measure.
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col text-paper">
       <Atmosphere />
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 bg-ink/70" />
       <Grain className="fixed inset-0 z-0" />
 
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/85 backdrop-blur-xl">
         <nav className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-4">
             <Link href="/" aria-label="Pari home">
               <Wordmark />
             </Link>
-            <span className="hidden border-l border-white/15 pl-4 label-data sm:inline">Docs</span>
+            <span className="hidden border-l border-white/15 pl-4 label-data text-sky sm:inline">Docs</span>
           </div>
           <div className="flex items-center gap-6">
             <a

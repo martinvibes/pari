@@ -6,11 +6,13 @@
 // proxy instead of an array.
 
 export type DocsNavItem = { href: string; label: string };
-export type DocsNavGroup = { label: string; items: DocsNavItem[] };
+/** `hue` marks the group in the sidebar: a wayfinding colour, not a status. */
+export type DocsNavGroup = { label: string; hue: string; items: DocsNavItem[] };
 
 export const DOCS_NAV: DocsNavGroup[] = [
   {
     label: "Overview",
+    hue: "#FFC857",
     items: [
       { href: "/docs", label: "Introduction" },
       { href: "/docs/quickstart", label: "Quickstart" },
@@ -18,6 +20,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
   },
   {
     label: "Concepts",
+    hue: "#3DDC97",
     items: [
       { href: "/docs/roles", label: "Parties and roles" },
       { href: "/docs/lifecycle", label: "Facility lifecycle" },
@@ -25,6 +28,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
   },
   {
     label: "Design",
+    hue: "#5AC8FA",
     items: [
       { href: "/docs/settlement", label: "CIP-56 settlement" },
       { href: "/docs/trading", label: "Trading and screening" },
@@ -33,6 +37,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
   },
   {
     label: "Reference",
+    hue: "#A78BFA",
     items: [
       { href: "/docs/authority", label: "Authority matrix" },
       { href: "/docs/security", label: "Limits and status" },

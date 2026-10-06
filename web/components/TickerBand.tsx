@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Highlight the main statements; render supporting facts in muted text.
+// Highlight the main statements; render supporting facts in muted text. The
+// separators cycle through the signal hues, a quiet thread of colour.
+const HUES = ["#3DDC97", "#5AC8FA", "#A78BFA", "#FFAC2E"];
 const FACTS: Array<{ text: string; statement?: boolean }> = [
   { text: "Every lender paid in one transaction", statement: true },
   { text: "CIP-56 settlement" },
@@ -14,11 +16,14 @@ const FACTS: Array<{ text: string; statement?: boolean }> = [
 function FactSequence({ hidden = false }: { hidden?: boolean }) {
   return (
     <div className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
-      {FACTS.map((fact) => (
+      {FACTS.map((fact, i) => (
         <span key={fact.text} className="flex shrink-0 items-center">
-          <span className={fact.statement ? "text-paper" : "text-ash"}>{fact.text}</span>
-          <span className="px-8 text-white/25" aria-hidden>
-            ·
+          <span className={fact.statement ? "font-semibold text-paper" : "font-medium text-pewter"}>{fact.text}</span>
+          <span className="px-8" aria-hidden>
+            <span
+              className="block h-1.5 w-1.5 rounded-pill"
+              style={{ background: HUES[i % HUES.length], boxShadow: `0 0 8px ${HUES[i % HUES.length]}` }}
+            />
           </span>
         </span>
       ))}

@@ -86,8 +86,9 @@ export default function SettlementPage() {
 
       <div className="mt-8">
         <Callout label="Settlement asset">
-          The test suite settles in a reference CIP-56 registry vendored from Splice 0.6.13. On
-          Canton networks the same interfaces settle in Canton Coin or any other CIP-56 instrument.
+          The tests, the sandbox demo and the HackCanton DevNet deployment settle in a reference
+          CIP-56 registry vendored from Splice 0.6.13. Canton Coin implements the same CIP-56
+          interfaces; Pari has not yet been run against it.
         </Callout>
       </div>
 

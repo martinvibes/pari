@@ -33,10 +33,10 @@ export function StarfieldBackground() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* Deep space base. */}
-      <div className="absolute inset-0 bg-[#080a10]" />
+      <div className="absolute inset-0 bg-[#030306]" />
 
       {/* Soft nebula. */}
-      <div className="absolute inset-0 bg-[radial-gradient(70%_90%_at_35%_45%,rgba(120,140,180,0.12),transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(70%_90%_at_35%_45%,rgba(120,140,180,0.06),transparent_60%)]" />
 
       {/* Two tiled star layers. */}
       <div

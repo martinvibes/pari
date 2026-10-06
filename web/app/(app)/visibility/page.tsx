@@ -2,6 +2,7 @@
 
 import type { Metadata } from "next";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { Party } from "@/components/app/party";
 import { PageHeader, Panel, TableScroll, Tag } from "@/components/app/ui";
 import { PRIVACY_CHECKS } from "@/lib/pari/checks";
 import { PERSONAS } from "@/lib/pari/personas";
@@ -49,7 +50,7 @@ export default async function VisibilityPage() {
                 <th>Contract</th>
                 {seen.map(({ persona }) => (
                   <th key={persona.id} className="text-right">
-                    {persona.name}
+                    <Party name={persona.name} className="text-paper" />
                   </th>
                 ))}
               </tr>
@@ -92,7 +93,7 @@ export default async function VisibilityPage() {
                   <span className="text-paper">{check.claim}</span>
                   <span className="mt-0.5 block font-mono text-xs text-ash">{check.test}</span>
                 </span>
-                {holds ? <Tag tone="paper">Holds</Tag> : <Tag tone="alert">Broken</Tag>}
+                {holds ? <Tag tone="ok">Holds</Tag> : <Tag tone="stop">Broken</Tag>}
               </li>
             );
           })}

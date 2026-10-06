@@ -54,7 +54,7 @@ export function FooterBrand() {
         className="flex w-max items-center gap-[2vw] whitespace-nowrap will-change-transform"
       >
         <Logo className="h-[12vw] w-[12vw] shrink-0 text-paper" />
-        <span className="text-[16vw] font-light leading-none tracking-tighter text-paper">
+        <span className="text-[16vw] font-normal leading-none tracking-tighter text-paper">
           pari
         </span>
       </div>

@@ -5,6 +5,8 @@ import "server-only";
 /** Where the JSON Ledger API lives and how the app authenticates to it. */
 export const LEDGER = {
   url: (process.env.PARI_LEDGER_URL ?? "http://localhost:7575").replace(/\/$/, ""),
+  /** The network's name, as the app's header shows it. */
+  network: process.env.PARI_NETWORK ?? "Canton sandbox",
   /** The ledger user to submit as; defaults to the token's subject, else `pari-web`. */
   userId: process.env.PARI_LEDGER_USER,
   /** A fixed bearer token. The local sandbox needs none. */

@@ -2,8 +2,18 @@
 
 import type { Metadata } from "next";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Tag } from "@/components/Tag";
 
 export const metadata: Metadata = { title: "Limits and status" };
+
+// Mirrors the Status table in the README.
+const STATUS = [
+  { item: "Daml model and test suite", done: true },
+  { item: "Web app for agent, lenders, borrower and buyers, on a local Canton sandbox", done: true },
+  { item: "Deployment on the HackCanton DevNet, settling in a CIP-56 test token", done: true },
+  { item: "Settlement in Canton Coin or a stablecoin", done: false },
+  { item: "Agent hosted as a decentralized party across independent operators", done: false },
+];
 
 export default function SecurityPage() {
   return (
@@ -40,22 +50,14 @@ export default function SecurityPage() {
         <h2>Status</h2>
         <table>
           <tbody>
-            <tr>
-              <td>Daml model and test suite</td>
-              <td>Done</td>
-            </tr>
-            <tr>
-              <td>Web app for agent, lenders, borrower and buyers</td>
-              <td>In progress</td>
-            </tr>
-            <tr>
-              <td>Deployment on the HackCanton DevNet, settling in Canton Coin</td>
-              <td>In progress</td>
-            </tr>
-            <tr>
-              <td>Agent hosted as a decentralized party across independent operators</td>
-              <td>Planned</td>
-            </tr>
+            {STATUS.map((row) => (
+              <tr key={row.item}>
+                <td>{row.item}</td>
+                <td className="text-right">
+                  <Tag tone={row.done ? "ok" : "neutral"}>{row.done ? "Done" : "Planned"}</Tag>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

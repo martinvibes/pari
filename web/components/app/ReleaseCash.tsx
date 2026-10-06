@@ -18,12 +18,12 @@ export function ReleaseCash({ view, persona }: { view: View; persona: Persona })
     <Panel
       title="Cash to take back"
       note="You allocated this cash to a settlement that was then called off. It never left your control: it stays locked to that settlement until you withdraw it, and no one else can."
-      aside={<Tag tone="signal">Locked</Tag>}
+      aside={<Tag tone="wait">Locked</Tag>}
     >
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="label-data">Locked (USD)</p>
-          <p className="mt-2 text-4xl font-light tabular-nums">{formatCents(total)}</p>
+          <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
         </div>
         <ActionForm action={act.releaseCash} label="Withdraw to my holdings" hidden={{ persona: persona.id }} />
       </div>

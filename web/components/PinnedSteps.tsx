@@ -7,10 +7,10 @@ import { Scrim } from "@/components/Scrim";
 import { clamp } from "@/lib/conductor";
 import { useConductor } from "@/lib/useConductor";
 
-export type PinnedStep = { n: string; title: string; kicker: string; body: React.ReactNode };
+export type PinnedStep = { n: string; title: string; kicker: string; hue: string; body: React.ReactNode };
 
 /** Desktop "how it works": the band pins to the viewport for ~2.6 screens of
- *  scroll and one monochrome SVG scene morphs through the three protocol
+ *  scroll and one SVG scene morphs through the three protocol
  *  moments in place. Scroll position picks the phase.
  *
  *  The scene itself is the 3D world behind the band, not an SVG beside the
@@ -77,13 +77,18 @@ export function PinnedSteps({ steps }: { steps: PinnedStep[] }) {
                     i > 0 ? "absolute inset-0" : ""
                   } ${active ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-4"}`}
                 >
-                  <span className="block text-9xl font-light leading-none text-white/15 lg:text-[13rem]">
+                  <span
+                    className="block bg-clip-text text-9xl font-normal leading-none text-transparent lg:text-[13rem]"
+                    style={{ backgroundImage: `linear-gradient(180deg, ${step.hue}59, rgba(255,255,255,0.04))` }}
+                  >
                     {step.n}
                   </span>
-                  <h2 className="mt-6 text-5xl font-light tracking-tight lg:-mt-10 lg:text-7xl">
+                  <h2 className="mt-6 text-5xl font-medium tracking-tight lg:-mt-10 lg:text-7xl">
                     {step.title}
                   </h2>
-                  <p className="mt-4 label-data">{step.kicker}</p>
+                  <p className="mt-4 label-data" style={{ color: step.hue }}>
+                    {step.kicker}
+                  </p>
                   <p className="mt-8 max-w-xl text-lg leading-relaxed text-smoke lg:text-xl">
                     {step.body}
                   </p>
@@ -96,9 +101,8 @@ export function PinnedSteps({ steps }: { steps: PinnedStep[] }) {
               {steps.map((step, i) => (
                 <span
                   key={step.n}
-                  className={`h-px transition-all duration-500 ${
-                    phase === i + 1 ? "w-14 bg-paper" : "w-6 bg-white/25"
-                  }`}
+                  className={`h-0.5 transition-all duration-500 ${phase === i + 1 ? "w-14" : "w-6 bg-white/25"}`}
+                  style={phase === i + 1 ? { background: step.hue, boxShadow: `0 0 10px ${step.hue}` } : undefined}
                 />
               ))}
             </div>

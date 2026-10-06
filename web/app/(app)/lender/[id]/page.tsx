@@ -6,6 +6,7 @@ import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
 import { ReleaseCash } from "@/components/app/ReleaseCash";
+import { Party } from "@/components/app/party";
 import { Empty, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { clampDate, formatDate, formatTime, todayIso } from "@/lib/pari/dates";
 import { balanceCents, paymentLabel, positionOf, tradeAllocation } from "@/lib/pari/deal";
@@ -44,6 +45,7 @@ export default async function LenderPage({ params }: Params) {
       <PageHeader
         kicker={persona.blurb}
         title={persona.name}
+        party={persona.name}
         lede={`Your position, your payments and your trades. Canton shows ${persona.name} only what ${persona.name} is party to: no other lender's holding, no register, no DQ list.`}
       />
 
@@ -211,13 +213,16 @@ function Trades({ view, persona }: { view: View; persona: Persona }) {
                 const buying = o.buyer === party;
                 return (
                   <tr key={offer.contractId}>
-                    <td className="whitespace-nowrap">{buying ? `Buy from ${name(o.seller)}` : `Sell to ${name(o.buyer)}`}</td>
+                    <td className="whitespace-nowrap">
+                      {buying ? "Buy from " : "Sell to "}
+                      <Party name={name(buying ? o.seller : o.buyer)} className="ml-1" />
+                    </td>
                     <td className="text-right">{formatMoney(o.amount)}</td>
                     <td className="text-right">{formatPrice(o.price)}</td>
                     <td className="text-right">{formatCents(tradeCashCents(o.amount, o.price))}</td>
                     <td className="whitespace-nowrap text-smoke">{formatDate(o.tradeDate)}</td>
                     <td>
-                      <Tag tone="signal">{buying ? "Offer to you" : "Offered"}</Tag>
+                      <Tag tone="wait">{buying ? "Offer to you" : "Offered"}</Tag>
                     </td>
                     <td>
                       <div className="flex justify-end gap-2">
@@ -255,13 +260,16 @@ function Trades({ view, persona }: { view: View; persona: Persona }) {
                 const funded = buying && tradeAllocation(s, t) !== undefined;
                 return (
                   <tr key={ticket.contractId}>
-                    <td className="whitespace-nowrap">{buying ? `Buy from ${name(t.seller)}` : `Sell to ${name(t.buyer)}`}</td>
+                    <td className="whitespace-nowrap">
+                      {buying ? "Buy from " : "Sell to "}
+                      <Party name={name(buying ? t.seller : t.buyer)} className="ml-1" />
+                    </td>
                     <td className="text-right">{formatMoney(t.amount)}</td>
                     <td className="text-right">{formatPrice(t.price)}</td>
                     <td className="text-right">{formatMoney(t.cash)}</td>
                     <td className="whitespace-nowrap text-smoke">{formatDate(t.tradeDate)}</td>
                     <td>
-                      <Tag tone="paper">{funded ? "Funded" : "Agreed"}</Tag>
+                      <Tag tone={funded ? "ok" : "info"}>{funded ? "Funded" : "Agreed"}</Tag>
                     </td>
                     <td className="text-right text-xs text-ash">With the agent to settle</td>
                   </tr>
@@ -333,7 +341,7 @@ function Wall({ view, persona, election }: { view: View; persona: Persona; elect
                     <td className="min-w-[16rem] whitespace-normal">
                       <span className="flex items-center gap-3">
                         {a.payload.title}
-                        {a.payload.mnpi ? <Tag tone="paper">MNPI</Tag> : null}
+                        {a.payload.mnpi ? <Tag tone="private">MNPI</Tag> : null}
                       </span>
                     </td>
                     <td className="font-mono text-xs text-smoke">

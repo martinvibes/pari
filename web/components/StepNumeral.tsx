@@ -37,7 +37,7 @@ export function StepNumeral({ children }: { children: React.ReactNode }) {
   return (
     <span
       ref={ref}
-      className="block text-8xl font-light leading-none text-white/20 will-change-transform sm:text-9xl"
+      className="block text-8xl font-normal leading-none text-white/20 will-change-transform sm:text-9xl"
     >
       {children}
     </span>

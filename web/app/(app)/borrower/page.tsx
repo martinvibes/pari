@@ -5,6 +5,7 @@ import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
 import { ReleaseCash } from "@/components/app/ReleaseCash";
+import { Party } from "@/components/app/party";
 import { Empty, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { formatDate, formatTime } from "@/lib/pari/dates";
 import { balanceCents, facilityOf, outstandingCents, paymentLabel, requestState } from "@/lib/pari/deal";
@@ -32,6 +33,7 @@ export default async function BorrowerPage() {
       <PageHeader
         kicker="Borrower"
         title="Northwind"
+        party="Northwind"
         lede="Fund payments from your own holdings, give notice of prepayments, keep the DQ list and post documents. Trade prices never reach Northwind: a ticket stays between buyer, seller and agent."
       >
         <Facts
@@ -96,16 +98,16 @@ function ToPay({ view, facility: f, rate }: { view: View; facility: P.Facility; 
       note="Each leg becomes a CIP-56 allocation from Northwind's own holdings, which only the agent can execute and only into that lender's account. Fund less than 100% and every lender receives the same fraction; the rest stays owed."
       aside={
         unfunded === 0 ? (
-          <Tag tone="paper">{fundedBp === null ? "Funded" : `Funded ${fundedBp / 100}%`}</Tag>
+          <Tag tone="ok">{fundedBp === null ? "Funded" : `Funded ${fundedBp / 100}%`}</Tag>
         ) : (
-          <Tag tone="signal">Awaiting funds</Tag>
+          <Tag tone="wait">Awaiting funds</Tag>
         )
       }
       className="lg:col-span-7"
     >
       <div>
         <p className="label-data">{paymentLabel(request.payload.kind)} (USD)</p>
-        <p className="mt-2 text-4xl font-light tabular-nums">{formatCents(total)}</p>
+        <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
       </div>
       <TableScroll>
         <table className="table-data">
@@ -119,7 +121,9 @@ function ToPay({ view, facility: f, rate }: { view: View; facility: P.Facility; 
           <tbody>
             {legs.map((leg) => (
               <tr key={leg.legId}>
-                <td>{view.name(leg.lender)}</td>
+                <td>
+                  <Party name={view.name(leg.lender)} />
+                </td>
                 <td className="text-right">{formatCents(leg.due)}</td>
                 <td className={`text-right ${leg.allocation ? "" : "text-ash"}`}>
                   {leg.allocation ? formatMoney(leg.allocation.payload.allocation.transferLeg.amount) : "Not funded"}
@@ -166,7 +170,7 @@ function Prepay({ view }: { view: View }) {
       {view.s.notices.map((notice) => (
         <div key={notice.contractId} className="flex items-center justify-between gap-4 border-t border-white/10 pt-5">
           <p className="text-lg tabular-nums">{formatMoney(notice.payload.amount)} USD</p>
-          <Tag tone="signal">With the agent</Tag>
+          <Tag tone="wait">With the agent</Tag>
         </div>
       ))}
     </Panel>
@@ -213,10 +217,10 @@ function DqList({ view }: { view: View }) {
           {screenings.map((r) => (
             <div key={r.contractId} className="flex items-center justify-between gap-4 text-sm">
               <span>
-                {name(r.payload.candidate)}
+                <Party name={name(r.payload.candidate)} />
                 <span className="ml-3 text-xs text-ash">{formatTime(r.payload.screenedAt)}</span>
               </span>
-              {r.payload.cleared ? <Tag tone="paper">Cleared</Tag> : <Tag tone="alert">Disqualified</Tag>}
+              {r.payload.cleared ? <Tag tone="ok">Cleared</Tag> : <Tag tone="stop">Disqualified</Tag>}
             </div>
           ))}
         </div>
@@ -255,7 +259,7 @@ function Documents({ view }: { view: View }) {
                     <td className="min-w-[16rem] whitespace-normal">
                       <span className="flex items-center gap-3">
                         {doc.payload.title}
-                        {doc.payload.mnpi ? <Tag tone="paper">MNPI</Tag> : null}
+                        {doc.payload.mnpi ? <Tag tone="private">MNPI</Tag> : null}
                       </span>
                     </td>
                     <td className="font-mono text-xs text-smoke">

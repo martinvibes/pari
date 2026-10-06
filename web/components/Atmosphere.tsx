@@ -16,7 +16,7 @@ const BODY_STARS = [
 export function Atmosphere() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,#000000_0%,#05070d_52%,#080a10_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,#000000_0%,#020205_55%,#040408_100%)]" />
       <div
         className="absolute inset-0 opacity-70"
         style={{ backgroundImage: BODY_STARS, backgroundRepeat: "repeat", backgroundSize: "520px 520px" }}
@@ -28,7 +28,7 @@ export function Atmosphere() {
       <div className="atmosphere-nebula atmosphere-nebula-white hidden lg:block" />
       <div className="atmosphere-nebula atmosphere-nebula-blue hidden lg:block" />
       {/* Vignette: seats the corners so content reads against a stage. */}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_40%,transparent_55%,rgba(0,0,0,0.5)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_40%,transparent_45%,rgba(0,0,0,0.75)_100%)]" />
     </div>
   );
 }

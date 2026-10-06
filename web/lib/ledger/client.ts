@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { bearerToken, ledgerUser } from "@/lib/ledger/auth";
 import { LEDGER } from "@/lib/ledger/config";
@@ -153,11 +154,21 @@ export type Submission = {
   disclosedContracts?: Disclosed[];
 };
 
+const committed = new AsyncLocalStorage<string[]>();
+
+/** Runs `work` and collects the update id of every transaction it commits,
+ *  in order: the ledger's own receipt for what the work did. */
+export async function recordUpdates<T>(work: () => Promise<T>): Promise<{ result: T; updateIds: string[] }> {
+  const updateIds: string[] = [];
+  const result = await committed.run(updateIds, work);
+  return { result, updateIds };
+}
+
 /** Submit commands atomically and wait for the transaction. Returns the
  *  contracts it created, so a caller can chain on them. */
 export async function submit({ actAs, readAs = [], commands, disclosedContracts = [] }: Submission) {
   const result = await call<{
-    transaction: { events: Array<{ CreatedEvent?: CreatedEvent }> };
+    transaction: { updateId: string; events: Array<{ CreatedEvent?: CreatedEvent }> };
   }>("/v2/commands/submit-and-wait-for-transaction", {
     commands: {
       commands,
@@ -176,6 +187,7 @@ export async function submit({ actAs, readAs = [], commands, disclosedContracts 
       transactionShape: "TRANSACTION_SHAPE_ACS_DELTA",
     },
   });
+  committed.getStore()?.push(result.transaction.updateId);
   return result.transaction.events.flatMap((e) =>
     e.CreatedEvent ? [{ contractId: e.CreatedEvent.contractId, templateId: e.CreatedEvent.templateId }] : [],
   );

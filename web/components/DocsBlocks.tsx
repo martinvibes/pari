@@ -17,18 +17,19 @@ export function DocsHeader({
   summary: string;
 }) {
   return (
-    <header className="border-b border-white/10 pb-8">
-      <p className="label-data">{kicker}</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-paper sm:text-4xl">
+    <header className="border-b border-white/10 pb-10">
+      <p className="label-data text-sky">{kicker}</p>
+      <h1 className="mt-3 text-4xl font-semibold tracking-[-0.02em] text-paper sm:text-5xl">
         {title}
       </h1>
-      <p className="mt-4 max-w-2xl text-[15px] leading-7 text-smoke">{summary}</p>
+      <p className="mt-5 max-w-2xl text-[19px] leading-8 text-smoke">{summary}</p>
     </header>
   );
 }
 
-// Quiet aside panel. `signal` marks live-network caveats: the one place docs
-// use amber, consistent with the app's "amber = signal, never decoration".
+// Aside panel. A note is sky, the colour of "more to know"; `signal` marks
+// live-network caveats in amber, consistent with the app's "amber = waiting
+// or live".
 export function Callout({
   label,
   signal = false,
@@ -39,9 +40,13 @@ export function Callout({
   children: React.ReactNode;
 }) {
   return (
-    <aside className={`panel-subtle border-l-2 p-5 ${signal ? "border-l-amber" : "border-l-white/30"}`}>
-      <p className={`label-data mb-2 ${signal ? "text-amber" : ""}`}>{label}</p>
-      <div className="text-[14px] leading-6 text-smoke [&_a]:text-paper [&_a]:underline [&_a]:decoration-white/30 [&_a]:underline-offset-4 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-paper [&_strong]:font-semibold [&_strong]:text-paper">
+    <aside
+      className={`border border-l-2 p-5 ${
+        signal ? "border-amber/20 border-l-amber bg-amber/[0.05]" : "border-sky/15 border-l-sky bg-sky/[0.04]"
+      }`}
+    >
+      <p className={`label-data mb-2 ${signal ? "text-amber" : "text-sky"}`}>{label}</p>
+      <div className="text-[15px] leading-7 text-smoke [&_a]:text-paper [&_a]:underline [&_a]:decoration-white/30 [&_a]:underline-offset-4 [&_code]:font-mono [&_code]:text-[14px] [&_code]:text-paper [&_strong]:font-semibold [&_strong]:text-paper">
         {children}
       </div>
     </aside>
@@ -60,7 +65,7 @@ export function DocsPager({ current }: { current: string }) {
       {prev ? (
         <Link href={prev.href} className="group flex-1 border border-white/10 p-5 transition hover:border-white/40">
           <p className="label-data mb-2">Previous</p>
-          <p className="text-[15px] text-paper">{prev.label}</p>
+          <p className="text-[16px] font-semibold text-paper">{prev.label}</p>
         </Link>
       ) : (
         <div className="flex-1" />
@@ -71,7 +76,7 @@ export function DocsPager({ current }: { current: string }) {
           className="group flex-1 border border-white/10 p-5 text-right transition hover:border-white/40"
         >
           <p className="label-data mb-2">Next</p>
-          <p className="text-[15px] text-paper">{next.label}</p>
+          <p className="text-[16px] font-semibold text-paper">{next.label}</p>
         </Link>
       ) : (
         <div className="flex-1" />

@@ -61,7 +61,9 @@ function GuaranteeRow({
         className="absolute -left-[2.15rem] top-10 sm:-left-[3.7rem] sm:top-1/2 sm:-translate-y-1/2"
       >
         <span
-          className="block h-2 w-2 bg-paper transition-all duration-500"
+          className={`block h-2 w-2 transition-all duration-500 ${
+            lit ? "bg-mint shadow-[0_0_12px_rgba(61,220,151,0.9)]" : "bg-paper"
+          }`}
           style={
             stripHidden
               ? { opacity: 0, transform: "scale(0)" }
@@ -74,21 +76,21 @@ function GuaranteeRow({
         />
       </span>
       <span
-        className={`text-6xl font-light leading-none transition-colors duration-700 sm:text-7xl ${
-          lit ? "text-white/45" : "text-white/15"
+        className={`text-6xl font-normal leading-none transition-colors duration-700 sm:text-7xl ${
+          lit ? "text-mint/60" : "text-white/15"
         }`}
       >
         {guarantee.index}
       </span>
       <div>
         <h3
-          className={`text-2xl font-light tracking-tight transition-colors duration-700 sm:text-3xl ${
+          className={`text-2xl font-medium tracking-tight transition-colors duration-700 sm:text-3xl ${
             lit ? "text-paper" : "text-smoke"
           }`}
         >
           {guarantee.title}
         </h3>
-        <p className="mt-2 max-w-2xl leading-relaxed text-smoke">{guarantee.body}</p>
+        <p className="mt-2 max-w-2xl text-lg leading-relaxed text-smoke">{guarantee.body}</p>
       </div>
     </div>
   );
@@ -108,7 +110,7 @@ export function GuaranteesStrip() {
     <section className="relative bg-transparent">
       <div className="mx-auto max-w-[1280px] px-6 py-20 sm:px-16 sm:py-24">
         <KickerWipe className="label-data">Design / Guarantees</KickerWipe>
-        <h2 className="mt-5 max-w-3xl text-5xl font-light tracking-tight sm:text-6xl lg:text-7xl">
+        <h2 className="mt-5 max-w-3xl text-5xl font-medium tracking-tight sm:text-6xl lg:text-7xl">
           <WordReveal brightWords={[3]}>Built into the ledger</WordReveal>
         </h2>
 

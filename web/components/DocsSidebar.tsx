@@ -14,7 +14,10 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
     <nav aria-label="Documentation" className="flex flex-col gap-8">
       {DOCS_NAV.map((group) => (
         <div key={group.label}>
-          <p className="label-data mb-3">{group.label}</p>
+          <p className="label-data mb-3 flex items-center gap-2.5">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-pill" style={{ background: group.hue }} />
+            {group.label}
+          </p>
           <ul className="flex flex-col">
             {group.items.map((item) => {
               const active = pathname === item.href;
@@ -24,11 +27,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                     href={item.href}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
-                    className={`block border-l py-1.5 pl-4 text-[14px] transition ${
-                      active
-                        ? "border-paper text-paper"
-                        : "border-white/10 text-ash hover:border-white/40 hover:text-paper"
+                    className={`block border-l-2 py-2 pl-4 text-[15px] font-medium transition ${
+                      active ? "text-paper" : "border-white/10 text-pewter hover:border-white/40 hover:text-paper"
                     }`}
+                    style={
+                      active
+                        ? { borderColor: group.hue, background: `linear-gradient(90deg, ${group.hue}1f, transparent 80%)` }
+                        : undefined
+                    }
                   >
                     {item.label}
                   </Link>

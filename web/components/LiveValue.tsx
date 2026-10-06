@@ -11,7 +11,7 @@ const SETTLE_MS = 900;
 /** A live protocol value. When `value` changes, the characters that changed
  *  roll over odometer-style (old digit up and out, new digit in from below)
  *  and the whole value flashes amber for a beat: amber marking a live signal,
- *  exactly per the single-accent rule. While `loading`, renders a skeleton
+ *  amber's one job in the signal palette. While `loading`, renders a skeleton
  *  shimmer instead. Static under prefers-reduced-motion (values swap in
  *  place, no stale characters; see the .lv-* rules in globals.css). */
 export function LiveValue({

@@ -180,6 +180,7 @@ web_env() {
   packages="$(pinned_packages "$(access_token)" | jq -r 'join(",")')"
   cd "$ROOT/web"
   PARI_LEDGER_URL="$JSON_API" \
+  PARI_NETWORK="Canton DevNet" \
   PARI_PACKAGE_PREFERENCE="$packages" \
   PARI_LEDGER_TOKEN_FILE=.pari/devnet-tokens.json \
   PARI_OIDC_TOKEN_URL="$OIDC_TOKEN_URL" \

@@ -6,15 +6,17 @@ export function RollingLink({
   href,
   children,
   className = "",
+  style,
   onClick,
 }: {
   href: string;
   children: string;
   className?: string;
+  style?: React.CSSProperties;
   onClick?: () => void;
 }) {
   return (
-    <Link href={href} className={`roll ${className}`} onClick={onClick}>
+    <Link href={href} className={`roll ${className}`} style={style} onClick={onClick}>
       <span className="roll-label">
         {children}
         {/* select-none keeps the visual duplicate out of copied text. */}

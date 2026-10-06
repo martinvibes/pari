@@ -4,20 +4,23 @@
 
 import { revalidatePath } from "next/cache";
 import { loadCast, partyOf, type Cast } from "@/lib/ledger/cast";
+import { recordUpdates } from "@/lib/ledger/client";
 import { formatDate } from "@/lib/pari/dates";
 import * as ops from "@/lib/pari/operations";
 import { personaById } from "@/lib/pari/personas";
 import type { Side } from "@/lib/pari/types";
 
 // The app's writes. Each action submits as the one party entitled to it and
-// reports the ledger's verdict, including the model's own refusal reasons.
+// reports the ledger's verdict, including the model's own refusal reasons and,
+// when it commits, the update id of each transaction.
 
-export type ActionResult = { ok: boolean; message: string };
+export type ActionResult = { ok: boolean; message: string; updateIds?: string[] };
 type Action = (previous: ActionResult | null, form: FormData) => Promise<ActionResult>;
 
 async function run(work: (cast: Cast) => Promise<string>): Promise<ActionResult> {
   try {
-    return { ok: true, message: await work(loadCast()) };
+    const { result, updateIds } = await recordUpdates(() => work(loadCast()));
+    return { ok: true, message: result, updateIds };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   } finally {

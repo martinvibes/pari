@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
-import { Empty, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
+import { Party } from "@/components/app/party";
+import { Empty, FACILITY_TONE, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import type { Contract } from "@/lib/ledger/client";
 import { addMonths, clampDate, formatDate, formatTime } from "@/lib/pari/dates";
 import {
@@ -49,12 +50,13 @@ export default async function AgentPage() {
       <PageHeader
         kicker="Administrative agent"
         title="Agent"
+        party="Agent"
         lede="Keep the register, fix the rate, request payments and settle trades. The agent never holds the money: every payment is a CIP-56 allocation the payer funds from its own holdings."
       >
         <Facts
           items={[
             { label: "Facility", value: f.terms.name },
-            { label: "Status", value: f.status },
+            { label: "Status", value: f.status, tone: FACILITY_TONE[f.status] },
             { label: "Margin", value: `${f.terms.marginBps} bp` },
             { label: "Matures", value: formatDate(f.terms.maturityDate) },
           ]}
@@ -114,7 +116,9 @@ function Register({
           <tbody>
             {rows.map(([lender, entry]) => (
               <tr key={lender}>
-                <td>{view.name(lender)}</td>
+                <td>
+                  <Party name={view.name(lender)} />
+                </td>
                 <td className="text-right">{formatMoney(entry.principal)}</td>
                 <td className="text-right text-smoke">{formatShare(toCents(entry.principal), outstanding)}</td>
                 <td className="text-smoke">{formatDate(entry.accrualStart)}</td>
@@ -156,7 +160,7 @@ function Payments({
       >
         <div>
           <p className="label-data">Interest due at period end (USD)</p>
-          <p className="mt-2 text-4xl font-light tabular-nums">{formatCents(total)}</p>
+          <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
         </div>
         <ActionForm action={act.requestInterest} label="Request interest" />
         <p className="text-xs leading-relaxed text-ash">
@@ -222,7 +226,7 @@ function OpenRequest({ view, state }: { view: View; state: RequestState }) {
       title="Open request"
       note="One CIP-56 leg per lender, each funded by the borrower from its own holdings. Settling executes every leg in one transaction, or none."
       aside={
-        <Tag tone={fundedBp === null ? "signal" : "paper"}>
+        <Tag tone={fundedBp === null ? "wait" : "ok"}>
           {fundedBp === null ? `${funded} of ${legs.length} funded` : `Funded ${fundedBp / 100}%`}
         </Tag>
       }
@@ -230,7 +234,7 @@ function OpenRequest({ view, state }: { view: View; state: RequestState }) {
     >
       <div>
         <p className="label-data">{paymentLabel(request.payload.kind)} (USD)</p>
-        <p className="mt-2 text-4xl font-light tabular-nums">{formatCents(total)}</p>
+        <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
       </div>
       <TableScroll>
         <table className="table-data">
@@ -244,7 +248,9 @@ function OpenRequest({ view, state }: { view: View; state: RequestState }) {
           <tbody>
             {legs.map((leg) => (
               <tr key={leg.legId}>
-                <td>{view.name(leg.lender)}</td>
+                <td>
+                  <Party name={view.name(leg.lender)} />
+                </td>
                 <td className="text-right">{formatCents(leg.due)}</td>
                 <td className={`text-right ${leg.allocation ? "" : "text-ash"}`}>
                   {leg.allocation ? formatMoney(leg.allocation.payload.allocation.transferLeg.amount) : "Not funded"}
@@ -300,20 +306,21 @@ function Trades({ view }: { view: View }) {
                 return (
                   <tr key={ticket.contractId}>
                     <td className="whitespace-nowrap">
-                      {name(t.seller)} → {name(t.buyer)}
+                      <Party name={name(t.seller)} /> <span className="px-1 text-ash">→</span>{" "}
+                      <Party name={name(t.buyer)} />
                     </td>
                     <td className="text-right">{formatMoney(t.amount)}</td>
                     <td className="text-right">{formatPrice(t.price)}</td>
                     <td className="text-right">{formatMoney(t.cash)}</td>
                     <td className="whitespace-nowrap text-smoke">{formatDate(t.tradeDate)}</td>
-                    <td>{funded ? <Tag tone="paper">Funded</Tag> : <Tag tone="signal">Awaiting buyer</Tag>}</td>
+                    <td>{funded ? <Tag tone="ok">Funded</Tag> : <Tag tone="wait">Awaiting buyer</Tag>}</td>
                     <td>
                       {!screening ? (
                         <Tag>Not screened</Tag>
                       ) : screening.payload.cleared ? (
-                        <Tag tone="paper">Cleared</Tag>
+                        <Tag tone="ok">Cleared</Tag>
                       ) : (
-                        <Tag tone="alert">Disqualified</Tag>
+                        <Tag tone="stop">Disqualified</Tag>
                       )}
                     </td>
                     <td>
@@ -365,8 +372,12 @@ function Documents({ view }: { view: View }) {
                 <th>Document</th>
                 {elections.map((e) => (
                   <th key={e.contractId}>
-                    {name(e.payload.lender)}
-                    <span className="mt-1 block text-[11px] normal-case tracking-normal text-ash">
+                    <Party name={name(e.payload.lender)} className="text-paper" />
+                    <span
+                      className={`mt-1 block text-[11px] normal-case tracking-normal ${
+                        e.payload.side === "PrivateSide" ? "text-iris" : "text-ash"
+                      }`}
+                    >
                       {e.payload.side === "PrivateSide" ? "Private side" : "Public side"}
                     </span>
                   </th>
@@ -379,13 +390,13 @@ function Documents({ view }: { view: View }) {
                   <td className="min-w-[16rem] whitespace-normal">
                     <span className="flex items-center gap-3">
                       {doc.payload.title}
-                      {doc.payload.mnpi ? <Tag tone="paper">MNPI</Tag> : null}
+                      {doc.payload.mnpi ? <Tag tone="private">MNPI</Tag> : null}
                     </span>
                   </td>
                   {elections.map((e) =>
                     shared(doc, e.payload.lender) ? (
                       <td key={e.contractId}>
-                        <Tag>Shared</Tag>
+                        <Tag tone="ok">Shared</Tag>
                       </td>
                     ) : (
                       <td key={e.contractId}>
@@ -440,7 +451,9 @@ function Receipts({ view }: { view: View }) {
               {receipts.map((r) => (
                 <tr key={r.contractId}>
                   <td className="whitespace-nowrap text-smoke">{formatTime(r.payload.paidAt)}</td>
-                  <td>{name(r.payload.lender)}</td>
+                  <td>
+                    <Party name={name(r.payload.lender)} />
+                  </td>
                   <td>{paymentLabel(r.payload.kind)}</td>
                   <td className="text-right text-smoke">{formatMoney(r.payload.due)}</td>
                   <td className="text-right">{formatMoney(r.payload.paid)}</td>

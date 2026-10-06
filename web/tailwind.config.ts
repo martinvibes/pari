@@ -2,10 +2,11 @@
 
 import type { Config } from "tailwindcss";
 
-// "Cinematic darkroom" monochrome design system. One accent (signal-amber) that
-// marks live/active signals only. Shape is binary: pill (999px) for buttons and
-// tags, sharp (0px) for cards, inputs, and panels. No shadows or glows; depth is
-// white/dark tonal contrast only.
+// "Cinematic darkroom" design system: paper type on a near-black stage, with
+// colour reserved for meaning. Each signal hue below has one job, and each
+// party in the deal has an identity hue (components/app/party.tsx). Shape
+// is binary: pill (999px) for buttons and tags, sharp (0px) for cards, inputs,
+// and panels. Depth is tonal contrast; glow marks live signals only.
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -17,13 +18,20 @@ const config: Config = {
       colors: {
         paper: "#FFFFFF",
         ink: "#000000",
-        carbon: "#181818",
-        ash: "#6D6D6D",
-        smoke: "#9A9A9A",
-        pewter: "#808080",
-        graphite: "#636363",
-        // The single accent. One job: live/active signals.
-        amber: "#FFAC2E",
+        carbon: "#0C0C0E",
+        // Raised surfaces on carbon: table heads, inputs, the receipt card.
+        coal: "#141417",
+        // Greys, lightest first. Each holds AA contrast on ink at its size.
+        smoke: "#C4C4CA",
+        pewter: "#A3A3AA",
+        ash: "#8E8E96",
+        graphite: "#6E6E76",
+        // Signals.
+        amber: "#FFAC2E", // live or waiting on someone
+        mint: "#3DDC97", // committed, settled, holds
+        rose: "#FF5C72", // refused, disqualified, broken
+        sky: "#5AC8FA", // information, shared, agreed
+        iris: "#A78BFA", // private: MNPI, private side
       },
       fontFamily: {
         // Inter everywhere, wired through next/font's CSS variable.
