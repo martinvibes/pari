@@ -124,6 +124,15 @@ body {
    server ships the finished state, JS arms the animated one, and
    prefers-reduced-motion keeps the static state. No color is introduced. */
 
+/* Avenir Next has no cut between UltraLight and Regular. Set on UltraLight,
+   a hairline stroke in the text's own colour lands the weight in between.
+   Under hero-shimmer that colour is transparent and the sheen paints the
+   stroke too. */
+.weight-book {
+  -webkit-text-stroke: 0.024em currentColor;
+  -webkit-font-smoothing: antialiased;
+}
+
 /* Liquid-metal sheen panned across the hero headline. The gradient is
    paper-to-smoke only, so the headline stays monochrome. */
 .hero-shimmer {
