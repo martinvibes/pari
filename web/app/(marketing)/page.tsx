@@ -119,11 +119,11 @@ export default function LandingPage() {
             </p>
             <h1
               data-exit="headline"
-              className="hero-shimmer max-w-4xl text-5xl font-medium leading-[1.02] tracking-tight sm:text-7xl lg:text-8xl"
+              className="hero-shimmer max-w-4xl text-5xl font-normal leading-[1.02] tracking-tight sm:text-7xl lg:text-8xl"
             >
               The private ledger for syndicated loans.
             </h1>
-            <p data-exit="lede" className="mt-8 max-w-xl text-lg font-medium leading-relaxed text-smoke sm:text-xl">
+            <p data-exit="lede" className="mt-8 max-w-xl text-lg leading-relaxed text-smoke sm:text-xl">
               Keep the register, pay every lender in one transaction, and settle trades
               delivery-versus-payment. Each lender sees its own position, and nothing else.
             </p>
