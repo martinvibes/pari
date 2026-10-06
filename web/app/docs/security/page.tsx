@@ -10,8 +10,11 @@ export const metadata: Metadata = { title: "Limits and status" };
 const STATUS = [
   { item: "Daml model and test suite", done: true },
   { item: "Web app for agent, lenders, borrower and buyers, on a local Canton sandbox", done: true },
-  { item: "Deployment on the HackCanton DevNet, settling in a CIP-56 test token", done: true },
-  { item: "Settlement in Canton Coin or a stablecoin", done: false },
+  { item: "Deployment on the HackCanton DevNet", done: true },
+  { item: "The borrower's auditor, with an audit trail rebuilt and re-checked from the ledger", done: true },
+  { item: "A hundred lenders per transaction, tested and timed on a Canton sandbox", done: true },
+  { item: "Settlement in Canton Coin, on DevNet", done: true },
+  { item: "Settlement in a USD stablecoin (e.g. USDCx)", done: false },
   { item: "Agent hosted as a decentralized party across independent operators", done: false },
 ];
 

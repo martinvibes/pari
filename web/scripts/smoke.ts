@@ -11,7 +11,7 @@ import { loadCast, partyOf } from "@/lib/ledger/cast";
 import { qualifiedName, witnessed } from "@/lib/ledger/client";
 import { auditTrail } from "@/lib/pari/audit";
 import { PRIVACY_CHECKS } from "@/lib/pari/checks";
-import { balanceCents, facilityOf, positionOf, requestState, strandedAllocations } from "@/lib/pari/deal";
+import { balanceCents, facilityOf, instrumentOf, positionOf, requestState, strandedAllocations } from "@/lib/pari/deal";
 import { formatCents, formatMoney, toCents } from "@/lib/pari/money";
 import * as ops from "@/lib/pari/operations";
 import { PERSONAS, persona } from "@/lib/pari/personas";
@@ -19,8 +19,18 @@ import { namer } from "@/lib/pari/session";
 import { snapshot } from "@/lib/pari/snapshot";
 
 const cast = loadCast();
-const usd = { admin: cast.registry, id: "USD" };
+const instrument = instrumentOf(cast);
 const party = (id: string) => partyOf(cast, persona(id));
+
+// Canton Coin charges its holding fees to the payer, so a payer's change comes
+// back short by a fraction of a coin; on Canton Coin each cash figure may fall
+// short of the model's by up to this much. Every leg a lender or seller
+// receives is still checked to the cent, by the auditor's replay below.
+const FEES = cast.instrument === "Amulet" ? 100n : 0n;
+
+// What each party held beyond the deal's own cash when the smoke test began:
+// nothing on a fresh sandbox; on DevNet, faucet headroom and earlier coins.
+const opening = new Map<string, bigint>();
 const LENDER_IDS = ["alder", "birch", "cedar", "delta"];
 
 const DQ_REFUSAL = "Pari: buyer is cleared against the borrower's DQ list";
@@ -30,12 +40,26 @@ const PUBLIC_DOC = "credit-agreement";
 
 // Reading the ledger ------------------------------------------------------------
 
-async function cash(id: string): Promise<string> {
-  return formatCents(balanceCents(await snapshot(party(id)), party(id), usd));
+async function balance(id: string): Promise<bigint> {
+  return balanceCents(await snapshot(party(id)), party(id), instrument) - (opening.get(id) ?? 0n);
 }
 
-async function cashOf(ids: string[]): Promise<Record<string, string>> {
-  return Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await cash(id)])));
+async function cash(id: string): Promise<string> {
+  return formatCents(await balance(id));
+}
+
+/** Each party's cash is the model's figure, less at most the payer's fees. */
+async function cashIs(expected: Record<string, string>, what: string) {
+  const ids = Object.keys(expected);
+  const actual = new Map(await Promise.all(ids.map(async (id) => [id, await balance(id)] as const)));
+  const off = ids.filter((id) => {
+    const short = toCents(expected[id]!.replaceAll(",", "")) - actual.get(id)!;
+    return short < 0n || short > FEES;
+  });
+  if (off.length > 0) {
+    const got = Object.fromEntries([...actual].map(([id, c]) => [id, formatCents(c)]));
+    throw new Error(`${what}\n      expected ${JSON.stringify(expected)}\n      got      ${JSON.stringify(got)}`);
+  }
 }
 
 async function facility() {
@@ -161,12 +185,16 @@ async function audit() {
 
 const steps: Array<[string, () => Promise<void>]> = [
   [
-    "seeded: $100m closed, first period fixed at 4.30% + 350bp",
+    "seeded: 100m closed, first period fixed at 4.30% + 350bp",
     async () => {
       const f = await facility();
       same(f.period?.end, "2026-12-15", "period end");
       same(await register("principal"), { alder: "50,000,000.00", birch: "30,000,000.00", cedar: "20,000,000.00" }, "register");
-      same(await cashOf(["northwind", "delta", "rival"]), { northwind: "105,000,000.00", delta: "20,000,000.00", rival: "20,000,000.00" }, "cash");
+      const seeded = { northwind: "105,000,000.00", alder: "0.00", birch: "0.00", cedar: "0.00", delta: "20,000,000.00", rival: "20,000,000.00", agent: "0.00" };
+      if (FEES > 0n) {
+        for (const [id, amount] of Object.entries(seeded)) opening.set(id, (await balance(id)) - toCents(amount.replaceAll(",", "")));
+      }
+      await cashIs(seeded, "cash");
       await privacyHolds();
     },
   ],
@@ -182,7 +210,7 @@ const steps: Array<[string, () => Promise<void>]> = [
       await ops.acceptTrade(cast, party("delta"), await offerTo("delta", "alder"));
       await ops.screenBuyer(cast, party("delta"));
       await ops.settleTrade(cast, await ticketFor("delta"));
-      same(await cashOf(["alder", "delta"]), { alder: "9,950,000.00", delta: "10,050,000.00" }, "cash");
+      await cashIs({ alder: "9,950,000.00", delta: "10,050,000.00" }, "cash");
       same(await register("principal"), { alder: "40,000,000.00", birch: "30,000,000.00", cedar: "20,000,000.00", delta: "10,000,000.00" }, "register principal");
       same((await register("carried")).alder, "325,000.00", "interest Alder earned to the trade date");
       same(await principals(), { alder: "40,000,000.00", birch: "30,000,000.00", cedar: "20,000,000.00", delta: "10,000,000.00" }, "positions");
@@ -204,7 +232,7 @@ const steps: Array<[string, () => Promise<void>]> = [
       await ops.declineTrade(cast, ticket);
       same(await lockedFor("rival"), "4,950,000.00", "Rival's cash locked to the declined trade");
       await ops.releaseCash(party("rival"));
-      same(await cash("rival"), "20,000,000.00", "Rival's cash");
+      await cashIs({ rival: "20,000,000.00" }, "Rival's cash");
       same((await principals()).cedar, "20,000,000.00", "Cedar's position");
     },
   ],
@@ -228,7 +256,7 @@ const steps: Array<[string, () => Promise<void>]> = [
       await ops.cancelRequest(cast);
       same(await lockedFor("northwind"), "1,971,666.65", "Northwind's cash locked to the cancelled request");
       await ops.releaseCash(party("northwind"));
-      same(await cash("northwind"), "105,000,000.00", "Northwind's cash");
+      await cashIs({ northwind: "105,000,000.00" }, "Northwind's cash");
     },
   ],
   [
@@ -237,8 +265,7 @@ const steps: Array<[string, () => Promise<void>]> = [
       await ops.requestInterest(cast);
       await ops.fundRequest(cast, 5000);
       await ops.settlePayment(cast);
-      same(
-        await cashOf(["alder", "birch", "cedar", "delta"]),
+      await cashIs(
         { alder: "10,376,833.33", birch: "295,750.00", cedar: "197,166.66", delta: "10,116,083.33" },
         "lender cash",
       );
@@ -255,7 +282,7 @@ const steps: Array<[string, () => Promise<void>]> = [
       await ops.settlePayment(cast);
       same(await principals(), { alder: "30,000,000.00", birch: "22,500,000.00", cedar: "15,000,000.00", delta: "7,500,000.00" }, "positions");
       same(await register("principal"), await principals(), "register agrees with every position");
-      same(await cash("northwind"), "79,014,166.68", "Northwind's cash");
+      await cashIs({ northwind: "79,014,166.68" }, "Northwind's cash");
     },
   ],
   [
@@ -340,9 +367,11 @@ const steps: Array<[string, () => Promise<void>]> = [
     "no money created or lost, the agent never held any, and every privacy claim holds",
     async () => {
       const everyone = ["northwind", "alder", "birch", "cedar", "delta", "rival", "agent"];
-      const total = (await Promise.all(everyone.map(async (id) => balanceCents(await snapshot(party(id)), party(id), usd))))
-        .reduce((sum, c) => sum + c, 0n);
-      same(formatCents(total), "145,000,000.00", "cash across every party");
+      const total = (await Promise.all(everyone.map(balance))).reduce((sum, c) => sum + c, 0n);
+      const lost = 14_500_000_000n - total;
+      if (lost < 0n || lost > FEES * BigInt(everyone.length)) {
+        throw new Error(`cash across every party: expected 145,000,000.00, got ${formatCents(total)}`);
+      }
       same(await cash("agent"), "0.00", "the agent's cash");
       await privacyHolds();
     },

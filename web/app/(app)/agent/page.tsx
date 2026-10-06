@@ -9,6 +9,7 @@ import { Empty, FACILITY_TONE, Facts, Field, PageHeader, Panel, Stats, TableScro
 import type { Contract } from "@/lib/ledger/client";
 import { addMonths, clampDate, formatDate, formatTime } from "@/lib/pari/dates";
 import {
+  cashUnit,
   facilityOf,
   latestScreening,
   outstandingCents,
@@ -36,6 +37,7 @@ export const metadata: Metadata = { title: "Agent" };
 export default async function AgentPage() {
   const view = await viewAs(persona("agent"));
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
+  const unit = cashUnit(view.cast);
   const facility = facilityOf(view.s);
   if (!facility) {
     return <LedgerUnavailable problem={{ unavailable: "cast", detail: "The demo facility is not on this ledger yet." }} />;
@@ -65,7 +67,7 @@ export default async function AgentPage() {
 
       <Stats
         items={[
-          { label: "Outstanding (USD)", value: formatCents(outstanding) },
+          { label: `Outstanding (${unit})`, value: formatCents(outstanding) },
           { label: "Lenders", value: String(f.register.length) },
           { label: "All-in rate", value: rate ? formatRate(rate) : "Not fixed" },
           { label: f.period ? "Period ends" : "Paid through", value: formatDate(f.period?.end ?? f.paidThrough) },
@@ -147,6 +149,7 @@ function Payments({
   rate: string | null;
   request: RequestState | null;
 }) {
+  const unit = cashUnit(view.cast);
   if (request) return <OpenRequest view={view} state={request} />;
 
   if (f.period && rate) {
@@ -159,7 +162,7 @@ function Payments({
         className="lg:col-span-5"
       >
         <div>
-          <p className="label-data">Interest due at period end (USD)</p>
+          <p className="label-data">Interest due at period end ({unit})</p>
           <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
         </div>
         <ActionForm action={act.requestInterest} label="Request interest" />
@@ -203,7 +206,7 @@ function Payments({
         >
           <div>
             <p className="label-data">Prepayment notice</p>
-            <p className="mt-1 text-lg tabular-nums">{formatMoney(notice.payload.amount)} USD</p>
+            <p className="mt-1 text-lg tabular-nums">{formatMoney(notice.payload.amount)} {unit}</p>
           </div>
           <ActionForm
             action={act.acceptPrepayment}
@@ -218,6 +221,7 @@ function Payments({
 }
 
 function OpenRequest({ view, state }: { view: View; state: RequestState }) {
+  const unit = cashUnit(view.cast);
   const { request, legs, fundedBp } = state;
   const total = legs.reduce((sum, leg) => sum + leg.due, 0n);
   const funded = legs.filter((leg) => leg.allocation).length;
@@ -233,7 +237,7 @@ function OpenRequest({ view, state }: { view: View; state: RequestState }) {
       className="lg:col-span-5"
     >
       <div>
-        <p className="label-data">{paymentLabel(request.payload.kind)} (USD)</p>
+        <p className="label-data">{paymentLabel(request.payload.kind)} ({unit})</p>
         <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
       </div>
       <TableScroll>
@@ -420,6 +424,7 @@ function Documents({ view }: { view: View }) {
 }
 
 function Receipts({ view }: { view: View }) {
+  const unit = cashUnit(view.cast);
   const { s, name } = view;
   const receipts = [...s.receipts].sort((a, b) =>
     a.payload.paidAt === b.payload.paidAt
@@ -444,7 +449,7 @@ function Receipts({ view }: { view: View }) {
                 <th>Lender</th>
                 <th>Payment</th>
                 <th className="text-right">Due</th>
-                <th className="text-right">Paid (USD)</th>
+                <th className="text-right">Paid ({unit})</th>
               </tr>
             </thead>
             <tbody>

@@ -7,7 +7,7 @@ import { UpdateId } from "@/components/app/UpdateId";
 import { Empty, FACILITY_TONE, Facts, PageHeader, Panel, Stats, TableScroll, Tag, type Tone } from "@/components/app/ui";
 import { auditTrail, type Audit, type Finding, type TrailRow } from "@/lib/pari/audit";
 import { formatTime } from "@/lib/pari/dates";
-import { outstandingCents, unitOf } from "@/lib/pari/deal";
+import { cashUnit, outstandingCents, unitOf } from "@/lib/pari/deal";
 import { formatCents, formatShare, toCents } from "@/lib/pari/money";
 import { persona } from "@/lib/pari/personas";
 import { isUnavailable, unavailable, viewAs, type View } from "@/lib/pari/session";
@@ -46,7 +46,7 @@ export default async function AuditorPage() {
   const paid = audit.rows
     .filter((r) => r.event === "Interest paid" || r.event === "Principal repaid")
     .reduce((sum, r) => sum + (r.amount ?? 0n), 0n);
-  const unit = f ? unitOf(f.terms.instrumentId) : "USD";
+  const unit = f ? unitOf(f.terms.instrumentId) : cashUnit(view.cast);
 
   return (
     <div className="space-y-12">

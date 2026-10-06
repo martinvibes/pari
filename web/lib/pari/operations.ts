@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "server-only";
-import { create, disclosable, exercise, qualifiedName, submit, type Command } from "@/lib/ledger/client";
+import { create, exercise, qualifiedName, submit, type Command } from "@/lib/ledger/client";
 import type { Cast } from "@/lib/ledger/cast";
+import { NO_EXTRA_ARGS, disclosedOf, registryFor } from "@/lib/ledger/registry";
 import {
   DEAL_ID,
   TRADE_LEG_ID,
   facilityOf,
+  instrumentOf,
   latestScreening,
   positionOf,
   requestState,
   strandedAllocations,
   tradeAllocation,
 } from "@/lib/pari/deal";
-import { CIP56, T, TEST_TOKEN_RULES } from "@/lib/pari/ids";
+import { CIP56, T } from "@/lib/pari/ids";
 import { basisPointsToFraction, shareOf, toCents, toDecimal } from "@/lib/pari/money";
 import { snapshot } from "@/lib/pari/snapshot";
 import type * as P from "@/lib/pari/types";
@@ -22,7 +24,6 @@ import type * as P from "@/lib/pari/types";
 // ledger is the judge: any operation the model forbids comes back as an error
 // carrying the model's `Pari: …` reason.
 
-const NO_EXTRA_ARGS = { context: { values: {} }, meta: { values: {} } };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function deadlines() {
@@ -31,10 +32,6 @@ function deadlines() {
     allocateBefore: new Date(now + 2 * DAY_MS).toISOString(),
     settleBefore: new Date(now + 3 * DAY_MS).toISOString(),
   };
-}
-
-function usd(cast: Cast): P.InstrumentId {
-  return { admin: cast.registry, id: "USD" };
 }
 
 async function requireFacility(party: string) {
@@ -51,9 +48,10 @@ async function one(party: string, command: Command) {
 // CIP-56 wallet ---------------------------------------------------------------
 
 /** Fund one settlement leg from the sender's own holdings through the
- *  registry's allocation factory, as the sender's CIP-56 wallet would. */
-async function allocate(cast: Cast, spec: P.AllocationView["allocation"]) {
-  const sender = spec.transferLeg.sender;
+ *  registry's allocation factory, as the sender's CIP-56 wallet would.
+ *  Returns the allocation's contract id. */
+export async function allocate(spec: P.AllocationView["allocation"]): Promise<string> {
+  const { sender, instrumentId } = spec.transferLeg;
   const s = await snapshot(sender);
   const inputs = s.holdings.filter(
     (h) =>
@@ -63,21 +61,38 @@ async function allocate(cast: Cast, spec: P.AllocationView["allocation"]) {
       h.payload.instrumentId.id === spec.transferLeg.instrumentId.id,
   );
   if (inputs.length === 0) throw new Error("No cash to allocate from.");
-  const [factory] = await disclosable(cast.registry, TEST_TOKEN_RULES);
-  if (!factory) throw new Error("The token registry's allocation factory is missing.");
+  const args = {
+    expectedAdmin: instrumentId.admin,
+    allocation: spec,
+    requestedAt: new Date(Date.now() - 5000).toISOString(),
+    inputHoldingCids: inputs.map((h) => h.contractId),
+    extraArgs: NO_EXTRA_ARGS,
+  };
+  const { factoryId, extraArgs, disclosed } = await registryFor(instrumentId).allocationFactory(args);
   await submit({
     actAs: [sender],
-    disclosedContracts: [factory],
-    commands: [
-      exercise(CIP56.AllocationFactory, factory.contractId, "AllocationFactory_Allocate", {
-        expectedAdmin: cast.registry,
-        allocation: spec,
-        requestedAt: new Date(Date.now() - 5000).toISOString(),
-        inputHoldingCids: inputs.map((h) => h.contractId),
-        extraArgs: NO_EXTRA_ARGS,
-      }),
-    ],
+    disclosedContracts: disclosed,
+    commands: [exercise(CIP56.AllocationFactory, factoryId, "AllocationFactory_Allocate", { ...args, extraArgs })],
   });
+  const funded = (await snapshot(sender)).allocations.find(
+    (a) =>
+      a.payload.allocation.transferLegId === spec.transferLegId &&
+      a.payload.allocation.settlement.settlementRef.id === spec.settlement.settlementRef.id &&
+      a.payload.allocation.transferLeg.receiver === spec.transferLeg.receiver,
+  );
+  if (!funded) throw new Error("The registry did not create the allocation.");
+  return funded.contractId;
+}
+
+/** Each allocation paired with the registry context that executes it, and
+ *  the contracts the agent's submission must disclose. */
+export async function executable(instrument: P.InstrumentId, allocationCids: string[]) {
+  const registry = registryFor(instrument);
+  const contexts = await Promise.all(allocationCids.map((cid) => registry.allocationContext(cid, "execute-transfer")));
+  return {
+    inputs: allocationCids.map((cid, i) => ({ _1: cid, _2: contexts[i]!.extraArgs })),
+    disclosed: disclosedOf(contexts),
+  };
 }
 
 // Agent -----------------------------------------------------------------------
@@ -118,15 +133,21 @@ export async function settlePayment(cast: Cast) {
     if (!position) throw new Error("A lender's position is missing.");
     return [l.lender, position.contractId];
   });
-  const allocations = paid.map((l) => [l.lender, { _1: l.allocation!.contractId, _2: NO_EXTRA_ARGS }]);
-  await one(
-    cast.agent,
-    exercise(T.Facility, facility.contractId, "Facility_Settle", {
-      fraction: basisPointsToFraction(state.fundedBp),
-      positions,
-      allocations,
-    }),
+  const { inputs, disclosed } = await executable(
+    facility.payload.terms.instrumentId,
+    paid.map((l) => l.allocation!.contractId),
   );
+  await submit({
+    actAs: [cast.agent],
+    disclosedContracts: disclosed,
+    commands: [
+      exercise(T.Facility, facility.contractId, "Facility_Settle", {
+        fraction: basisPointsToFraction(state.fundedBp),
+        positions,
+        allocations: paid.map((l, i) => [l.lender, inputs[i]]),
+      }),
+    ],
+  });
 }
 
 /** Check a buyer against the borrower's DQ list. The buyer never sees this. */
@@ -151,17 +172,21 @@ export async function settleTrade(cast: Cast, ticketCid: string) {
   if (!allocation) throw new Error("The buyer has not funded the price yet.");
   const desk = s.desks[0];
   if (!desk) throw new Error("The agent's desk is missing.");
-  await one(
-    cast.agent,
-    exercise(T.AgentDesk, desk.contractId, "Desk_SettleTrade", {
-      facilityCid: facility.contractId,
-      ticketCid,
-      screeningCid: screening.contractId,
-      sellerPositionCid: sellerPosition.contractId,
-      buyerPositionCid: positionOf(s, buyer)?.contractId ?? null,
-      allocation: { _1: allocation.contractId, _2: NO_EXTRA_ARGS },
-    }),
-  );
+  const { inputs, disclosed } = await executable(ticket.payload.instrumentId, [allocation.contractId]);
+  await submit({
+    actAs: [cast.agent],
+    disclosedContracts: disclosed,
+    commands: [
+      exercise(T.AgentDesk, desk.contractId, "Desk_SettleTrade", {
+        facilityCid: facility.contractId,
+        ticketCid,
+        screeningCid: screening.contractId,
+        sellerPositionCid: sellerPosition.contractId,
+        buyerPositionCid: positionOf(s, buyer)?.contractId ?? null,
+        allocation: inputs[0],
+      }),
+    ],
+  });
 }
 
 /** Call off a trade the agent will not settle, e.g. one whose buyer is
@@ -189,7 +214,7 @@ export async function fundRequest(cast: Cast, bp: number) {
     const amount = shareOf(leg.due, bp);
     if (leg.allocation || amount === 0n) continue;
     const transferLeg = legs[leg.legId]!;
-    await allocate(cast, {
+    await allocate({
       settlement,
       transferLegId: leg.legId,
       transferLeg: { ...transferLeg, amount: toDecimal(amount) },
@@ -241,10 +266,14 @@ export async function removeAuditor(cast: Cast) {
 export async function releaseCash(owner: string) {
   const stranded = strandedAllocations(await snapshot(owner), owner);
   if (stranded.length === 0) throw new Error("No cash is held for a called-off settlement.");
+  const contexts = await Promise.all(
+    stranded.map((a) => registryFor(a.payload.allocation.transferLeg.instrumentId).allocationContext(a.contractId, "withdraw")),
+  );
   await submit({
     actAs: [owner],
-    commands: stranded.map((a) =>
-      exercise(CIP56.Allocation, a.contractId, "Allocation_Withdraw", { extraArgs: NO_EXTRA_ARGS }),
+    disclosedContracts: disclosedOf(contexts),
+    commands: stranded.map((a, i) =>
+      exercise(CIP56.Allocation, a.contractId, "Allocation_Withdraw", { extraArgs: contexts[i]!.extraArgs }),
     ),
   });
 }
@@ -266,7 +295,7 @@ export async function offerTrade(
       amount: toDecimal(toCents(trade.amount)),
       price: (Number(trade.pricePercent) / 100).toFixed(6),
       tradeDate: trade.tradeDate,
-      instrumentId: usd(cast),
+      instrumentId: instrumentOf(cast),
       settleBefore: deadlines().settleBefore,
     }),
   );
@@ -279,7 +308,7 @@ export async function acceptTrade(cast: Cast, buyer: string, offerCid: string) {
   const ticket = (await snapshot(buyer)).tickets.find((t) => t.contractId === ticketCid);
   if (!ticket) throw new Error("The trade ticket was not created.");
   const { seller, cash, instrumentId, settlement } = ticket.payload;
-  await allocate(cast, {
+  await allocate({
     settlement,
     transferLegId: TRADE_LEG_ID,
     transferLeg: { sender: buyer, receiver: seller, amount: cash, instrumentId, meta: { values: {} } },

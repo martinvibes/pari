@@ -8,7 +8,14 @@ import { ReleaseCash } from "@/components/app/ReleaseCash";
 import { Party } from "@/components/app/party";
 import { Empty, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { formatDate, formatTime } from "@/lib/pari/dates";
-import { balanceCents, facilityOf, outstandingCents, paymentLabel, requestState } from "@/lib/pari/deal";
+import {
+  balanceCents,
+  cashUnit,
+  facilityOf,
+  outstandingCents,
+  paymentLabel,
+  requestState,
+} from "@/lib/pari/deal";
 import { allInRate, formatCents, formatMoney, formatRate, interestDueCents } from "@/lib/pari/money";
 import { LENDERS, persona } from "@/lib/pari/personas";
 import { isUnavailable, viewAs, type View } from "@/lib/pari/session";
@@ -20,6 +27,7 @@ export default async function BorrowerPage() {
   const northwind = persona("northwind");
   const view = await viewAs(northwind);
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
+  const unit = cashUnit(view.cast);
   const facility = facilityOf(view.s);
   if (!facility) {
     return <LedgerUnavailable problem={{ unavailable: "cast", detail: "The demo facility is not on this ledger yet." }} />;
@@ -39,7 +47,7 @@ export default async function BorrowerPage() {
         <Facts
           items={[
             { label: "Facility", value: f.terms.name },
-            { label: "Commitment", value: `${formatMoney(f.terms.commitment)} USD` },
+            { label: "Commitment", value: `${formatMoney(f.terms.commitment)} ${unit}` },
             { label: "Matures", value: formatDate(f.terms.maturityDate) },
           ]}
         />
@@ -47,8 +55,8 @@ export default async function BorrowerPage() {
 
       <Stats
         items={[
-          { label: "Outstanding (USD)", value: formatCents(outstandingCents(f)) },
-          { label: "Cash (USD)", value: formatCents(balanceCents(view.s, view.party, f.terms.instrumentId)) },
+          { label: `Outstanding (${unit})`, value: formatCents(outstandingCents(f)) },
+          { label: `Cash (${unit})`, value: formatCents(balanceCents(view.s, view.party, f.terms.instrumentId)) },
           { label: "All-in rate", value: rate ? formatRate(rate) : "Not fixed" },
           { label: f.period ? "Period ends" : "Paid through", value: formatDate(f.period?.end ?? f.paidThrough) },
         ]}
@@ -98,6 +106,7 @@ function Auditor({ view, facility: f }: { view: View; facility: P.Facility }) {
 }
 
 function ToPay({ view, facility: f, rate }: { view: View; facility: P.Facility; rate: string | null }) {
+  const unit = cashUnit(view.cast);
   const state = requestState(view.s, f);
 
   if (!state) {
@@ -110,7 +119,7 @@ function ToPay({ view, facility: f, rate }: { view: View; facility: P.Facility; 
       <Panel title="To pay" note="The agent requests each payment; Northwind funds it." className="lg:col-span-7">
         <Empty>
           {period && projected !== null
-            ? `Nothing requested yet. Interest of about ${formatCents(projected)} USD falls due on ${formatDate(period.end)}.`
+            ? `Nothing requested yet. Interest of about ${formatCents(projected)} ${unit} falls due on ${formatDate(period.end)}.`
             : "Nothing requested. The agent fixes the next period's rate first."}
         </Empty>
       </Panel>
@@ -134,7 +143,7 @@ function ToPay({ view, facility: f, rate }: { view: View; facility: P.Facility; 
       className="lg:col-span-7"
     >
       <div>
-        <p className="label-data">{paymentLabel(request.payload.kind)} (USD)</p>
+        <p className="label-data">{paymentLabel(request.payload.kind)} ({unit})</p>
         <p className="mt-2 text-4xl font-medium tabular-nums">{formatCents(total)}</p>
       </div>
       <TableScroll>
@@ -184,6 +193,7 @@ function ToPay({ view, facility: f, rate }: { view: View; facility: P.Facility; 
 }
 
 function Prepay({ view }: { view: View }) {
+  const unit = cashUnit(view.cast);
   return (
     <Panel
       title="Prepay principal"
@@ -191,13 +201,13 @@ function Prepay({ view }: { view: View }) {
       className="lg:col-span-5"
     >
       <ActionForm action={act.noticePrepayment} label="Give notice" className="space-y-5">
-        <Field label="Amount (USD)">
+        <Field label={`Amount (${unit})`}>
           <input name="amount" inputMode="decimal" placeholder="25,000,000" className="field" required />
         </Field>
       </ActionForm>
       {view.s.notices.map((notice) => (
         <div key={notice.contractId} className="flex items-center justify-between gap-4 border-t border-white/10 pt-5">
-          <p className="text-lg tabular-nums">{formatMoney(notice.payload.amount)} USD</p>
+          <p className="text-lg tabular-nums">{formatMoney(notice.payload.amount)} {unit}</p>
           <Tag tone="wait">With the agent</Tag>
         </div>
       ))}

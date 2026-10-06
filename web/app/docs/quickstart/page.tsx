@@ -118,10 +118,10 @@ npm run dev`}</code>
           own node.
         </Callout>
         <Callout label="Settlement asset">
-          The tests and the demo, on the sandbox and on the HackCanton DevNet, settle in a
-          reference CIP-56 test token vendored from Splice. Pari uses only the standard CIP-56
-          allocation interfaces, so it is not tied to that token; settlement in Canton Coin or a
-          stablecoin is planned. See{" "}
+          The tests and the sandbox demo settle in a reference CIP-56 test token vendored from
+          Splice; on the HackCanton DevNet the deal settles in Canton Coin, tapped from the DevNet
+          faucet. Pari uses only the standard CIP-56 allocation interfaces, so the model is the same
+          for both. See{" "}
           <Link href="/docs/settlement">CIP-56 settlement</Link>.
         </Callout>
       </div>

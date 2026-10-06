@@ -13,7 +13,7 @@ payments, secondary trades, and the information walls around them.
 | **Lenders** | Each holds a private, co-signed position. |
 | **Buyers** | Funds buying into the loan from an existing lender. |
 | **Auditor** | The borrower's auditor, appointed by the borrower. Observes the facility, controls no choice, holds no money. |
-| **Registry** | The CIP-56 instrument admin: a test token in the test suite, on the sandbox and on DevNet. |
+| **Registry** | The CIP-56 instrument admin: a test token in the test suite and on the sandbox; Canton Coin's DSO on DevNet. |
 
 ## Contracts
 

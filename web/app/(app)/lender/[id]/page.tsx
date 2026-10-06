@@ -9,7 +9,14 @@ import { ReleaseCash } from "@/components/app/ReleaseCash";
 import { Party } from "@/components/app/party";
 import { Empty, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { clampDate, formatDate, formatTime, todayIso } from "@/lib/pari/dates";
-import { balanceCents, paymentLabel, positionOf, tradeAllocation } from "@/lib/pari/deal";
+import {
+  balanceCents,
+  cashUnit,
+  instrumentOf,
+  paymentLabel,
+  positionOf,
+  tradeAllocation,
+} from "@/lib/pari/deal";
 import { formatCents, formatMoney, formatPrice, toCents, tradeCashCents } from "@/lib/pari/money";
 import { LENDERS, personaById, type Persona } from "@/lib/pari/personas";
 import { announcedPeriod, isUnavailable, viewAs, type View } from "@/lib/pari/session";
@@ -31,10 +38,11 @@ export default async function LenderPage({ params }: Params) {
   const persona = lenderPersona(params.id);
   const view = await viewAs(persona);
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
+  const unit = cashUnit(view.cast);
 
   const { s, party } = view;
   const position = positionOf(s, party);
-  const usd = { admin: view.cast.registry, id: "USD" };
+  const instrument = instrumentOf(view.cast);
   const received = s.receipts
     .filter((r) => r.payload.lender === party)
     .reduce((sum, r) => sum + toCents(r.payload.paid), 0n);
@@ -51,9 +59,9 @@ export default async function LenderPage({ params }: Params) {
 
       <Stats
         items={[
-          { label: "Principal (USD)", value: position ? formatMoney(position.payload.principal) : "None" },
-          { label: "Cash (USD)", value: formatCents(balanceCents(s, party, usd)) },
-          { label: "Received (USD)", value: formatCents(received) },
+          { label: `Principal (${unit})`, value: position ? formatMoney(position.payload.principal) : "None" },
+          { label: `Cash (${unit})`, value: formatCents(balanceCents(s, party, instrument)) },
+          { label: `Received (${unit})`, value: formatCents(received) },
           {
             label: "Information side",
             value: election ? (election.payload.side === "PrivateSide" ? "Private" : "Public") : "None",
@@ -84,6 +92,7 @@ async function Sell({
   persona: Persona;
   position: P.Position | null;
 }) {
+  const unit = cashUnit(view.cast);
   if (!position) {
     return (
       <Panel title="Sell" note="Sell part or all of your position to another lender." className="lg:col-span-5">
@@ -119,7 +128,7 @@ async function Sell({
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Par amount (USD)">
+          <Field label={`Par amount (${unit})`}>
             <input name="amount" inputMode="decimal" defaultValue={formatCents(defaultAmount)} className="field" required />
           </Field>
           <Field label="Price (% of par)">
@@ -143,6 +152,7 @@ async function Sell({
 }
 
 function Receipts({ view }: { view: View }) {
+  const unit = cashUnit(view.cast);
   const receipts = [...view.s.receipts].sort((a, b) => (a.payload.paidAt < b.payload.paidAt ? 1 : -1));
   return (
     <Panel
@@ -160,7 +170,7 @@ function Receipts({ view }: { view: View }) {
                 <th>Paid</th>
                 <th>Payment</th>
                 <th className="text-right">Due</th>
-                <th className="text-right">Paid (USD)</th>
+                <th className="text-right">Paid ({unit})</th>
               </tr>
             </thead>
             <tbody>

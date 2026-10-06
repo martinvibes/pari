@@ -6,7 +6,9 @@ import { resolve } from "node:path";
 import type { CastKey, Persona } from "@/lib/pari/personas";
 import { PERSONAS } from "@/lib/pari/personas";
 
-export type Cast = Record<CastKey, string>;
+/** The demo deal's parties, and its instrument's id when not the test token's
+ *  `USD` (Canton Coin is `Amulet`, administered by the cast's `registry`). */
+export type Cast = Record<CastKey, string> & { instrument?: string };
 
 export class CastMissingError extends Error {
   constructor(message: string) {

@@ -6,14 +6,18 @@
 # Keycloak token for your hackathon account.
 #
 #   scripts/devnet.sh login    sign in once (asks for email and password)
-#   scripts/devnet.sh seed     seed the demo deal on the Console's parties
+#   scripts/devnet.sh seed     seed the demo deal in Canton Coin on the Console's parties
 #   scripts/devnet.sh web      run the web app against DevNet
 #   scripts/devnet.sh smoke    drive the seeded deal through every app action
 #   scripts/devnet.sh reset    archive the deal, so the parties can be seeded again
 #
+# On DevNet the deal settles in Canton Coin: cash comes from the DevNet faucet,
+# and every allocation goes through Canton Coin's CIP-56 registry, reached
+# through the validator's scan proxy.
+#
 # The node is shared, and any team may upload a later version of a package
 # Pari uses. Every submission therefore pins the package ids built into the
-# DAR, as `Pari.Demo.seed` and PARI_PACKAGE_PREFERENCE do.
+# DAR, through PARI_PACKAGE_PREFERENCE.
 #
 # Tokens and the cast are written to web/.pari/, which git ignores.
 
@@ -23,10 +27,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TOKENS="$ROOT/web/.pari/devnet-tokens.json"
 CAST="$ROOT/web/.pari/devnet-cast.json"
 DAR="$ROOT/daml/pari-demo/.daml/dist/pari-demo-0.2.0.dar"
-DPM="${DPM:-dpm}"
 
 JSON_API="https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services"
-GRPC_HOST="ledger-api-grpc.participant.hackcanton-01.devnet.naas.noders.services"
+REGISTRY_URL="https://validator-api-http.validator.hackcanton-01.devnet.naas.noders.services/api/validator/v0/scan-proxy"
 OIDC_TOKEN_URL="https://keycloak.naas.noders.services/realms/noders-appsfactory/protocol/openid-connect/token"
 OIDC_CLIENT_ID="web-app-ui-hackcanton-01-devnet"
 
@@ -116,27 +119,22 @@ pinned_packages() {
 
 seed() {
   [[ ! -f "$CAST" ]] || die "already seeded ($CAST); run: make devnet-reset to start over"
-  local token user packages
+  local token user
   token="$(access_token)"
   user="$(claim sub)"
-  packages="$(pinned_packages "$token")"
   input="$(mktemp)"
-  token_file="$(mktemp)"
-  trap 'rm -f "$input" "$token_file"' EXIT
-  cast_from_rights "$token" "$user" | jq --argjson packages "$packages" '{cast: ., packages: $packages}' > "$input"
-  echo "Seeding the demo deal as ledger user $user:"
+  trap 'rm -f "$input"' EXIT
+  cast_from_rights "$token" "$user" | jq '{cast: .}' > "$input"
+  echo "Seeding the demo deal in Canton Coin as ledger user $user:"
   jq -r '.cast | to_entries[] | "  \(.key): \(.value)"' "$input"
-  printf %s "$token" > "$token_file"
-  "$DPM" script --dar "$DAR" --script-name Pari.Demo:seed \
-    --ledger-host "$GRPC_HOST" --ledger-port 443 --tls \
-    --access-token-file "$token_file" --user-id "$user" \
-    --input-file "$input" --output-file "$CAST" --wall-clock-time
-  echo "Seeded. Cast written to web/.pari/devnet-cast.json."
+  PARI_SEED_INPUT="$input" ledger_env seed-coin
+  echo "Cast written to web/.pari/devnet-cast.json."
 }
 
-# Archives every active contract of the cast's parties in one transaction, so
-# the same parties can be seeded again. Possible only because this demo's one
-# ledger user acts as every party.
+# Archives every active Pari and test-token contract of the cast's parties in
+# one transaction, so the same parties can be seeded again. Possible only
+# because this demo's one ledger user acts as every party. Canton Coin stays:
+# its holdings are the DSO's to archive, and the next seed reuses them.
 reset() {
   local token user parties offset contracts count
   token="$(access_token)"
@@ -151,7 +149,8 @@ reset() {
       }
     }' | curl -sS --fail-with-body "$JSON_API/v2/state/active-contracts" -H "Authorization: Bearer $token" \
       -H 'content-type: application/json' -d @- |
-    jq -c '[.[].contractEntry.JsActiveContract.createdEvent // empty | {templateId, contractId}] | unique_by(.contractId)')"
+    jq -c '[.[].contractEntry.JsActiveContract.createdEvent // empty | {templateId, contractId}
+      | select(.templateId | split(":")[1] | test("^(Pari|Splice\\.Testing)\\."))] | unique_by(.contractId)')"
   count="$(jq length <<< "$contracts")"
   if (( count == 0 )); then
     echo "Nothing to archive."
@@ -174,19 +173,24 @@ reset() {
 }
 
 # Runs an npm script in web/ against DevNet. The app refreshes the token itself.
-web_env() {
+ledger_env() {
   local packages
-  [[ -f "$CAST" ]] || die "not seeded yet; run: make devnet-seed"
   packages="$(pinned_packages "$(access_token)" | jq -r 'join(",")')"
   cd "$ROOT/web"
   PARI_LEDGER_URL="$JSON_API" \
   PARI_NETWORK="Canton DevNet" \
   PARI_PACKAGE_PREFERENCE="$packages" \
+  PARI_REGISTRY_URL="$REGISTRY_URL" \
   PARI_LEDGER_TOKEN_FILE=.pari/devnet-tokens.json \
   PARI_OIDC_TOKEN_URL="$OIDC_TOKEN_URL" \
   PARI_OIDC_CLIENT_ID="$OIDC_CLIENT_ID" \
   PARI_CAST_FILE=.pari/devnet-cast.json \
     npm run --silent "$@"
+}
+
+web_env() {
+  [[ -f "$CAST" ]] || die "not seeded yet; run: make devnet-seed"
+  ledger_env "$@"
 }
 
 case "${1:-}" in

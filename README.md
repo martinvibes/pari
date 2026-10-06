@@ -96,9 +96,11 @@ transaction.
 
 To run it on the HackCanton DevNet instead, create the parties and upload the
 DAR in the node's Console, then `make devnet-login`, `make devnet-seed` and
-`make devnet-web`: see [docs/devnet.md](docs/devnet.md). The smoke test
-passed there on 6 October, and that page lists the update ids of the closing,
-a trade, an interest payment and a prepayment.
+`make devnet-web`: see [docs/devnet.md](docs/devnet.md). There the deal
+settles in Canton Coin, tapped from the DevNet faucet and moved through Canton
+Coin's own CIP-56 allocations. The smoke test passed there on 6 October, and
+that page lists the update ids of the closing, a trade, the interest payments
+and a prepayment.
 
 The demo server signs as every party so one browser can play the whole deal.
 Each screen still reads the ledger as its own party, and every action is
@@ -110,7 +112,7 @@ authority it would with each party on its own node.
 ```
 daml/pari/         The Pari model
 daml/pari-tests/   Daml Script tests for every guarantee above
-daml/pari-demo/    Seed script for the demo deal, on a sandbox or DevNet
+daml/pari-demo/    Seed script for the demo deal on a sandbox, and the scale run
 daml/dars/         Vendored Splice token-standard packages (see its README)
 docs/              Architecture, authority matrix and DevNet guide
 web/               Website, docs and app (Next.js)
@@ -122,10 +124,11 @@ web/               Website, docs and app (Next.js)
 |---|---|
 | Daml model and test suite | Done |
 | Web app for agent, lenders, borrower and buyers, on a local Canton sandbox | Done |
-| Deployment on the HackCanton DevNet, settling in a CIP-56 test token | Done |
+| Deployment on the HackCanton DevNet | Done |
 | The borrower's auditor, with an audit trail rebuilt and re-checked from the ledger | Done |
 | A hundred lenders per transaction, tested and timed on a Canton sandbox | Done |
-| Settlement in Canton Coin or a stablecoin | Planned |
+| Settlement in Canton Coin, on DevNet | Done |
+| Settlement in a USD stablecoin (e.g. USDCx) | Planned |
 | Agent hosted as a decentralized party across independent operators | Planned |
 
 ## Disclosure

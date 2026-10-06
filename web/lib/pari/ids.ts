@@ -6,7 +6,10 @@
 const pari = (module: string, entity: string) => `#pari:Pari.${module}:${entity}`;
 
 export const T = {
+  FacilityProposal: pari("Facility", "FacilityProposal"),
   Facility: pari("Facility", "Facility"),
+  CommitmentOffer: pari("Syndication", "CommitmentOffer"),
+  Commitment: pari("Syndication", "Commitment"),
   Position: pari("Position", "Position"),
   Receipt: pari("Position", "Receipt"),
   PaymentRequest: pari("Payment", "PaymentRequest"),

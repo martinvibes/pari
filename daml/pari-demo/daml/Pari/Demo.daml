@@ -1,12 +1,10 @@
 -- | Seeds a running ledger with the demo deal the web app drives.
 --
--- Run `sandbox` against a local ledger to allocate fresh parties, or `seed`
--- with an input file of existing parties (e.g. ones created on DevNet). Both
--- write the cast to the output file for the web app.
+-- Run `sandbox` against a local ledger to allocate fresh parties; it writes
+-- the cast to the output file for the web app. On DevNet the deal is seeded
+-- in Canton Coin by `web/scripts/seed-coin.ts` instead.
 module Pari.Demo
   ( sandbox
-  , Seed(..)
-  , seed
   , scale
   ) where
 
@@ -27,7 +25,7 @@ sandbox : Script Cast
 sandbox = do
   tag <- runTag
   cast <- allocateCastWith \name -> allocatePartyByHint (PartyIdHint (name <> "-" <> tag))
-  seedWith mempty cast
+  seedWith cast
 
 -- | The scale test's deal on a live ledger, with new parties: a hundred
 -- lenders close, are paid interest and are prepaid, each step checked and
@@ -51,42 +49,31 @@ base36 n
   | otherwise = base36 (n / 36) <> digit
   where digit = Text.substring (n % 36) 1 "0123456789abcdefghijklmnopqrstuvwxyz"
 
--- | `seed`'s input: the parties, and the ids of the packages the deal runs.
--- A shared participant may vet a later version of a package this deal uses,
--- uploaded by someone else, and would otherwise prefer it.
-data Seed = Seed with
-    cast : Cast
-    packages : [Text]
-
--- | The demo deal on existing parties, every submission pinned to `packages`.
-seed : Seed -> Script Cast
-seed Seed{..} = seedWith (packagePreference (map PackageId packages)) cast
-
 -- | Leaves the Northwind deal closed with its first period's rate fixed and
 -- the cast's auditor, if any, appointed before closing; cash with the
 -- borrower and both buyers, each lender's information election, and two
 -- borrower documents not yet shared. Every later step (interest, trades, prepayment,
 -- document distribution) is driven from the web app.
-seedWith : SubmitOptions -> Cast -> Script Cast
-seedWith pin cast = do
-  env <- prepare pin cast
+seedWith : Cast -> Script Cast
+seedWith cast = do
+  env <- prepare mempty cast
   (proposed, commitments) <- syndicateFacility env
   audited <- case cast.auditor of
     None -> pure proposed
-    Some auditor -> submit (actAs cast.borrower <> pin) $ exerciseCmd proposed Facility_AppointAuditor with
+    Some auditor -> submit (actAs cast.borrower) $ exerciseCmd proposed Facility_AppointAuditor with
       newAuditor = auditor
-  closed <- submit (actAs cast.agent <> pin) $ exerciseCmd audited Facility_Close with commitments
-  _ <- submit (actAs cast.agent <> pin) $ exerciseCmd closed Facility_FixRate with
+  closed <- submit (actAs cast.agent) $ exerciseCmd audited Facility_Close with commitments
+  _ <- submit (actAs cast.agent) $ exerciseCmd closed Facility_FixRate with
     baseRate = sofr
     periodEnd = firstPeriodEnd
   forA_ [(cast.alder, PrivateSide), (cast.birch, PublicSide), (cast.cedar, PublicSide)] \(lender, side) ->
-    submit (actAs lender <> pin) $ createCmd InfoElection with
+    submit (actAs lender) $ createCmd InfoElection with
       lender
       agent = cast.agent
       facilityId = dealId
       side
   forA_ documents \(docId, title, mnpi, sha256) ->
-    submit (actAs cast.borrower <> pin) $ createCmd Document with
+    submit (actAs cast.borrower) $ createCmd Document with
       borrower = cast.borrower
       agent = cast.agent
       facilityId = dealId

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "server-only";
+import type { Cast } from "@/lib/ledger/cast";
 import type { Contract } from "@/lib/ledger/client";
 import { formatDate } from "@/lib/pari/dates";
 import { impliedBasisPoints, toCents } from "@/lib/pari/money";
@@ -113,8 +114,19 @@ export function balanceCents(s: Snapshot, owner: string, instrument: P.Instrumen
     .reduce((sum, h) => sum + toCents(h.payload.amount), 0n);
 }
 
+/** The instrument the demo deal is funded and repaid in, as the seed chose
+ *  it: the test token `USD` unless the cast names another. */
+export function instrumentOf(cast: Cast): P.InstrumentId {
+  return { admin: cast.registry, id: cast.instrument ?? "USD" };
+}
+
 /** The unit an instrument's amounts are shown in: Canton Coin's registry id
  *  is `Amulet`; other instruments go by their id. */
 export function unitOf(instrument: P.InstrumentId): string {
   return instrument.id === "Amulet" ? "CC" : instrument.id;
+}
+
+/** The unit the demo deal's cash is shown in. */
+export function cashUnit(cast: Cast): string {
+  return unitOf(instrumentOf(cast));
 }
