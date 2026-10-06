@@ -5,6 +5,7 @@
 -- write the cast to the output file for the web app.
 module Pari.Demo
   ( sandbox
+  , Seed(..)
   , seed
   ) where
 
@@ -23,7 +24,7 @@ sandbox : Script Cast
 sandbox = do
   tag <- runTag
   cast <- allocateCastWith \name -> allocatePartyByHint (PartyIdHint (name <> "-" <> tag))
-  seed cast
+  seedWith mempty cast
 
 -- | Seconds since the epoch, in base 36.
 runTag : Script Text
@@ -37,22 +38,33 @@ base36 n
   | otherwise = base36 (n / 36) <> digit
   where digit = Text.substring (n % 36) 1 "0123456789abcdefghijklmnopqrstuvwxyz"
 
+-- | `seed`'s input: the parties, and the ids of the packages the deal runs.
+-- A shared participant may vet a later version of a package this deal uses,
+-- uploaded by someone else, and would otherwise prefer it.
+data Seed = Seed with
+    cast : Cast
+    packages : [Text]
+
+-- | The demo deal on existing parties, every submission pinned to `packages`.
+seed : Seed -> Script Cast
+seed Seed{..} = seedWith (packagePreference (map PackageId packages)) cast
+
 -- | Leaves the Northwind deal closed with its first period's rate fixed, cash
 -- with the borrower and both buyers, each lender's information election, and
 -- two borrower documents not yet shared. Every later step (interest, trades,
 -- prepayment, document distribution) is driven from the web app.
-seed : Cast -> Script Cast
-seed cast = do
-  env <- prepare cast
+seedWith : SubmitOptions -> Cast -> Script Cast
+seedWith pin cast = do
+  env <- prepare pin cast
   _ <- activeFacility env
   forA_ [(cast.alder, PrivateSide), (cast.birch, PublicSide), (cast.cedar, PublicSide)] \(lender, side) ->
-    submit lender $ createCmd InfoElection with
+    submit (actAs lender <> pin) $ createCmd InfoElection with
       lender
       agent = cast.agent
       facilityId = dealId
       side
   forA_ documents \(docId, title, mnpi, sha256) ->
-    submit cast.borrower $ createCmd Document with
+    submit (actAs cast.borrower <> pin) $ createCmd Document with
       borrower = cast.borrower
       agent = cast.agent
       facilityId = dealId

@@ -15,4 +15,6 @@ export const LEDGER = {
     tokenUrl: process.env.PARI_OIDC_TOKEN_URL,
     clientId: process.env.PARI_OIDC_CLIENT_ID,
   },
+  /** Package ids every submission prefers, comma-separated; see `submit`. */
+  packagePreference: (process.env.PARI_PACKAGE_PREFERENCE ?? "").split(",").filter(Boolean),
 };

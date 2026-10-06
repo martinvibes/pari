@@ -83,7 +83,9 @@ Daml tests and every privacy claim against each party's own view.
 
 To run it on the HackCanton DevNet instead, create the parties and upload the
 DAR in the node's Console, then `make devnet-login`, `make devnet-seed` and
-`make devnet-web`: see [docs/devnet.md](docs/devnet.md).
+`make devnet-web`: see [docs/devnet.md](docs/devnet.md). The same smoke test
+passes there, all 11 checks, and that page lists the update ids of the closing,
+a trade, an interest payment and a prepayment.
 
 The demo server signs as every party so one browser can play the whole deal.
 Each screen still reads the ledger as its own party, and every action is
@@ -107,7 +109,7 @@ web/               Website, docs and app (Next.js)
 |---|---|
 | Daml model and test suite | Done |
 | Web app for agent, lenders, borrower and buyers, on a local Canton sandbox | Done |
-| Deployment on the HackCanton DevNet, settling in a CIP-56 test token | In progress |
+| Deployment on the HackCanton DevNet, settling in a CIP-56 test token | Done |
 | Settlement in Canton Coin or a stablecoin | Planned |
 | Agent hosted as a decentralized party across independent operators | Planned |
 

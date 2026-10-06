@@ -9,7 +9,9 @@ import { LedgerError } from "@/lib/ledger/errors";
 // A thin client for the Canton JSON Ledger API v2: read the active contract
 // set as one party, and submit commands as one or more parties. Templates and
 // interfaces are referenced by package name (`#pari:Module:Template`), so the
-// app keeps working across package versions.
+// app keeps working across package versions. On a shared participant, where
+// anyone may upload a later version of a package Pari uses, submissions pin
+// the versions in LEDGER.packagePreference.
 
 export type Contract<T> = {
   contractId: string;
@@ -164,6 +166,7 @@ export async function submit({ actAs, readAs = [], commands, disclosedContracts 
       actAs,
       readAs,
       disclosedContracts,
+      packageIdSelectionPreference: LEDGER.packagePreference,
     },
     transactionFormat: {
       eventFormat: {

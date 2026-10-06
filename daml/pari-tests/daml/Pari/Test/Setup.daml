@@ -44,6 +44,9 @@ data Env = Env with
     rules : ContractId TokenRules
     desk : ContractId AgentDesk
     dqList : ContractId DqList
+    pin : SubmitOptions
+      -- ^ Carried by every submission here: the package versions to run (see
+      -- `Pari.Demo.seed`), or none.
 
 -- Dates used across the suite.
 closing, firstPeriodEnd, midPeriod, maturity : Date
@@ -95,13 +98,14 @@ allocateCastWith allocate = do
   pure Cast with ..
 
 -- | The token registry, the agent's desk, the borrower's DQ list (naming the
--- rival), and cash for the borrower, the syndicate and both buyers.
-prepare : Cast -> Script Env
-prepare Cast{..} = do
+-- rival), and cash for the borrower, the syndicate and both buyers. Every
+-- submission carries `pin`.
+prepare : SubmitOptions -> Cast -> Script Env
+prepare pin Cast{..} = do
   let usd = InstrumentId with admin = registry; id = "USD"
-  rules <- submit registry $ createCmd TokenRules with admin = registry
-  desk <- submit agent $ createCmd AgentDesk with agent
-  dqList <- submit borrower $ createCmd DqList with
+  rules <- submit (actAs registry <> pin) $ createCmd TokenRules with admin = registry
+  desk <- submit (actAs agent <> pin) $ createCmd AgentDesk with agent
+  dqList <- submit (actAs borrower <> pin) $ createCmd DqList with
     borrower
     agent
     facilityId = dealId
@@ -116,13 +120,13 @@ prepare Cast{..} = do
 setup : Script Env
 setup = do
   setTime (time closing 9 0 0)
-  allocateCast >>= prepare
+  allocateCast >>= prepare mempty
 
 -- Tokens --------------------------------------------------------------------
 
 mint : Env -> Party -> Decimal -> Script ()
 mint env owner amount = do
-  submit (actAs [owner, env.registry]) $ createCmd Token with
+  submit (actAs [owner, env.registry] <> env.pin) $ createCmd Token with
     holding = HoldingView with
       owner
       instrumentId = env.usd
@@ -147,7 +151,7 @@ allocate : Env -> SettlementInfo -> Text -> TransferLeg -> Script AllocationInpu
 allocate env settlement transferLegId transferLeg = do
   holdings <- holdingsOf env transferLeg.sender
   now <- getTime
-  result <- submit (actAs transferLeg.sender <> readAs env.registry) $
+  result <- submit (actAs transferLeg.sender <> readAs env.registry <> env.pin) $
     exerciseCmd (toInterfaceContractId @AllocationFactory env.rules) AllocationFactory_Allocate with
       expectedAdmin = env.registry
       allocation = AllocationSpecification with settlement; transferLegId; transferLeg
@@ -169,16 +173,16 @@ deadlines = do
 -- their funding allocations, but do not close yet.
 syndicateFacility : Env -> Script (ContractId Facility, [(ContractId Commitment, AllocationInput)])
 syndicateFacility env = do
-  proposal <- submit env.agent $ createCmd FacilityProposal with
+  proposal <- submit (actAs env.agent <> env.pin) $ createCmd FacilityProposal with
     agent = env.agent
     borrower = env.borrower
     terms = dealTerms env
-  facility <- submit env.borrower $ exerciseCmd proposal FacilityProposal_Accept
+  facility <- submit (actAs env.borrower <> env.pin) $ exerciseCmd proposal FacilityProposal_Accept
   (allocateBefore, settleBefore) <- deadlines
   commitments <- forA (syndicate env) \(lender, amount) -> do
-    offer <- submit env.agent $ exerciseCmd facility Facility_Invite with
+    offer <- submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_Invite with
       lender; amount; allocateBefore; settleBefore
-    commitmentCid <- submit lender $ exerciseCmd offer CommitmentOffer_Accept
+    commitmentCid <- submit (actAs lender <> env.pin) $ exerciseCmd offer CommitmentOffer_Accept
     commitment <- fromSomeNote "commitment" <$> queryContractId lender commitmentCid
     allocation <- allocate env commitment.settlement (legIdFor lender)
       (mkLeg lender env.borrower amount env.usd)
@@ -188,13 +192,13 @@ syndicateFacility env = do
 closeFacility : Env -> Script (ContractId Facility)
 closeFacility env = do
   (facility, commitments) <- syndicateFacility env
-  submit env.agent $ exerciseCmd facility Facility_Close with commitments
+  submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_Close with commitments
 
 -- | A closed facility with the first period's rate fixed.
 activeFacility : Env -> Script (ContractId Facility)
 activeFacility env = do
   facility <- closeFacility env
-  submit env.agent $ exerciseCmd facility Facility_FixRate with
+  submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_FixRate with
     baseRate = sofr
     periodEnd = firstPeriodEnd
 
@@ -225,7 +229,7 @@ pay env facilityCid fraction = do
     allocation <- allocate env request.settlement legId leg with amount
     pure (leg.receiver, allocation)
   positions <- positionsOf (map fst legs)
-  submit env.agent $ exerciseCmd facilityCid Facility_Settle with
+  submit (actAs env.agent <> env.pin) $ exerciseCmd facilityCid Facility_Settle with
     fraction
     positions
     allocations = Map.fromList legs
@@ -236,4 +240,4 @@ legsOf request = TextMap.toList request.legs
 requestInterest : Env -> ContractId Facility -> Script (ContractId Facility, ContractId PaymentRequest)
 requestInterest env facility = do
   (allocateBefore, settleBefore) <- deadlines
-  submit env.agent $ exerciseCmd facility Facility_RequestInterest with allocateBefore; settleBefore
+  submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_RequestInterest with allocateBefore; settleBefore

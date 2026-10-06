@@ -9,6 +9,11 @@
 #   scripts/devnet.sh seed     seed the demo deal on the Console's parties
 #   scripts/devnet.sh web      run the web app against DevNet
 #   scripts/devnet.sh smoke    drive the seeded deal through every app action
+#   scripts/devnet.sh reset    archive the deal, so the parties can be seeded again
+#
+# The node is shared, and any team may upload a later version of a package
+# Pari uses. Every submission therefore pins the package ids built into the
+# DAR, as `Pari.Demo.seed` and PARI_PACKAGE_PREFERENCE do.
 #
 # Tokens and the cast are written to web/.pari/, which git ignores.
 
@@ -96,18 +101,31 @@ cast_from_rights() {
             end)'
 }
 
-seed() {
+# The ids of the packages the deal runs, Pari and the token standard, as a
+# JSON array read from the DAR's file names. The node must have each one.
+pinned_packages() {
+  local token="$1" ids missing
   [[ -f "$DAR" ]] || die "no DAR at $DAR; run: make build"
-  [[ ! -f "$CAST" ]] || die "already seeded ($CAST). Seeding again needs new parties; move that file away first."
-  local token user
+  ids="$(unzip -Z1 "$DAR" | sed -nE 's#^(.*/)?(pari|splice-.*)-[0-9.]+-([0-9a-f]{64})\.dalf$#\2 \3#p' |
+    jq -Rn '[inputs | split(" ") | select(.[0] == "pari" or (.[0] | startswith("splice-"))) | .[1]]')"
+  missing="$(curl -sS --fail-with-body "$JSON_API/v2/packages" -H "Authorization: Bearer $token" |
+    jq -r --argjson ids "$ids" '$ids - .packageIds | .[]')"
+  [[ -z "$missing" ]] || die "the node lacks packages from $DAR: $missing. Upload the DAR in the Console."
+  printf '%s\n' "$ids"
+}
+
+seed() {
+  [[ ! -f "$CAST" ]] || die "already seeded ($CAST); run: make devnet-reset to start over"
+  local token user packages
   token="$(access_token)"
   user="$(claim sub)"
+  packages="$(pinned_packages "$token")"
   input="$(mktemp)"
   token_file="$(mktemp)"
   trap 'rm -f "$input" "$token_file"' EXIT
-  cast_from_rights "$token" "$user" > "$input"
+  cast_from_rights "$token" "$user" | jq --argjson packages "$packages" '{cast: ., packages: $packages}' > "$input"
   echo "Seeding the demo deal as ledger user $user:"
-  jq -r 'to_entries[] | "  \(.key): \(.value)"' "$input"
+  jq -r '.cast | to_entries[] | "  \(.key): \(.value)"' "$input"
   printf %s "$token" > "$token_file"
   "$DPM" script --dar "$DAR" --script-name Pari.Demo:seed \
     --ledger-host "$GRPC_HOST" --ledger-port 443 --tls \
@@ -116,12 +134,53 @@ seed() {
   echo "Seeded. Cast written to web/.pari/devnet-cast.json."
 }
 
+# Archives every active contract of the cast's parties in one transaction, so
+# the same parties can be seeded again. Possible only because this demo's one
+# ledger user acts as every party.
+reset() {
+  local token user parties offset contracts count
+  token="$(access_token)"
+  user="$(claim sub)"
+  parties="$(cast_from_rights "$token" "$user" | jq -c '[.[]]')"
+  offset="$(curl -sS --fail-with-body "$JSON_API/v2/state/ledger-end" -H "Authorization: Bearer $token" | jq .offset)"
+  contracts="$(jq -n --argjson parties "$parties" --argjson offset "$offset" '{
+      activeAtOffset: $offset,
+      eventFormat: {
+        filtersByParty: ($parties | map({key: ., value: {cumulative: [{identifierFilter: {WildcardFilter: {value: {includeCreatedEventBlob: false}}}}]}}) | from_entries),
+        verbose: false
+      }
+    }' | curl -sS --fail-with-body "$JSON_API/v2/state/active-contracts" -H "Authorization: Bearer $token" \
+      -H 'content-type: application/json' -d @- |
+    jq -c '[.[].contractEntry.JsActiveContract.createdEvent // empty | {templateId, contractId}] | unique_by(.contractId)')"
+  count="$(jq length <<< "$contracts")"
+  if (( count == 0 )); then
+    echo "Nothing to archive."
+  else
+    jq -r '.[].templateId | split(":")[1:] | join(":")' <<< "$contracts" | sort | uniq -c
+    local answer
+    read -rp "Archive these $count contracts? [y/N] " answer
+    [[ "$answer" == y ]] || die "nothing archived"
+    jq -n --argjson contracts "$contracts" --argjson parties "$parties" \
+      --arg user "$user" --arg commandId "pari-reset-$(date +%s)" '{
+        commands: [$contracts[] | {ExerciseCommand: (. + {choice: "Archive", choiceArgument: {}})}],
+        commandId: $commandId,
+        userId: $user,
+        actAs: $parties
+      }' | curl -sS --fail-with-body "$JSON_API/v2/commands/submit-and-wait" -H "Authorization: Bearer $token" \
+        -H 'content-type: application/json' -d @- > /dev/null
+    echo "Archived $count contracts."
+  fi
+  rm -f "$CAST"
+}
+
 # Runs an npm script in web/ against DevNet. The app refreshes the token itself.
 web_env() {
-  access_token > /dev/null
+  local packages
   [[ -f "$CAST" ]] || die "not seeded yet; run: make devnet-seed"
+  packages="$(pinned_packages "$(access_token)" | jq -r 'join(",")')"
   cd "$ROOT/web"
   PARI_LEDGER_URL="$JSON_API" \
+  PARI_PACKAGE_PREFERENCE="$packages" \
   PARI_LEDGER_TOKEN_FILE=.pari/devnet-tokens.json \
   PARI_OIDC_TOKEN_URL="$OIDC_TOKEN_URL" \
   PARI_OIDC_CLIENT_ID="$OIDC_CLIENT_ID" \
@@ -134,5 +193,6 @@ case "${1:-}" in
   seed) seed ;;
   web) web_env dev ;;
   smoke) web_env smoke ;;
-  *) die "usage: scripts/devnet.sh login | seed | web | smoke" ;;
+  reset) reset ;;
+  *) die "usage: scripts/devnet.sh login | seed | web | smoke | reset" ;;
 esac

@@ -7,7 +7,7 @@ SMOKE_CAST := web/.pari/smoke-cast.json
 SEED := $(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:sandbox \
 	--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file
 
-.PHONY: build test sandbox seed smoke devnet-login devnet-seed devnet-web devnet-smoke
+.PHONY: build test sandbox seed smoke devnet-login devnet-seed devnet-web devnet-smoke devnet-reset
 
 # Build the Pari model, its tests and the demo package.
 build:
@@ -47,3 +47,7 @@ devnet-web:
 
 devnet-smoke:
 	scripts/devnet.sh smoke
+
+# Archive the deal, so the same parties can be seeded again.
+devnet-reset:
+	scripts/devnet.sh reset
