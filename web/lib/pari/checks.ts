@@ -19,7 +19,7 @@ export const PRIVACY_CHECKS: PrivacyCheck[] = [
       lenders(seen).every(({ view }) => view.s.positions.every((p) => p.payload.lender === view.party)),
   },
   {
-    claim: "Only the agent and the borrower see the register",
+    claim: "No lender sees the register",
     test: "Syndication: test_lenders_see_only_their_own_position",
     holds: (seen) => lenders(seen).every(({ view }) => view.s.facilities.length === 0),
   },
@@ -45,6 +45,19 @@ export const PRIVACY_CHECKS: PrivacyCheck[] = [
         ({ view }) =>
           view.s.documents.length === 0 && view.s.accesses.every((a) => a.payload.lender === view.party),
       ),
+  },
+  {
+    claim: "The auditor sees the register, and no position, price, DQ list or document",
+    test: "Audit: test_auditor_holds_no_price_dq_list_or_document",
+    holds: (seen) =>
+      seen
+        .filter(({ persona }) => persona.role === "auditor")
+        .every(
+          ({ view: { s } }) =>
+            s.facilities.length <= 1 &&
+            s.positions.length + s.offers.length + s.tickets.length === 0 &&
+            s.dqLists.length + s.screenings.length + s.documents.length + s.accesses.length + s.elections.length === 0,
+        ),
   },
   {
     claim: "The agent holds no money",

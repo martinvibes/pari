@@ -45,7 +45,8 @@ export default function IntroductionPage() {
         <ul>
           <li>
             <strong>Private positions.</strong> Each lender&rsquo;s position is a contract co-signed
-            by that lender and the agent. Only the agent and the borrower see the full register.
+            by that lender and the agent. Only the agent, the borrower and the borrower&rsquo;s auditor
+            see the full register.
           </li>
           <li>
             <strong>Atomic payments.</strong> Interest and principal reach every lender in one

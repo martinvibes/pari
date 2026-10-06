@@ -147,6 +147,129 @@ export async function disclosable(party: string, templateId: string): Promise<Di
   }));
 }
 
+/** One event of a transaction, as one witness of it receives it. Node ids
+ *  order the tree: an exercise's consequences are the nodes after it, up to
+ *  and including its `lastDescendantNodeId`. */
+export type TreeEvent =
+  | {
+      kind: "created";
+      nodeId: number;
+      templateId: string;
+      contractId: string;
+      payload: unknown;
+      views: Record<string, unknown>;
+    }
+  | {
+      kind: "exercised";
+      nodeId: number;
+      lastDescendantNodeId: number;
+      templateId: string;
+      contractId: string;
+      choice: string;
+      argument: unknown;
+      consuming: boolean;
+    };
+
+export type Transaction = { updateId: string; offset: number; effectiveAt: string; events: TreeEvent[] };
+
+type JsTransaction = {
+  updateId: string;
+  offset: number;
+  effectiveAt: string;
+  events: Array<{
+    CreatedEvent?: CreatedEvent & { nodeId: number };
+    ExercisedEvent?: {
+      nodeId: number;
+      lastDescendantNodeId: number;
+      templateId: string;
+      contractId: string;
+      choice: string;
+      choiceArgument: unknown;
+      consuming: boolean;
+    };
+  }>;
+};
+
+const PAGE = 100;
+
+/** Every transaction `party` witnessed, oldest first, from the participant's
+ *  pruning horizon to the ledger end: for each, the events `party` is
+ *  entitled to see, with the choices that produced them. Created events of
+ *  the given interfaces carry their views. */
+export async function witnessed(party: string, interfaces: string[] = []): Promise<Transaction[]> {
+  const end = await ledgerEnd();
+  const { participantPrunedUpToInclusive } = await call<{ participantPrunedUpToInclusive: number }>(
+    "/v2/state/latest-pruned-offsets",
+  );
+  const filters = [
+    { identifierFilter: { WildcardFilter: { value: { includeCreatedEventBlob: false } } } },
+    ...interfaces.map((interfaceId) => ({
+      identifierFilter: {
+        InterfaceFilter: { value: { interfaceId, includeInterfaceView: true, includeCreatedEventBlob: false } },
+      },
+    })),
+  ];
+  const transactions: Transaction[] = [];
+  let from = participantPrunedUpToInclusive;
+  while (from < end) {
+    const page = await call<Array<{ update: { Transaction?: { value: JsTransaction }; OffsetCheckpoint?: { value: { offset: number } } } }>>(
+      `/v2/updates?limit=${PAGE}`,
+      {
+        beginExclusive: from,
+        endInclusive: end,
+        updateFormat: {
+          includeTransactions: {
+            eventFormat: { filtersByParty: { [party]: { cumulative: filters } }, verbose: false },
+            transactionShape: "TRANSACTION_SHAPE_LEDGER_EFFECTS",
+          },
+        },
+      },
+    );
+    for (const { update } of page) {
+      const tx = update.Transaction?.value;
+      if (tx) transactions.push(toTransaction(tx));
+      from = Math.max(from, tx?.offset ?? update.OffsetCheckpoint?.value.offset ?? from);
+    }
+    if (page.length < PAGE) break;
+  }
+  return transactions;
+}
+
+function toTransaction(tx: JsTransaction): Transaction {
+  const events = tx.events.flatMap((e): TreeEvent[] => {
+    if (e.CreatedEvent) {
+      const c = e.CreatedEvent;
+      return [
+        {
+          kind: "created",
+          nodeId: c.nodeId,
+          templateId: c.templateId,
+          contractId: c.contractId,
+          payload: c.createArgument,
+          views: Object.fromEntries((c.interfaceViews ?? []).map((v) => [qualifiedName(v.interfaceId), v.viewValue])),
+        },
+      ];
+    }
+    if (e.ExercisedEvent) {
+      const x = e.ExercisedEvent;
+      return [
+        {
+          kind: "exercised",
+          nodeId: x.nodeId,
+          lastDescendantNodeId: x.lastDescendantNodeId,
+          templateId: x.templateId,
+          contractId: x.contractId,
+          choice: x.choice,
+          argument: x.choiceArgument,
+          consuming: x.consuming,
+        },
+      ];
+    }
+    return [];
+  });
+  return { updateId: tx.updateId, offset: tx.offset, effectiveAt: tx.effectiveAt, events };
+}
+
 export type Submission = {
   actAs: string[];
   readAs?: string[];

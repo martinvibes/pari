@@ -133,6 +133,18 @@ export const updateDqList: Action = async (_, form) =>
     return "DQ list updated. Only Northwind and the agent can see it.";
   });
 
+export const appointAuditor: Action = async () =>
+  run(async (cast) => {
+    await ops.appointAuditor(cast);
+    return "Auditor appointed. From now on it sees the register and every payment.";
+  });
+
+export const removeAuditor: Action = async () =>
+  run(async (cast) => {
+    await ops.removeAuditor(cast);
+    return "Auditor removed. It keeps what it saw, and sees nothing new.";
+  });
+
 // Any payer ---------------------------------------------------------------------
 
 export const releaseCash: Action = async (_, form) =>

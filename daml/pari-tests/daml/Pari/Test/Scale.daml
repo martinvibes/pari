@@ -1,0 +1,126 @@
+-- | Scale: one facility across a hundred lenders. The closing funds the
+-- borrower from every lender, the interest payment reaches every lender, and
+-- a prepayment is shared to the cent, each in one transaction.
+--
+-- `atScale` is the deal itself and leaves the time alone, so the demo package
+-- also runs it on a live ledger and times each step (`make scale`).
+module Pari.Test.Scale where
+
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.Map qualified as Map
+import DA.Optional (fromSomeNote)
+import DA.Time (RelTime, subTime)
+import Daml.Script
+
+import Pari.Facility
+import Pari.Interest
+import Pari.Payment
+import Pari.Util (floorCents)
+
+import Pari.Test.Setup
+
+-- | Lenders in the wide syndicate.
+wide : Int
+wide = 100
+
+-- | Lender i commits 1m plus i × 7,919.13: uneven, so a pro-rata split
+-- leaves cents to place.
+commitmentOf : Int -> Decimal
+commitmentOf i = 1_000_000.0 + intToDecimal i * 7_919.13
+
+-- | The prepayment: a third of the facility, which no commitment divides evenly.
+prepaymentOf : Decimal -> Decimal
+prepaymentOf total = floorCents (total / 3.0)
+
+-- | Wall-clock time each one-transaction step took. Zero under a test's
+-- static time.
+data Timings = Timings with
+    lenders : Int
+    closingTook : RelTime
+    interestTook : RelTime
+    prepaymentTook : RelTime
+  deriving (Eq, Show)
+
+-- | `n` lenders, each holding exactly its commitment in cash.
+wideSyndicate : Env -> (Text -> Script Party) -> Int -> Script [(Party, Decimal)]
+wideSyndicate env allocate n = forA [1 .. n] \i -> do
+  lender <- allocate ("Lender" <> show i)
+  let amount = commitmentOf i
+  mint env lender amount
+  pure (lender, amount)
+
+-- | The agent exercises `choice` on the facility, timed.
+agentTimed : Choice Facility c (ContractId Facility) => Env -> ContractId Facility -> c -> Script (ContractId Facility, RelTime)
+agentTimed env facility choice = do
+  start <- getTime
+  result <- submit (actAs env.agent <> env.pin) $ exerciseCmd facility choice
+  end <- getTime
+  pure (result, subTime end start)
+
+-- | The wide deal from closing to a prepayment, checking every lender after
+-- each step.
+atScale : Env -> [(Party, Decimal)] -> Script Timings
+atScale env syndicate = do
+  let total = sum (map snd syndicate)
+      prepayment = prepaymentOf total
+  borrowerBefore <- balanceOf env env.borrower
+
+  -- Closing: every lender's allocation reaches the borrower in one transaction.
+  (proposed, commitments) <- syndicateFacilityWith env syndicate
+  (facility, closingTook) <- agentTimed env proposed Facility_Close with commitments
+  borrowerCash <- balanceOf env env.borrower
+  borrowerCash === borrowerBefore + total
+  state <- facilityOf env facility
+  Map.size state.register === length syndicate
+  outstanding state === total
+
+  -- Interest: one leg per lender, ACT/360 on its own principal, all paid at once.
+  facility <- submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_FixRate with
+    baseRate = sofr
+    periodEnd = firstPeriodEnd
+  (facility, _) <- requestInterest env facility
+  let rate = allInRate (dealTerms env).marginBps sofr
+      due = Map.fromList [(lender, accrual amount rate closing firstPeriodEnd) | (lender, amount) <- syndicate]
+  payment <- fund env facility 1.0
+  Map.size payment.allocations === length syndicate
+  (facility, interestTook) <- agentTimed env facility payment
+  forA_ syndicate \(lender, _) -> do
+    cash <- balanceOf env lender
+    cash === lookupNote lender due
+
+  -- Prepayment: shared pro rata to the cent, the leftover cents placed by the model.
+  let shares = proRata prepayment (Map.fromList syndicate)
+  sum (Map.values shares) === prepayment
+  notice <- submit (actAs env.borrower <> env.pin) $ createCmd PrepaymentNotice with
+    borrower = env.borrower
+    agent = env.agent
+    facilityId = dealId
+    amount = prepayment
+  (allocateBefore, settleBefore) <- deadlines
+  (facility, _) <- submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_AcceptPrepayment with
+    noticeCid = notice
+    allocateBefore
+    settleBefore
+  repayment <- fund env facility 1.0
+  (facility, prepaymentTook) <- agentTimed env facility repayment
+  state <- facilityOf env facility
+  outstanding state === total - prepayment
+  forA_ syndicate \(lender, committed) -> do
+    let share = lookupNote lender shares
+    ((.principal) <$> Map.lookup lender state.register) === Some (committed - share)
+    (_, position) <- positionOf lender
+    position.principal === committed - share
+    cash <- balanceOf env lender
+    cash === lookupNote lender due + share
+
+  pure Timings with lenders = length syndicate; ..
+  where
+    lookupNote lender = fromSomeNote ("no entry for " <> show lender) . Map.lookup lender
+
+test_a_hundred_lenders_settle_in_one_transaction_each : Script ()
+test_a_hundred_lenders_settle_in_one_transaction_each = do
+  env <- setup
+  syndicate <- wideSyndicate env allocateParty wide
+  _ <- atScale env syndicate
+  pure ()

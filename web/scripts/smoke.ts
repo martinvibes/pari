@@ -8,6 +8,8 @@
 //   make smoke    (with `make sandbox` running; seeds a deal of its own)
 
 import { loadCast, partyOf } from "@/lib/ledger/cast";
+import { qualifiedName, witnessed } from "@/lib/ledger/client";
+import { auditTrail } from "@/lib/pari/audit";
 import { PRIVACY_CHECKS } from "@/lib/pari/checks";
 import { balanceCents, facilityOf, positionOf, requestState, strandedAllocations } from "@/lib/pari/deal";
 import { formatCents, formatMoney, toCents } from "@/lib/pari/money";
@@ -139,6 +141,20 @@ async function notice() {
   const found = (await snapshot(cast.agent)).notices[0];
   if (!found) throw new Error("The agent holds no prepayment notice.");
   return found.contractId;
+}
+
+// Templates whose contracts carry a trade price, the DQ list or the data room.
+const NEVER_TO_AUDITOR = [
+  "Pari.Trade:TradeOffer",
+  "Pari.Trade:TradeTicket",
+  "Pari.Screening:DqList",
+  "Pari.Disclosure:Document",
+  "Pari.Disclosure:DocumentAccess",
+  "Pari.Disclosure:InfoElection",
+];
+
+async function audit() {
+  return auditTrail(party("auditor"), namer(cast));
 }
 
 // The deal ----------------------------------------------------------------------
@@ -282,6 +298,42 @@ const steps: Array<[string, () => Promise<void>]> = [
         .filter((r) => r.payload.candidate === party("rival"))
         .sort((a, b) => (a.payload.screenedAt < b.payload.screenedAt ? 1 : -1))[0];
       same(latest?.payload.cleared, true, "Rival's latest screening");
+    },
+  ],
+  [
+    "the auditor replays the deal from the ledger: every check holds, and it never received a price, the DQ list or a document",
+    async () => {
+      const trail = await audit();
+      const failed = trail.rows.flatMap((r) => r.checks.filter((c) => !c.ok).map((c) => `${r.event}: ${c.label}`));
+      same(failed, [], "audit checks failed");
+      same(trail.reconciliation.filter((f) => f.state !== "ok").map((f) => f.label), [], "reconciliation findings not holding");
+      same(
+        NEVER_TO_AUDITOR.filter((t) => trail.received.has(t)),
+        [],
+        "templates among the events the auditor witnessed",
+      );
+      same(trail.rows.filter((r) => r.event === "Interest paid").length, 2, "interest payments in the trail");
+      // Recording a trade uses up the buyer's clearance inside the facility's
+      // choice, so the auditor witnesses that, and nothing else of screening.
+      const screenings = (await witnessed(party("auditor"))).flatMap((tx) =>
+        tx.events
+          .filter((e) => qualifiedName(e.templateId) === "Pari.Screening:ScreeningResult")
+          .map((e) => (e.kind === "exercised" ? e.choice : "created")),
+      );
+      same(screenings, ["Archive"], "what the auditor witnessed of screening: the one trade's clearance, used up");
+    },
+  ],
+  [
+    "Northwind removes its auditor: the auditor sees nothing new, then is appointed again",
+    async () => {
+      const before = (await audit()).transactions;
+      await ops.removeAuditor(cast);
+      same((await snapshot(party("auditor"))).facilities.length, 0, "facilities the removed auditor holds");
+      await ops.updateDqList(cast, []);
+      await ops.fixRate(cast, "4.30", "2027-06-15");
+      same((await audit()).transactions, before + 1, "transactions the auditor witnessed after removal");
+      await ops.appointAuditor(cast);
+      same((await snapshot(party("auditor"))).facilities.length, 1, "facilities the reappointed auditor holds");
     },
   ],
   [

@@ -85,6 +85,8 @@ data Cast = Cast with
     cedar : Party
     buyer : Party
     rival : Party
+    auditor : Optional Party
+      -- ^ The borrower's auditor, appointed before closing, if the deal has one.
   deriving (Eq, Show)
 
 allocateCast : Script Cast
@@ -93,8 +95,9 @@ allocateCast = allocateCastWith allocateParty
 -- | Allocates the cast with `allocate`, given each party's name.
 allocateCastWith : (Text -> Script Party) -> Script Cast
 allocateCastWith allocate = do
-  [registry, agent, borrower, alder, birch, cedar, buyer, rival] <-
-    mapA allocate ["Registry", "Agent", "Northwind", "Alder", "Birch", "Cedar", "Delta", "Rival"]
+  [registry, agent, borrower, alder, birch, cedar, buyer, rival, auditorParty] <-
+    mapA allocate ["Registry", "Agent", "Northwind", "Alder", "Birch", "Cedar", "Delta", "Rival", "Auditor"]
+  let auditor = Some auditorParty
   pure Cast with ..
 
 -- | The token registry, the agent's desk, the borrower's DQ list (naming the
@@ -172,14 +175,19 @@ deadlines = do
 -- | Propose and accept the facility, collect the three commitments with
 -- their funding allocations, but do not close yet.
 syndicateFacility : Env -> Script (ContractId Facility, [(ContractId Commitment, AllocationInput)])
-syndicateFacility env = do
+syndicateFacility env = syndicateFacilityWith env (syndicate env)
+
+-- | As `syndicateFacility`, with each of `lenders` committing the amount
+-- paired with it. The facility's commitment is their total.
+syndicateFacilityWith : Env -> [(Party, Decimal)] -> Script (ContractId Facility, [(ContractId Commitment, AllocationInput)])
+syndicateFacilityWith env lenders = do
   proposal <- submit (actAs env.agent <> env.pin) $ createCmd FacilityProposal with
     agent = env.agent
     borrower = env.borrower
-    terms = dealTerms env
+    terms = (dealTerms env) with commitment = sum (map snd lenders)
   facility <- submit (actAs env.borrower <> env.pin) $ exerciseCmd proposal FacilityProposal_Accept
   (allocateBefore, settleBefore) <- deadlines
-  commitments <- forA (syndicate env) \(lender, amount) -> do
+  commitments <- forA lenders \(lender, amount) -> do
     offer <- submit (actAs env.agent <> env.pin) $ exerciseCmd facility Facility_Invite with
       lender; amount; allocateBefore; settleBefore
     commitmentCid <- submit (actAs lender <> env.pin) $ exerciseCmd offer CommitmentOffer_Accept
@@ -221,6 +229,13 @@ facilityOf env cid = fromSomeNote "facility" <$> queryContractId env.agent cid
 -- due, and the agent settles.
 pay : Env -> ContractId Facility -> Decimal -> Script (ContractId Facility)
 pay env facilityCid fraction = do
+  settle <- fund env facilityCid fraction
+  submit (actAs env.agent <> env.pin) $ exerciseCmd facilityCid settle
+
+-- | The borrower funds every leg of the open request at `fraction` of what is
+-- due. Returns the agent's settlement, ready to submit.
+fund : Env -> ContractId Facility -> Decimal -> Script Facility_Settle
+fund env facilityCid fraction = do
   facility <- facilityOf env facilityCid
   let requestCid = fromSomeNote "no open request" facility.pending
   request <- fromSomeNote "request" <$> queryContractId env.borrower requestCid
@@ -229,7 +244,7 @@ pay env facilityCid fraction = do
     allocation <- allocate env request.settlement legId leg with amount
     pure (leg.receiver, allocation)
   positions <- positionsOf (map fst legs)
-  submit (actAs env.agent <> env.pin) $ exerciseCmd facilityCid Facility_Settle with
+  pure Facility_Settle with
     fraction
     positions
     allocations = Map.fromList legs

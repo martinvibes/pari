@@ -56,6 +56,8 @@ export type Facility = {
   period: Period | null;
   pending: string | null;
   nextRef: string;
+  /** Absent on facilities created by package versions before 0.2.0. */
+  auditor?: Party | null;
 };
 
 export type PaymentKind = { tag: "InterestPayment"; value: { period: Period } } | { tag: "PrincipalPayment"; value: unknown };

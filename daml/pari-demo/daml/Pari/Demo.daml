@@ -7,6 +7,7 @@ module Pari.Demo
   ( sandbox
   , Seed(..)
   , seed
+  , scale
   ) where
 
 import DA.Date (Month(..), date)
@@ -16,6 +17,8 @@ import DA.Time (convertRelTimeToMicroseconds, subTime, time)
 import Daml.Script
 
 import Pari.Disclosure
+import Pari.Facility
+import Pari.Test.Scale (Timings, atScale, wide, wideSyndicate)
 import Pari.Test.Setup
 
 -- | A new deal with new parties, so the same ledger can be seeded again for
@@ -25,6 +28,16 @@ sandbox = do
   tag <- runTag
   cast <- allocateCastWith \name -> allocatePartyByHint (PartyIdHint (name <> "-" <> tag))
   seedWith mempty cast
+
+-- | The scale test's deal on a live ledger, with new parties: a hundred
+-- lenders close, are paid interest and are prepaid, each step checked and
+-- timed by the wall clock. `make scale`.
+scale : Script Timings
+scale = do
+  tag <- runTag
+  let named name = allocatePartyByHint (PartyIdHint (name <> "-" <> tag))
+  env <- allocateCastWith named >>= prepare mempty
+  wideSyndicate env named wide >>= atScale env
 
 -- | Seconds since the epoch, in base 36.
 runTag : Script Text
@@ -49,14 +62,23 @@ data Seed = Seed with
 seed : Seed -> Script Cast
 seed Seed{..} = seedWith (packagePreference (map PackageId packages)) cast
 
--- | Leaves the Northwind deal closed with its first period's rate fixed, cash
--- with the borrower and both buyers, each lender's information election, and
--- two borrower documents not yet shared. Every later step (interest, trades,
--- prepayment, document distribution) is driven from the web app.
+-- | Leaves the Northwind deal closed with its first period's rate fixed and
+-- the cast's auditor, if any, appointed before closing; cash with the
+-- borrower and both buyers, each lender's information election, and two
+-- borrower documents not yet shared. Every later step (interest, trades, prepayment,
+-- document distribution) is driven from the web app.
 seedWith : SubmitOptions -> Cast -> Script Cast
 seedWith pin cast = do
   env <- prepare pin cast
-  _ <- activeFacility env
+  (proposed, commitments) <- syndicateFacility env
+  audited <- case cast.auditor of
+    None -> pure proposed
+    Some auditor -> submit (actAs cast.borrower <> pin) $ exerciseCmd proposed Facility_AppointAuditor with
+      newAuditor = auditor
+  closed <- submit (actAs cast.agent <> pin) $ exerciseCmd audited Facility_Close with commitments
+  _ <- submit (actAs cast.agent <> pin) $ exerciseCmd closed Facility_FixRate with
+    baseRate = sofr
+    periodEnd = firstPeriodEnd
   forA_ [(cast.alder, PrivateSide), (cast.birch, PublicSide), (cast.cedar, PublicSide)] \(lender, side) ->
     submit (actAs lender <> pin) $ createCmd InfoElection with
       lender

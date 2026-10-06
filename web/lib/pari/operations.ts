@@ -221,6 +221,20 @@ export async function updateDqList(cast: Cast, disqualified: string[]) {
   );
 }
 
+/** Appoint the cast's auditor to the facility, as the borrower. */
+export async function appointAuditor(cast: Cast) {
+  const { facility } = await requireFacility(cast.borrower);
+  await one(
+    cast.borrower,
+    exercise(T.Facility, facility.contractId, "Facility_AppointAuditor", { newAuditor: cast.auditor }),
+  );
+}
+
+export async function removeAuditor(cast: Cast) {
+  const { facility } = await requireFacility(cast.borrower);
+  await one(cast.borrower, exercise(T.Facility, facility.contractId, "Facility_RemoveAuditor", {}));
+}
+
 // Any payer -------------------------------------------------------------------
 
 /** Take back cash allocated to settlements that were called off, as its owner. */

@@ -65,7 +65,35 @@ export default async function BorrowerPage() {
         <DqList view={view} />
         <Documents view={view} />
       </div>
+
+      <Auditor view={view} facility={f} />
     </div>
+  );
+}
+
+function Auditor({ view, facility: f }: { view: View; facility: P.Facility }) {
+  const appointed = f.auditor;
+  return (
+    <Panel
+      title="Auditor"
+      note="Credit agreements let the borrower disclose the deal to its own auditors. An appointed auditor sees the register and every closing, payment and assignment from then on. It acts on nothing, and never sees a trade price, the DQ list or the data room."
+    >
+      {view.cast.auditor ? (
+        <div className="flex flex-wrap items-center justify-between gap-5">
+          <span className="flex items-center gap-4">
+            <Party name={view.name(appointed ?? view.cast.auditor)} className="text-lg text-paper" />
+            {appointed ? <Tag tone="ok">Appointed</Tag> : <Tag tone="neutral">Not appointed</Tag>}
+          </span>
+          {appointed ? (
+            <ActionForm action={act.removeAuditor} label="Remove auditor" variant="ghost" />
+          ) : (
+            <ActionForm action={act.appointAuditor} label="Appoint auditor" />
+          )}
+        </div>
+      ) : (
+        <Empty>This demo deal was seeded without an auditor.</Empty>
+      )}
+    </Panel>
   );
 }
 

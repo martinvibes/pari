@@ -9,8 +9,8 @@ import { PERSONAS } from "@/lib/pari/personas";
 export type Cast = Record<CastKey, string>;
 
 export class CastMissingError extends Error {
-  constructor(source: string) {
-    super(`No demo cast found at ${source}. Run \`make seed\` with the sandbox up.`);
+  constructor(message: string) {
+    super(message);
     this.name = "CastMissingError";
   }
 }
@@ -22,12 +22,15 @@ export function loadCast(): Cast {
   try {
     return JSON.parse(readFileSync(file, "utf8")) as Cast;
   } catch {
-    throw new CastMissingError(file);
+    throw new CastMissingError(`No demo cast found at ${file}. Run \`make seed\` with the sandbox up.`);
   }
 }
 
 export function partyOf(cast: Cast, persona: Persona): string {
-  return cast[persona.castKey];
+  const party = cast[persona.castKey];
+  // A deal seeded before the auditor joined the cast has none.
+  if (!party) throw new CastMissingError(`The demo deal has no ${persona.name} party. Seed a new deal.`);
+  return party;
 }
 
 /** The persona behind a party id, for naming parties on screen. */

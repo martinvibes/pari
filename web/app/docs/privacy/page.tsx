@@ -6,7 +6,7 @@ import { DocsHeader, DocsPager } from "@/components/DocsBlocks";
 export const metadata: Metadata = { title: "Who sees what" };
 
 const TRADE_VIEWS = [
-  { step: "Facility_RecordAssignment", who: "agent, borrower", learns: "seller, buyer, par amount, trade date, DQ clearance" },
+  { step: "Facility_RecordAssignment", who: "agent, borrower, auditor", learns: "seller, buyer, par amount, trade date, DQ clearance" },
   { step: "TradeTicket_Settle", who: "agent, seller, buyer", learns: "the price and the cash leg" },
   { step: "SellDown_Apply", who: "agent, seller", learns: "the seller's remaining position" },
   { step: "BuyIn_Apply", who: "agent, buyer", learns: "the buyer's new position" },
@@ -33,8 +33,8 @@ export default function PrivacyPage() {
 
         <h2>Interest payment</h2>
         <p>
-          The root is <code>Facility_Settle</code> on the facility, seen by the agent and the
-          borrower. Beneath it sits one <code>Position_Settle</code> per lender, each seen by the
+          The root is <code>Facility_Settle</code> on the facility, seen by the agent, the
+          borrower and the borrower&rsquo;s auditor. Beneath it sits one <code>Position_Settle</code> per lender, each seen by the
           agent, the borrower and that one lender. Lender A sees its own allocation execute and its
           own receipt. It never sees the facility, the request, or any other lender&rsquo;s leg. The
           request is never fetched inside a lender&rsquo;s part of the tree, so it is never disclosed
@@ -71,6 +71,16 @@ export default function PrivacyPage() {
         <p>
           So the borrower never learns the price, the buyer never learns what the seller still
           holds, the seller never learns what else the buyer holds, and other lenders see nothing.
+        </p>
+
+        <h2>The auditor</h2>
+        <p>
+          The borrower&rsquo;s auditor observes the facility, so it is an informee of every choice on
+          it and sees each closing, payment, prepayment and assignment with everything beneath it:
+          the register before and after, and each lender&rsquo;s transfer. In a trade it sees{" "}
+          <code>Facility_RecordAssignment</code> and the buyer&rsquo;s clearance it uses up, never
+          the ticket beside it, so never the price. The smoke test checks this against every event
+          the auditor&rsquo;s node received, not only the contracts it holds.
         </p>
 
         <h2>DQ screening</h2>

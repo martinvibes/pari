@@ -22,7 +22,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TOKENS="$ROOT/web/.pari/devnet-tokens.json"
 CAST="$ROOT/web/.pari/devnet-cast.json"
-DAR="$ROOT/daml/pari-demo/.daml/dist/pari-demo-0.1.0.dar"
+DAR="$ROOT/daml/pari-demo/.daml/dist/pari-demo-0.2.0.dar"
 DPM="${DPM:-dpm}"
 
 JSON_API="https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services"
@@ -31,7 +31,7 @@ OIDC_TOKEN_URL="https://keycloak.naas.noders.services/realms/noders-appsfactory/
 OIDC_CLIENT_ID="web-app-ui-hackcanton-01-devnet"
 
 # Each cast member (Pari.Test.Setup.Cast) and the Console party name it uses.
-ROLES="registry:registry agent:agent borrower:northwind alder:alder birch:birch cedar:cedar buyer:delta rival:rival"
+ROLES="registry:registry agent:agent borrower:northwind alder:alder birch:birch cedar:cedar buyer:delta rival:rival auditor:auditor"
 
 die() { echo "devnet: $*" >&2; exit 1; }
 

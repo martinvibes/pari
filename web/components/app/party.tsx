@@ -14,6 +14,7 @@ const HUES: Record<string, string> = {
   cedar: "#FF8FB1",
   delta: "#22D3EE",
   rival: "#FF7A45",
+  auditor: "#E9D3A8",
 };
 
 const UNKNOWN = "#6E6E76";

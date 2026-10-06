@@ -41,6 +41,8 @@ A lender cannot inflate its own position either
 | | `Facility_Settle` | agent | the borrower's allocations, one per lender | each allocation equals its leg × the same fraction; all or none |
 | | `Facility_CancelRequest` | agent | nothing | an open request exists |
 | | `Facility_RecordAssignment` | agent | register entries only | consumes a borrower-signed clearance for that buyer |
+| | `Facility_AppointAuditor` | borrower | nothing | the auditor is not the agent, the borrower or a lender |
+| | `Facility_RemoveAuditor` | borrower | nothing | an auditor is appointed |
 | `PaymentRequest` (agent) | CIP-56 `Reject` / `Withdraw` | borrower / agent | nothing | disabled: payments go through the facility |
 | `PrepaymentNotice` (borrower) | `Accept` | agent | nothing | consumed by the facility |
 | `CommitmentOffer` (agent, borrower) | `Accept` / `Decline` | lender | nothing | lender signs its commitment |
@@ -68,9 +70,17 @@ A lender cannot inflate its own position either
   keep anyone's cash by doing so: a sender can withdraw its own allocation at
   any time through the standard CIP-56 `Allocation_Withdraw`, and the app
   offers this whenever a payment is cancelled or a trade declined.
-- **The agent and the borrower see the register.** That matches syndicated
-  lending practice: the agent keeps the register and the borrower may inspect
-  it. Lenders see only their own position.
+- **The agent, the borrower and the borrower's auditor see the register.**
+  That matches syndicated lending practice: the agent keeps the register, the
+  borrower may inspect it, and the credit agreement lets the borrower disclose
+  it to its auditors. Lenders see only their own position. The auditor
+  controls no choice.
+- **The auditor sees each trade's clearance used up.** Recording a trade
+  consumes the buyer's DQ clearance inside a facility choice, so the auditor,
+  as an observer of the facility, witnesses that clearance. It says only that
+  the buyer was cleared, which the register already shows. The auditor never
+  receives the price, the DQ list or a document; the smoke test checks this
+  against every event the auditor's node received.
 - **One agent party.** The model treats the agent as one party. Hosting it as
   a decentralized party with a threshold across independent operators is a
   deployment concern and does not change the model.

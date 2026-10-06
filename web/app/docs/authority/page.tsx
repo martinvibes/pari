@@ -23,6 +23,8 @@ const CHOICES = [
   { contract: "Facility", choice: "Facility_Close", controller: "agent", moves: "each lender's own funding allocation", guard: "commitments sum to the facility size, one per lender" },
   { contract: "Facility", choice: "Facility_Settle", controller: "agent", moves: "the borrower's allocations, one per lender", guard: "each equals its leg × the same fraction; all or none" },
   { contract: "Facility", choice: "Facility_RecordAssignment", controller: "agent", moves: "register entries only", guard: "consumes a borrower-signed clearance for that buyer" },
+  { contract: "Facility", choice: "Facility_AppointAuditor", controller: "borrower", moves: "nothing", guard: "the auditor is not the agent, the borrower or a lender" },
+  { contract: "Facility", choice: "Facility_RemoveAuditor", controller: "borrower", moves: "nothing", guard: "an auditor is appointed" },
   { contract: "Position", choice: "Position_Settle", controller: "agent and borrower", moves: "the borrower's allocation to this lender", guard: "principal matches the register; leg pays this lender" },
   { contract: "Position", choice: "Position_Reduce", controller: "lender and agent", moves: "the lender's own principal", guard: "amount held" },
   { contract: "Position", choice: "Position_Increase", controller: "lender and agent", moves: "the lender's own principal", guard: "amount positive" },

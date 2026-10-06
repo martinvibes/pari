@@ -4,6 +4,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResult } from "@/app/(app)/actions";
+import { UpdateId } from "@/components/app/UpdateId";
 
 // The ledger's verdict on the last action, as a receipt in one place. It lives
 // in the app layout, so it survives the re-render that often removes the form
@@ -53,11 +54,6 @@ function seconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)} s`;
 }
 
-/** `1220ab…` ids are long; the head and tail are what people compare. */
-function shortId(id: string): string {
-  return id.length > 22 ? `${id.slice(0, 12)}…${id.slice(-6)}` : id;
-}
-
 function StateIcon({ state }: { state: State }) {
   if (state === "pending") {
     // Three ledger blocks, written one after another.
@@ -87,33 +83,6 @@ function Elapsed({ since }: { since: number }) {
     return () => clearInterval(timer);
   }, []);
   return <>{seconds(Math.max(0, now - since))}</>;
-}
-
-function UpdateId({ id }: { id: string }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(id);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard refused (insecure origin): the id stays selectable.
-    }
-  }
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="min-w-0 truncate font-mono text-[12px] text-smoke" title={id}>
-        {shortId(id)}
-      </span>
-      <button
-        type="button"
-        onClick={copy}
-        className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-ash transition hover:text-paper"
-      >
-        {copied ? <span className="text-mint">Copied</span> : "Copy"}
-      </button>
-    </div>
-  );
 }
 
 function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {

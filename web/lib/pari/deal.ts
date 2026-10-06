@@ -112,3 +112,9 @@ export function balanceCents(s: Snapshot, owner: string, instrument: P.Instrumen
     )
     .reduce((sum, h) => sum + toCents(h.payload.amount), 0n);
 }
+
+/** The unit an instrument's amounts are shown in: Canton Coin's registry id
+ *  is `Amulet`; other instruments go by their id. */
+export function unitOf(instrument: P.InstrumentId): string {
+  return instrument.id === "Amulet" ? "CC" : instrument.id;
+}

@@ -1,13 +1,13 @@
 DPM ?= dpm
 LEDGER_PORT ?= 6865
 JSON_PORT ?= 7575
-DEMO_DAR := daml/pari-demo/.daml/dist/pari-demo-0.1.0.dar
+DEMO_DAR := daml/pari-demo/.daml/dist/pari-demo-0.2.0.dar
 CAST := web/.pari/cast.json
 SMOKE_CAST := web/.pari/smoke-cast.json
 SEED := $(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:sandbox \
 	--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file
 
-.PHONY: build test sandbox seed smoke devnet-login devnet-seed devnet-web devnet-smoke devnet-reset
+.PHONY: build test sandbox seed smoke scale devnet-login devnet-seed devnet-web devnet-smoke devnet-reset
 
 # Build the Pari model, its tests and the demo package.
 build:
@@ -33,6 +33,14 @@ smoke:
 	@mkdir -p $(dir $(SMOKE_CAST))
 	$(SEED) $(SMOKE_CAST)
 	cd web && PARI_CAST_FILE=.pari/smoke-cast.json npm run --silent smoke
+
+# A hundred new lenders on the running sandbox: the closing, an interest
+# payment and a prepayment, each one transaction, checked and timed.
+scale:
+	@mkdir -p $(dir $(CAST))
+	$(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:scale \
+		--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file web/.pari/scale.json
+	@cat web/.pari/scale.json; echo
 
 # HackCanton DevNet. Create the parties and upload $(DEMO_DAR) in the node's
 # Console first (docs/devnet.md), then sign in, seed and run the app.

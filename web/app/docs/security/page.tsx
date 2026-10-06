@@ -33,8 +33,10 @@ export default function SecurityPage() {
             CIP-56 <code>Allocation_Withdraw</code>.
           </li>
           <li>
-            <strong>The agent and the borrower see the register.</strong> That matches syndicated
-            lending practice. Lenders see only their own position.
+            <strong>The agent, the borrower and the borrower&rsquo;s auditor see the register.</strong>{" "}
+            That matches syndicated lending practice. Lenders see only their own position. Recording
+            a trade uses up the buyer&rsquo;s DQ clearance inside a facility choice, so the auditor
+            witnesses that clearance; it never receives the price, the DQ list or a document.
           </li>
           <li>
             <strong>One agent party.</strong> The model treats the agent as one party. Hosting it as

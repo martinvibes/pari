@@ -12,7 +12,7 @@ export default function RolesPage() {
       <DocsHeader
         kicker="Concepts"
         title="Parties and roles"
-        summary="Five kinds of party take part in a Pari facility. Each one signs for what it owns and sees only what it is party to."
+        summary="Six kinds of party take part in a Pari facility. Each one signs for what it owns and sees only what it is party to."
       />
 
       <div className="docs-prose mt-8">
@@ -44,6 +44,13 @@ export default function RolesPage() {
               <td>Funds buying into the loan from an existing lender.</td>
             </tr>
             <tr>
+              <td>Auditor</td>
+              <td>
+                The borrower&rsquo;s auditor, appointed by the borrower. Follows the facility, acts on
+                nothing, holds no money.
+              </td>
+            </tr>
+            <tr>
               <td>Registry</td>
               <td>The admin of the CIP-56 instrument the loan is funded and repaid in.</td>
             </tr>
@@ -70,6 +77,17 @@ export default function RolesPage() {
           the agent and the borrower. Lenders are not stakeholders of it, which is why no lender can
           see another lender&rsquo;s holding. This matches syndicated lending practice: the agent
           keeps the register, and the borrower may inspect it.
+        </p>
+
+        <h2>The auditor follows, it does not act</h2>
+        <p>
+          Credit agreements let each party disclose the deal to its own auditors. The borrower
+          appoints its auditor with <code>Facility_AppointAuditor</code>, which makes the auditor an
+          observer of the facility. From then on it sees the register and every closing, payment,
+          prepayment and assignment as the facility records it, and the{" "}
+          <Link href="/auditor">auditor screen</Link> rebuilds and re-checks each one from the
+          ledger&rsquo;s own history. It controls no choice. It never sees a trade&rsquo;s price, the
+          DQ list or the data room, and once the borrower removes it, it sees nothing new.
         </p>
 
         <h2>A position belongs to its lender</h2>

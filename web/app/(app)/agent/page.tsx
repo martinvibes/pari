@@ -99,7 +99,7 @@ function Register({
   return (
     <Panel
       title="Register"
-      note="Every lender's principal and interest. Only the agent and the borrower hold the register; each lender sees its own line and nothing else."
+      note="Every lender's principal and interest. Only the agent, the borrower and Northwind's auditor hold the register; each lender sees its own line and nothing else."
       className="lg:col-span-7"
     >
       <TableScroll>

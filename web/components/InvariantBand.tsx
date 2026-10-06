@@ -10,8 +10,8 @@ import { prefersReducedMotion, useInView } from "@/lib/useInView";
 // The band that carries the thesis: the register of one loan, set enormous and
 // assembled on scroll. On fine pointers each lender's term is live: hovering
 // one dims the others, which is exactly what each lender sees on the ledger.
-// The sum stays with the agent and the borrower. Each lender wears the hue
-// its counterpart (Alder, Birch, Cedar) wears in the app.
+// The sum stays with the agent, the borrower and its auditor. Each lender
+// wears the hue its counterpart (Alder, Birch, Cedar) wears in the app.
 
 type Lender = "A" | "B" | "C";
 
@@ -117,7 +117,7 @@ export function InvariantBand() {
           }`}
           style={style(850)}
         >
-          One loan&rsquo;s register. Each lender sees its own term; only the agent and borrower see the sum
+          One loan&rsquo;s register. Each lender sees its own term; only the agent, the borrower and its auditor see the sum
         </p>
 
         <div className="mt-16 grid border-t border-white/15 sm:mt-20 sm:grid-cols-3">

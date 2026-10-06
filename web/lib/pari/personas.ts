@@ -3,10 +3,19 @@
 // The demo deal's cast. Each persona is one Canton party; the app reads the
 // ledger as that party, so every screen shows exactly what it can see.
 
-export type Role = "agent" | "borrower" | "lender";
+export type Role = "agent" | "borrower" | "lender" | "auditor";
 
 /** Keys of the cast file the seed script writes (Pari.Test.Setup.Cast). */
-export type CastKey = "registry" | "agent" | "borrower" | "alder" | "birch" | "cedar" | "buyer" | "rival";
+export type CastKey =
+  | "registry"
+  | "agent"
+  | "borrower"
+  | "alder"
+  | "birch"
+  | "cedar"
+  | "buyer"
+  | "rival"
+  | "auditor";
 
 export type Persona = {
   id: string;
@@ -25,6 +34,7 @@ export const PERSONAS: Persona[] = [
   { id: "cedar", name: "Cedar", role: "lender", castKey: "cedar", href: "/lender/cedar", blurb: "Lender, public side" },
   { id: "delta", name: "Delta", role: "lender", castKey: "buyer", href: "/lender/delta", blurb: "Fund buying in" },
   { id: "rival", name: "Rival", role: "lender", castKey: "rival", href: "/lender/rival", blurb: "On the DQ list" },
+  { id: "auditor", name: "Auditor", role: "auditor", castKey: "auditor", href: "/auditor", blurb: "The borrower's auditor" },
 ];
 
 export const LENDERS = PERSONAS.filter((p) => p.role === "lender");

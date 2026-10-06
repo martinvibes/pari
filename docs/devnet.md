@@ -13,12 +13,14 @@ with **Sign in with Authfactory**, open **Participants**, then the HackCanton
 node.
 
 1. On the **Parties** tab, create one party for each member of the demo cast:
-   `registry`, `agent`, `northwind`, `alder`, `birch`, `cedar`, `delta` and
-   `rival`. The Console prefixes each with your namespace and gives your ledger
-   user act-as rights on it.
-2. Under **Collections**, upload `daml/pari-demo/.daml/dist/pari-demo-0.1.0.dar`
-   (from `make build`). It carries Pari, the seed script and the CIP-56 test
-   token the demo settles in.
+   `registry`, `agent`, `northwind`, `alder`, `birch`, `cedar`, `delta`,
+   `rival` and `auditor`. The Console prefixes each with your namespace and
+   gives your ledger user act-as rights on it.
+2. Under **Collections**, upload two DARs: `daml/pari/.daml/dist/pari-0.2.0.dar`
+   (from `make build`), the Pari model, and
+   `daml/dars/splice-test-token-v1-1.0.0.dar`, the CIP-56 test token the demo
+   settles in. The seed script and the tests run from your machine, so their
+   packages need not be on the node.
 
 ## 2. Sign in, seed and run
 
@@ -35,12 +37,12 @@ Keycloak tokens, in a git-ignored file. The app and the scripts refresh the
 access token on their own (it lives three hours); sign in again only if the
 refresh token is revoked.
 
-`make devnet-seed` finds the eight parties among the ones your ledger user can
+`make devnet-seed` finds the nine parties among the ones your ledger user can
 act as, by name, and runs `Pari.Demo:seed` over the gRPC Ledger API.
 
 `make devnet-smoke` advances the seeded deal through every step the app
 offers, so run it on a deal you no longer need for a walkthrough.
-`make devnet-reset` lists every active contract of the eight parties and, once
+`make devnet-reset` lists every active contract of the nine parties and, once
 you confirm, archives them all in one transaction, so `make devnet-seed` can
 start a fresh deal on the same parties. It can, only because in this demo one
 ledger user acts as every party.

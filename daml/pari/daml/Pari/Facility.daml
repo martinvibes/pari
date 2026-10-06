@@ -15,6 +15,8 @@ module Pari.Facility
   , Facility_Settle(..)
   , Facility_CancelRequest(..)
   , Facility_RecordAssignment(..)
+  , Facility_AppointAuditor(..)
+  , Facility_RemoveAuditor(..)
   , outstanding
   ) where
 
@@ -81,14 +83,16 @@ template FacilityProposal
           period = None
           pending = None
           nextRef = 1
+          auditor = None
 
     choice FacilityProposal_Reject : ()
       controller borrower
       do pure ()
 
 -- | The credit agreement between the agent (acting for the lenders) and the
--- borrower. It holds the lender register, which only the agent and the
--- borrower can see: each lender sees its own position and nothing else.
+-- borrower. It holds the lender register, which only the agent, the borrower
+-- and the borrower's auditor can see: each lender sees its own position and
+-- nothing else.
 template Facility
   with
     agent : Party
@@ -104,8 +108,11 @@ template Facility
       -- ^ The open payment request. The register is frozen while one is open.
     nextRef : Int
       -- ^ Sequence number for settlement references.
+    auditor : Optional Party
+      -- ^ The borrower's auditor, if one is appointed.
   where
     signatory agent, borrower
+    observer optionalToList auditor
     ensure validTerms terms
 
     -- Syndication -------------------------------------------------------------
@@ -296,6 +303,30 @@ template Facility
               if sellerRetained then Map.insert seller seller' register else Map.delete seller register
         facilityCid <- create this with register = register'
         pure (facilityCid, Assignment with sellerRetained; buyerExisting = isSome buyerEntry)
+
+    -- Audit -------------------------------------------------------------------
+
+    -- | Appoint the borrower's auditor, or replace it. Credit agreements let
+    -- each party disclose the deal to its own auditors. The auditor observes
+    -- the facility from then on: it sees the register, and each closing,
+    -- payment, prepayment and assignment as the facility records it, with
+    -- the buyer's clearance an assignment uses up. It never sees a trade's
+    -- price, the DQ list or the data room. It controls no choice.
+    choice Facility_AppointAuditor : ContractId Facility
+      with
+        newAuditor : Party
+      controller borrower
+      do
+        require "the auditor is not the agent, the borrower or a lender"
+          (newAuditor /= agent && newAuditor /= borrower && not (Map.member newAuditor register))
+        create this with auditor = Some newAuditor
+
+    -- | End the auditor's view. It keeps what it has seen, and sees nothing new.
+    choice Facility_RemoveAuditor : ContractId Facility
+      controller borrower
+      do
+        require "an auditor is appointed" (isSome auditor)
+        create this with auditor = None
 
 -- | Principal outstanding across all lenders.
 outstanding : Facility -> Decimal
