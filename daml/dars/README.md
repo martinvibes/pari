@@ -1,8 +1,11 @@
 # Vendored packages
 
-Pari settles through the Canton token standard (CIP-56). These DARs are the
-unmodified Splice 0.6.13 releases, Apache-2.0, vendored so the model builds
-offline and pins the exact package ids deployed on Canton networks.
+Pari settles through the Canton token standard (CIP-56), and its agent can be
+run by several operators through BitSafe's governance packages. These DARs
+are vendored unmodified, so the model builds offline and pins the exact
+package ids deployed on Canton networks.
+
+Splice 0.6.13 releases, Apache-2.0:
 
 | DAR | Used by | SHA-256 |
 |---|---|---|
@@ -12,6 +15,15 @@ offline and pins the exact package ids deployed on Canton networks.
 | `splice-api-token-allocation-request-v1-1.0.0.dar` | model | `5aed3f7e69a2c84b2be9d2033c07029fcde375d5041db264e58f44c8c7538303` |
 | `splice-api-token-allocation-instruction-v1-1.0.0.dar` | tests | `e2607ca3a1d735a82d3066b78132aa8f94b1886c99a5f14148742d252c7220a2` |
 | `splice-test-token-v1-1.0.0.dar` | tests | `7596a91db7d8380c778242137f74e047a51e2fc606f1980ab9f90091789f1fd9` |
+
+BitSafe's Decentralization Manager, `releases/v1` at commit
+[`6be9739`](https://github.com/DLC-link/decentralization-manager/tree/6be973957f2b4a018632e2414b066ca4ca4d06aa/releases/v1),
+Apache-2.0, used by `pari-governance` and its tests:
+
+| DAR | Used by | SHA-256 |
+|---|---|---|
+| `governance-action-v1-0.1.0.dar` | governance | `4fc7912df4a0aeea3cfcc6ba07c880192a5fa88f7c75ed04b922602461b1e485` |
+| `governance-core-v1-0.1.0.dar` | governance tests | `b8d05903e63288d4114632f41386491cea215e177183514ea032fe35d24a9544` |
 
 The test token is a reference CIP-56 registry used only by the test suite. On
 DevNet and MainNet, Pari settles in Canton Coin or any other CIP-56 instrument

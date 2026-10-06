@@ -29,7 +29,8 @@ Loan agency still runs on email, PDFs and spreadsheets.
 ## What works today
 
 Every claim below is a Daml Script test in
-[`daml/pari-tests`](daml/pari-tests/daml/Pari/Test).
+[`daml/pari-tests`](daml/pari-tests/daml/Pari/Test), or for the governed
+agent in [`daml/pari-governance-tests`](daml/pari-governance-tests/daml/Pari/Test/Governance.daml).
 
 | Pari guarantees | Test |
 |---|---|
@@ -51,10 +52,13 @@ Every claim below is a Daml Script test in
 | Only the borrower appoints its auditor, who follows the register through every payment and trade and can act on nothing | `Audit: test_only_the_borrower_appoints_the_auditor`, `test_auditor_follows_the_register`, `test_auditor_acts_on_nothing` |
 | The auditor never holds a trade price, the DQ list or a document; once removed, it sees nothing new | `Audit: test_auditor_holds_no_price_dq_list_or_document`, `test_removed_auditor_sees_nothing_new` |
 | A hundred lenders: the closing, an interest payment and a prepayment each settle in one transaction, to the cent | `Scale: test_a_hundred_lenders_settle_in_one_transaction_each` |
+| The agent can be run by three independent operators: any two make it act, one alone moves nothing | `Governance: test_settlement_needs_two_of_three_operators`, `test_an_operator_alone_is_not_the_agent`, `test_operators_run_the_deal_two_of_three` |
 
 The full list of choices and what each can move is in the
 [authority matrix](docs/authority-matrix.md). How the workflows keep each
-party's view private is in [architecture](docs/architecture.md).
+party's view private is in [architecture](docs/architecture.md). How the
+agent runs as a decentralized party, two of three, is in
+[governance](docs/governance.md).
 
 ## Run it
 
@@ -94,6 +98,19 @@ clock. On an Apple M2 Pro with Canton 3.5.19, the hundred-lender closing took
 3.0 s, the interest payment 4.6 s and the prepayment 4.4 s, each one atomic
 transaction.
 
+To run the agent as a decentralized party, on a Splice LocalNet with three
+participant nodes and BitSafe's Decentralization Manager on each:
+
+```bash
+make localnet-up     # LocalNet, three operators' nodes, the agent's party and its rules
+make localnet-demo   # the deal, every agent action confirmed by two of three
+```
+
+The demo also checks that no node can submit as the agent, that one
+operator's confirmation pays no one, and that the other two settle a payment
+while the third node is offline. Prerequisites and scope are in
+[docs/governance.md](docs/governance.md).
+
 To run it on the HackCanton DevNet instead, create the parties and upload the
 DAR in the node's Console, then `make devnet-login`, `make devnet-seed` and
 `make devnet-web`: see [docs/devnet.md](docs/devnet.md). There the deal
@@ -110,12 +127,15 @@ authority it would with each party on its own node.
 ## Repo layout
 
 ```
-daml/pari/         The Pari model
-daml/pari-tests/   Daml Script tests for every guarantee above
-daml/pari-demo/    Seed script for the demo deal on a sandbox, and the scale run
-daml/dars/         Vendored Splice token-standard packages (see its README)
-docs/              Architecture, authority matrix and DevNet guide
-web/               Website, docs and app (Next.js)
+daml/pari/                   The Pari model
+daml/pari-tests/             Daml Script tests for every guarantee above
+daml/pari-demo/              Seed script for the demo deal on a sandbox, and the scale run
+daml/pari-governance/        The agent's actions as BitSafe governable actions
+daml/pari-governance-tests/  Daml Script tests for the governed agent
+daml/dars/                   Vendored Splice and BitSafe packages (see its README)
+docs/                        Architecture, authority matrix, governance and DevNet guides
+scripts/                     DevNet and LocalNet runners
+web/                         Website, docs and app (Next.js)
 ```
 
 ## Status
@@ -129,13 +149,15 @@ web/               Website, docs and app (Next.js)
 | A hundred lenders per transaction, tested and timed on a Canton sandbox | Done |
 | Settlement in Canton Coin, on DevNet | Done |
 | Settlement in a USD stablecoin (e.g. USDCx) | Planned |
-| Agent hosted as a decentralized party across independent operators | Planned |
+| Agent hosted as a decentralized party across independent operators, two of three | Done, on LocalNet |
 
 ## Disclosure
 
 The Pari model, tests and docs were designed and written from scratch during
 HackCanton Season 3. Pari depends on the unmodified Splice token-standard
-packages (Apache-2.0), vendored in `daml/dars/`. The web app's visual layer is
+packages (Apache-2.0), vendored in `daml/dars/`, and the governed agent on
+BitSafe's Decentralization Manager and its governance packages (Apache-2.0),
+used unmodified. The web app's visual layer is
 derived from the [sidereal-hedera](https://github.com/guha-rahul/sidereal-hedera)
 web app (Apache-2.0), with credit to its authors. See [NOTICE](NOTICE).
 

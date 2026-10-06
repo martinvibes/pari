@@ -2,5 +2,7 @@ sdk-version: 3.5.12
 
 packages:
   - ./pari
+  - ./pari-governance
   - ./pari-tests
   - ./pari-demo
+  - ./pari-governance-tests

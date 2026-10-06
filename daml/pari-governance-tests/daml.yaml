@@ -1,13 +1,17 @@
 sdk-version: 3.5.12
-name: pari-tests
+name: pari-governance-tests
 source: daml
-version: 0.2.0
+version: 0.1.0
 dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
 data-dependencies:
   - ../pari/.daml/dist/pari-0.2.0.dar
+  - ../pari-tests/.daml/dist/pari-tests-0.2.0.dar
+  - ../pari-governance/.daml/dist/pari-governance-0.1.0.dar
+  - ../dars/governance-action-v1-0.1.0.dar
+  - ../dars/governance-core-v1-0.1.0.dar
   - ../dars/splice-api-token-metadata-v1-1.0.0.dar
   - ../dars/splice-api-token-holding-v1-1.0.0.dar
   - ../dars/splice-api-token-allocation-v1-1.0.0.dar
@@ -18,8 +22,3 @@ build-options:
   - --target=2.2
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-# The hundred-lender scale test returns a ledger trace larger than the script
-# service's default message limit.
-script-service:
-  grpc-max-message-size: 536870912
-  jvm-options: [-Xmx2G]

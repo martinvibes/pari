@@ -32,5 +32,6 @@ export const CIP56 = {
     "#splice-api-token-allocation-instruction-v1:Splice.Api.Token.AllocationInstructionV1:AllocationFactory",
 } as const;
 
-/** The reference CIP-56 registry used on local ledgers. */
+/** The reference CIP-56 registry used on local ledgers, and its holdings. */
 export const TEST_TOKEN_RULES = "#splice-test-token-v1:Splice.Testing.Tokens.TestTokenV1:TokenRules";
+export const TEST_TOKEN = "#splice-test-token-v1:Splice.Testing.Tokens.TestTokenV1:Token";

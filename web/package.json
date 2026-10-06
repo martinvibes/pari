@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit --incremental false",
     "smoke": "tsx --conditions=react-server scripts/smoke.ts",
-    "seed-coin": "tsx --conditions=react-server scripts/seed-coin.ts"
+    "seed-coin": "tsx --conditions=react-server scripts/seed-coin.ts",
+    "governed": "tsx --conditions=react-server scripts/governed.ts"
   },
   "dependencies": {
     "lenis": "^1.3.25",

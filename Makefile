@@ -7,7 +7,7 @@ SMOKE_CAST := web/.pari/smoke-cast.json
 SEED := $(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:sandbox \
 	--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file
 
-.PHONY: build test sandbox seed smoke scale devnet-login devnet-seed devnet-web devnet-smoke devnet-reset
+.PHONY: build test sandbox seed smoke scale localnet-up localnet-demo localnet-down devnet-login devnet-seed devnet-web devnet-smoke devnet-reset
 
 # Build the Pari model, its tests and the demo package.
 build:
@@ -16,6 +16,7 @@ build:
 # Run every Daml Script test (needs a Java 17+ runtime on PATH).
 test: build
 	cd daml/pari-tests && $(DPM) test
+	cd daml/pari-governance-tests && $(DPM) test
 
 # A local Canton sandbox with Pari loaded and the JSON Ledger API on $(JSON_PORT).
 sandbox: build
@@ -41,6 +42,18 @@ scale:
 	$(DPM) script --dar $(DEMO_DAR) --script-name Pari.Demo:scale \
 		--ledger-host localhost --ledger-port $(LEDGER_PORT) --wall-clock-time --output-file web/.pari/scale.json
 	@cat web/.pari/scale.json; echo
+
+# The agent as a decentralized party on Splice LocalNet: three operators' nodes
+# running BitSafe's Decentralization Manager, two of three to act
+# (docs/governance.md). `localnet-demo` runs the deal through it.
+localnet-up: build
+	scripts/localnet.sh up
+
+localnet-demo:
+	scripts/localnet.sh demo
+
+localnet-down:
+	scripts/localnet.sh down
 
 # HackCanton DevNet. Create the parties and upload $(DEMO_DAR) in the node's
 # Console first (docs/devnet.md), then sign in, seed and run the app.

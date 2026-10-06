@@ -62,11 +62,19 @@ type ActiveContractEntry = {
   };
 };
 
+const ledgerUrl = new AsyncLocalStorage<string>();
+
+/** Runs `work` against the JSON Ledger API at `url` rather than LEDGER.url.
+ *  On a network of several participants, each party is reached on its own. */
+export function onLedger<T>(url: string, work: () => Promise<T>): Promise<T> {
+  return ledgerUrl.run(url.replace(/\/$/, ""), work);
+}
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
   const token = await bearerToken();
   if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(`${LEDGER.url}${path}`, {
+  const res = await fetch(`${ledgerUrl.getStore() ?? LEDGER.url}${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -277,6 +285,20 @@ export type Submission = {
   disclosedContracts?: Disclosed[];
 };
 
+export type Created = { contractId: string; templateId: string };
+
+/** A party whose submissions are made some other way: the agent, when its
+ *  operators act for it (lib/pari/governance.ts). */
+export type Delegate = { party: string; submit(submission: Submission): Promise<Created[]> };
+
+const delegates = new AsyncLocalStorage<Delegate>();
+
+/** Runs `work` with every submission acting as `delegate.party` handed to
+ *  `delegate.submit`. */
+export function delegating<T>(delegate: Delegate, work: () => Promise<T>): Promise<T> {
+  return delegates.run(delegate, work);
+}
+
 const committed = new AsyncLocalStorage<string[]>();
 
 /** Runs `work` and collects the update id of every transaction it commits,
@@ -289,7 +311,10 @@ export async function recordUpdates<T>(work: () => Promise<T>): Promise<{ result
 
 /** Submit commands atomically and wait for the transaction. Returns the
  *  contracts it created, so a caller can chain on them. */
-export async function submit({ actAs, readAs = [], commands, disclosedContracts = [] }: Submission) {
+export async function submit(submission: Submission): Promise<Created[]> {
+  const delegate = delegates.getStore();
+  if (delegate && submission.actAs.includes(delegate.party)) return delegate.submit(submission);
+  const { actAs, readAs = [], commands, disclosedContracts = [] } = submission;
   const result = await call<{
     transaction: { updateId: string; events: Array<{ CreatedEvent?: CreatedEvent }> };
   }>("/v2/commands/submit-and-wait-for-transaction", {

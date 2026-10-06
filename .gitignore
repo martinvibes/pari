@@ -33,3 +33,6 @@ next-env.d.ts
 
 # Demo cast written by `make seed` (local party ids)
 .pari/
+
+# LocalNet state written by scripts/localnet.sh (DecMan keys and databases)
+/.localnet/

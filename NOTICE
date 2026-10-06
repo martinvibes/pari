@@ -10,6 +10,11 @@ It includes or is derived from the following third-party work:
   affiliates, licensed under the Apache License, Version 2.0.
   https://github.com/hyperledger-labs/splice
 
+* daml/dars/governance-*.dar — the governance packages of BitSafe's Canton
+  Decentralized Party Manager (releases/v1), Copyright 2026 BitSafe Finance,
+  licensed under the Apache License, Version 2.0.
+  https://github.com/DLC-link/decentralization-manager
+
 * web/ — the visual layer of the web app (design system, landing-page
   components, 3D scene and docs chrome) is derived from the sidereal-hedera
   web app, Copyright 2026 The sidereal contributors (Rahul Guha and Poulav
