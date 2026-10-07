@@ -4,13 +4,17 @@
 
 import { useState } from "react";
 
-/** `1220ab…` ids are long; the head and tail are what people compare. */
+/** Ledger ids are long; the head and tail are what people compare. A party id
+ *  (`Alder-x1::1220ab…`) keeps its readable hint and shortens the fingerprint. */
 export function shortId(id: string): string {
+  const [hint, fingerprint] = id.split("::");
+  if (fingerprint !== undefined) return `${hint}::${fingerprint.slice(0, 8)}…${fingerprint.slice(-4)}`;
   return id.length > 22 ? `${id.slice(0, 12)}…${id.slice(-6)}` : id;
 }
 
-/** A ledger update id, shortened, with the full id one click away. */
-export function UpdateId({ id, className = "" }: { id: string; className?: string }) {
+/** A ledger id (an update id or a party id), shortened, with the full id one
+ *  click away. */
+export function LedgerId({ id, className = "" }: { id: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {

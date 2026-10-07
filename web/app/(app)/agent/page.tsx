@@ -53,6 +53,7 @@ export default async function AgentPage() {
         kicker="Administrative agent"
         title="Agent"
         party="Agent"
+        partyId={view.party}
         lede="Keep the register, fix the rate, request payments and settle trades. The agent never holds the money: every payment is a CIP-56 allocation the payer funds from its own holdings."
       >
         <Facts

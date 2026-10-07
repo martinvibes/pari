@@ -2,7 +2,8 @@
 
 import { LiveValue } from "@/components/LiveValue";
 import { Tag, type Tone } from "@/components/Tag";
-import { PartyDot } from "@/components/app/party";
+import { LedgerId } from "@/components/app/LedgerId";
+import { hueOfName } from "@/components/app/party";
 import type { Status } from "@/lib/pari/types";
 
 // Presentational building blocks for the app screens, in the darkroom system:
@@ -11,31 +12,58 @@ import type { Status } from "@/lib/pari/types";
 
 export { Tag, type Tone };
 
+/** A screen's title. A party's screen wears that party's hue: a seat chip, a
+ *  low glow behind the title, and the party id the screen reads the ledger as.
+ *  A screen with no party can set its own `accent`. */
 export function PageHeader({
   kicker,
   title,
   party,
+  partyId,
+  accent,
   lede,
   children,
 }: {
   kicker?: string;
   title: string;
-  /** The screen's own party, marked with its identity hue. */
+  /** The screen's own party, by display name. */
   party?: string;
+  /** That party's id on the ledger. */
+  partyId?: string;
+  accent?: string;
   lede?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const hue = accent ?? (party ? hueOfName(party) : undefined);
   return (
-    <header className="space-y-3">
-      {kicker ? (
-        <p className="label-data flex items-center gap-2.5">
-          {party ? <PartyDot name={party} /> : null}
+    <header className="relative space-y-4">
+      {hue ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-56 -top-64 -z-10 h-[600px] w-[960px] max-w-none"
+          style={{ background: `radial-gradient(closest-side, ${hue}1C, transparent)` }}
+        />
+      ) : null}
+      {kicker && hue ? (
+        <p
+          className="inline-flex items-center gap-2.5 rounded-pill border px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.14em]"
+          style={{ color: hue, borderColor: `${hue}4D`, background: `${hue}12` }}
+        >
+          <span aria-hidden className="h-1.5 w-1.5 rounded-pill" style={{ background: hue, boxShadow: `0 0 8px ${hue}` }} />
           {kicker}
         </p>
+      ) : kicker ? (
+        <p className="label-data">{kicker}</p>
       ) : null}
       <h1 className="text-6xl font-medium tracking-[-0.03em] sm:text-7xl">{title}</h1>
       {lede ? <p className="max-w-2xl text-lg leading-relaxed text-smoke">{lede}</p> : null}
-      {children ? <div className="pt-3">{children}</div> : null}
+      {partyId ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="label-data">Reading the ledger as</span>
+          <LedgerId id={partyId} />
+        </div>
+      ) : null}
+      {children ? <div className="pt-2">{children}</div> : null}
     </header>
   );
 }
@@ -92,8 +120,14 @@ export function Panel({
 /** A facility's lifecycle, as a status: live once closed, done once repaid. */
 export const FACILITY_TONE: Record<Status, Tone> = { Syndicating: "wait", Active: "ok", Repaid: "info" };
 
+/** Nothing here yet, framed as a gap the deal will fill. */
 export function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-[15px] text-pewter">{children}</p>;
+  return (
+    <div className="flex items-start gap-3 border border-dashed border-white/[0.14] bg-white/[0.015] px-4 py-3.5 text-[15px] leading-relaxed text-pewter">
+      <span aria-hidden className="mt-[0.55em] h-2 w-2 shrink-0 rounded-pill border border-ash/70" />
+      <div>{children}</div>
+    </div>
+  );
 }
 
 /** Horizontal scroll for wide tables on narrow screens. */

@@ -5,7 +5,7 @@ import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
 import { Party } from "@/components/app/party";
 import { PageHeader, Panel, TableScroll, Tag } from "@/components/app/ui";
 import { PRIVACY_CHECKS } from "@/lib/pari/checks";
-import { PERSONAS } from "@/lib/pari/personas";
+import { PERSONAS, SEATS } from "@/lib/pari/personas";
 import { isUnavailable, viewAs, type View } from "@/lib/pari/session";
 import type { Snapshot } from "@/lib/pari/snapshot";
 
@@ -39,6 +39,7 @@ export default async function VisibilityPage() {
       <PageHeader
         kicker="Privacy"
         title="Who sees what"
+        accent="#A78BFA"
         lede="Each column is one party's own query of the ledger. The app filters nothing: Canton returns only the contracts a party is a stakeholder of, so this matrix is the privacy model, read live."
       />
 
@@ -46,6 +47,24 @@ export default async function VisibilityPage() {
         <TableScroll>
           <table className="table-data">
             <thead>
+              {/* The cast seated as in the top bar; a group is named where its
+                  parties go by their own names. */}
+              <tr>
+                <th aria-hidden />
+                {SEATS.map(({ seat, label }) => {
+                  const members = PERSONAS.filter((p) => p.seat === seat);
+                  const named = members.some((p) => p.name !== label);
+                  return (
+                    <th key={seat} colSpan={members.length} className="!pb-2 text-center">
+                      {named ? (
+                        <span className="block border-b border-white/15 pb-1.5 text-[10px] tracking-[0.18em] text-graphite">
+                          {label}
+                        </span>
+                      ) : null}
+                    </th>
+                  );
+                })}
+              </tr>
               <tr>
                 <th>Contract</th>
                 {seen.map(({ persona }) => (

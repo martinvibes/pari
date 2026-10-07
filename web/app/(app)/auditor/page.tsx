@@ -3,7 +3,7 @@
 import type { Metadata } from "next";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
 import { Party } from "@/components/app/party";
-import { UpdateId } from "@/components/app/UpdateId";
+import { LedgerId } from "@/components/app/LedgerId";
 import { Empty, FACILITY_TONE, Facts, PageHeader, Panel, Stats, TableScroll, Tag, type Tone } from "@/components/app/ui";
 import { auditTrail, type Audit, type Finding, type TrailRow } from "@/lib/pari/audit";
 import { formatTime } from "@/lib/pari/dates";
@@ -54,6 +54,7 @@ export default async function AuditorPage() {
         kicker="The borrower's auditor"
         title="Auditor"
         party="Auditor"
+        partyId={view.party}
         lede="Appointed by Northwind, the auditor follows the facility on the ledger and acts on nothing. Its audit trail is the ledger's own history, as Canton lets the auditor see it: every line carries the id of the transaction it records, and every figure is checked again here."
       >
         {f ? (
@@ -230,7 +231,7 @@ function TrailLine({ view, row }: { view: View; row: TrailRow }) {
         )}
       </td>
       <td className="min-w-[12rem]">
-        <UpdateId id={row.updateId} />
+        <LedgerId id={row.updateId} />
       </td>
     </tr>
   );

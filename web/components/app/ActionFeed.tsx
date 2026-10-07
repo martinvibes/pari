@@ -4,7 +4,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResult } from "@/app/(app)/actions";
-import { UpdateId } from "@/components/app/UpdateId";
+import { LedgerId } from "@/components/app/LedgerId";
 
 // The ledger's verdict on the last action, as a receipt in one place. It lives
 // in the app layout, so it survives the re-render that often removes the form
@@ -143,7 +143,7 @@ function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {
             <div className="mt-4 space-y-1.5 border-t border-white/[0.08] pt-3">
               <p className="label-data text-[11px]">{ids.length === 1 ? "Update id" : `${ids.length} transactions`}</p>
               {ids.map((id) => (
-                <UpdateId key={id} id={id} />
+                <LedgerId key={id} id={id} />
               ))}
             </div>
           ) : null}

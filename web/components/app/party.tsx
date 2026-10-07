@@ -25,7 +25,7 @@ export function hueOf(personaId: string): string {
 }
 
 /** A party's hue by display name, as `View.name` returns it. */
-function hueOfName(name: string): string {
+export function hueOfName(name: string): string {
   const persona = PERSONAS.find((p) => p.name === name);
   return persona ? hueOf(persona.id) : UNKNOWN;
 }

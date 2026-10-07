@@ -54,6 +54,7 @@ export default async function LenderPage({ params }: Params) {
         kicker={persona.blurb}
         title={persona.name}
         party={persona.name}
+        partyId={party}
         lede={`Your position, your payments and your trades. Canton shows ${persona.name} only what ${persona.name} is party to: no other lender's holding, no register, no DQ list.`}
       />
 

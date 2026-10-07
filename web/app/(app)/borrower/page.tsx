@@ -42,6 +42,7 @@ export default async function BorrowerPage() {
         kicker="Borrower"
         title="Northwind"
         party="Northwind"
+        partyId={view.party}
         lede="Fund payments from your own holdings, give notice of prepayments, keep the DQ list and post documents. Trade prices never reach Northwind: a ticket stays between buyer, seller and agent."
       >
         <Facts

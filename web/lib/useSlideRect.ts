@@ -8,8 +8,8 @@ export type SlideRect = { left: number; top: number; width: number; height: numb
 
 /** Measures the element matching `selector` inside the returned container,
  *  relative to the container, re-measuring when `dep` changes or the container
- *  resizes. Drives the sliding active indicators (tab underline, direction
- *  highlight): the indicator is one absolutely positioned element whose
+ *  resizes. Drives the sliding active indicators (the cast rail's pill): the
+ *  indicator is one absolutely positioned element whose
  *  left/top/size transition between measurements instead of teleporting.
  *  Returns null until measured, so callers can keep a static fallback for
  *  server render and no-JS. */
@@ -28,7 +28,14 @@ export function useSlideRect<T extends HTMLElement>(selector: string, dep: unkno
       }
       const c = el.getBoundingClientRect();
       const a = active.getBoundingClientRect();
-      setRect({ left: a.left - c.left, top: a.top - c.top, width: a.width, height: a.height });
+      // In the container's own coordinates: inside its border, and past any
+      // scroll, so the indicator stays put while a narrow rail scrolls.
+      setRect({
+        left: a.left - c.left - el.clientLeft + el.scrollLeft,
+        top: a.top - c.top - el.clientTop + el.scrollTop,
+        width: a.width,
+        height: a.height,
+      });
     };
     measure();
     const ro = new ResizeObserver(measure);

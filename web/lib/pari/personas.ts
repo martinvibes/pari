@@ -17,24 +17,37 @@ export type CastKey =
   | "rival"
   | "auditor";
 
+/** Where a party sits at the deal table. Buyers use the lender screen (a buyer
+ *  is a lender once it buys in), but sit apart so the cast reads at a glance. */
+export type Seat = "agent" | "borrower" | "lender" | "buyer" | "auditor";
+
+export const SEATS: Array<{ seat: Seat; label: string }> = [
+  { seat: "agent", label: "Agent" },
+  { seat: "borrower", label: "Borrower" },
+  { seat: "lender", label: "Lenders" },
+  { seat: "buyer", label: "Buyers" },
+  { seat: "auditor", label: "Auditor" },
+];
+
 export type Persona = {
   id: string;
   name: string;
   role: Role;
+  seat: Seat;
   castKey: CastKey;
   href: string;
   blurb: string;
 };
 
 export const PERSONAS: Persona[] = [
-  { id: "agent", name: "Agent", role: "agent", castKey: "agent", href: "/agent", blurb: "Administrative agent" },
-  { id: "northwind", name: "Northwind", role: "borrower", castKey: "borrower", href: "/borrower", blurb: "Borrower" },
-  { id: "alder", name: "Alder", role: "lender", castKey: "alder", href: "/lender/alder", blurb: "Lender, private side" },
-  { id: "birch", name: "Birch", role: "lender", castKey: "birch", href: "/lender/birch", blurb: "Lender, public side" },
-  { id: "cedar", name: "Cedar", role: "lender", castKey: "cedar", href: "/lender/cedar", blurb: "Lender, public side" },
-  { id: "delta", name: "Delta", role: "lender", castKey: "buyer", href: "/lender/delta", blurb: "Fund buying in" },
-  { id: "rival", name: "Rival", role: "lender", castKey: "rival", href: "/lender/rival", blurb: "On the DQ list" },
-  { id: "auditor", name: "Auditor", role: "auditor", castKey: "auditor", href: "/auditor", blurb: "The borrower's auditor" },
+  { id: "agent", name: "Agent", role: "agent", seat: "agent", castKey: "agent", href: "/agent", blurb: "Administrative agent" },
+  { id: "northwind", name: "Northwind", role: "borrower", seat: "borrower", castKey: "borrower", href: "/borrower", blurb: "Borrower" },
+  { id: "alder", name: "Alder", role: "lender", seat: "lender", castKey: "alder", href: "/lender/alder", blurb: "Lender, private side" },
+  { id: "birch", name: "Birch", role: "lender", seat: "lender", castKey: "birch", href: "/lender/birch", blurb: "Lender, public side" },
+  { id: "cedar", name: "Cedar", role: "lender", seat: "lender", castKey: "cedar", href: "/lender/cedar", blurb: "Lender, public side" },
+  { id: "delta", name: "Delta", role: "lender", seat: "buyer", castKey: "buyer", href: "/lender/delta", blurb: "Fund buying in" },
+  { id: "rival", name: "Rival", role: "lender", seat: "buyer", castKey: "rival", href: "/lender/rival", blurb: "On the DQ list" },
+  { id: "auditor", name: "Auditor", role: "auditor", seat: "auditor", castKey: "auditor", href: "/auditor", blurb: "The borrower's auditor" },
 ];
 
 export const LENDERS = PERSONAS.filter((p) => p.role === "lender");
