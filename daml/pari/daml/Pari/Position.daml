@@ -1,0 +1,102 @@
+-- | A lender's share of a facility and its payment receipts.
+module Pari.Position
+  ( Position(..)
+  , Position_Settle(..)
+  , Position_Reduce(..)
+  , Position_Increase(..)
+  , Receipt(..)
+  ) where
+
+import Splice.Api.Token.AllocationV1 (SettlementInfo(..), TransferLeg(..))
+
+import Pari.Payment (PaymentKind(..))
+import Pari.Settlement
+import Pari.Util
+
+-- | A lender's position, co-signed by the lender. The agent cannot create,
+-- move or shrink it without the lender's authority.
+--
+-- A position can hold zero principal after a full sale while interest earned
+-- before the sale is still owed; it is archived once that interest is paid.
+template Position
+  with
+    agent : Party
+    lender : Party
+    facilityId : Text
+    principal : Decimal
+  where
+    signatory agent, lender
+    ensure principal >= 0.0 && isCents principal
+
+    -- | Receive one leg of a borrower payment. Only reachable from the
+    -- facility, which carries the borrower's authority; the leg must pay this
+    -- lender and match the borrower's allocation exactly.
+    choice Position_Settle : Optional (ContractId Position)
+      with
+        borrower : Party
+        expectedPrincipal : Decimal
+          -- ^ Principal recorded in the facility register.
+        principalReduction : Decimal
+        retain : Bool
+          -- ^ Keep the position even at zero principal (interest still owed).
+        kind : PaymentKind
+        due : Decimal
+        settlement : SettlementInfo
+        legId : Text
+        leg : TransferLeg
+        allocation : AllocationInput
+      controller agent, borrower
+      do
+        require "position matches the facility register" (principal == expectedPrincipal)
+        require "leg pays this lender from the borrower" (leg.receiver == lender && leg.sender == borrower)
+        settleLeg settlement legId leg allocation
+        now <- getTime
+        create Receipt with
+          agent
+          lender
+          facilityId
+          kind
+          due
+          paid = leg.amount
+          settlementRef = settlement.settlementRef.id
+          paidAt = now
+        let remaining = principal - principalReduction
+        if remaining == 0.0 && not retain
+          then pure None
+          else Some <$> create this with principal = remaining
+
+    -- | Sell part of the position. Applied from a settled trade.
+    choice Position_Reduce : Optional (ContractId Position)
+      with
+        amount : Decimal
+        retain : Bool
+      controller lender, agent
+      do
+        let remaining = principal - amount
+        require "sale amount is positive and held" (amount > 0.0 && remaining >= 0.0)
+        if remaining == 0.0 && not retain
+          then pure None
+          else Some <$> create this with principal = remaining
+
+    -- | Add principal bought in a settled trade.
+    choice Position_Increase : ContractId Position
+      with
+        amount : Decimal
+      controller lender, agent
+      do
+        require "purchase amount is positive" (amount > 0.0)
+        create this with principal = principal + amount
+
+-- | A lender's record of one payment received.
+template Receipt
+  with
+    agent : Party
+    lender : Party
+    facilityId : Text
+    kind : PaymentKind
+    due : Decimal
+    paid : Decimal
+    settlementRef : Text
+    paidAt : Time
+  where
+    signatory agent, lender

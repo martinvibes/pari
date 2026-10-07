@@ -1,0 +1,116 @@
+-- | Principal repayment, and the guards against a Revlon-style mistaken
+-- payment: principal moves only against the borrower's own notice, and no
+-- settlement can pay out more than the borrower allocated for that leg.
+module Pari.Test.Principal where
+
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+import DA.Time (time)
+import Daml.Script
+
+import Pari.Facility
+import Pari.Payment
+import Pari.Position
+
+import Pari.Test.Setup
+
+-- | Close, run the first period and pay its interest, so the facility sits
+-- between periods where prepayment is allowed.
+betweenPeriods : Env -> Script (ContractId Facility)
+betweenPeriods env = do
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env facility
+  pay env facility 1.0
+
+prepay : Env -> ContractId Facility -> Decimal -> Script (ContractId Facility)
+prepay env facility amount = do
+  notice <- submit env.borrower $ createCmd PrepaymentNotice with
+    borrower = env.borrower
+    agent = env.agent
+    facilityId = dealId
+    amount
+  (allocateBefore, settleBefore) <- deadlines
+  (facility, _) <- submit env.agent $ exerciseCmd facility Facility_AcceptPrepayment with
+    noticeCid = notice; allocateBefore; settleBefore
+  pay env facility 1.0
+
+test_prepayment_is_shared_pro_rata : Script ()
+test_prepayment_is_shared_pro_rata = do
+  env <- setup
+  facility <- betweenPeriods env
+  facility <- prepay env facility 25_000_000.0
+
+  state <- facilityOf env facility
+  outstanding state === 75_000_000.0
+  fmap (.principal) state.register ===
+    Map.fromList [(env.alder, 37_500_000.0), (env.birch, 22_500_000.0), (env.cedar, 15_000_000.0)]
+  (_, alder) <- positionOf env.alder
+  alder.principal === 37_500_000.0
+
+test_full_repayment_retires_the_facility : Script ()
+test_full_repayment_retires_the_facility = do
+  env <- setup
+  facility <- betweenPeriods env
+  facility <- prepay env facility 100_000_000.0
+
+  state <- facilityOf env facility
+  state.status === Repaid
+  state.register === Map.empty
+  forA_ (syndicate env) \(lender, _) -> do
+    positions <- query @Position lender
+    positions === []
+
+test_agent_cannot_originate_a_principal_payment : Script ()
+test_agent_cannot_originate_a_principal_payment = do
+  env <- setup
+  _ <- betweenPeriods env
+  -- Only the borrower can give notice of a repayment.
+  submitMustFail env.agent $ createCmd PrepaymentNotice with
+    borrower = env.borrower
+    agent = env.agent
+    facilityId = dealId
+    amount = 100_000_000.0
+
+test_settlement_cannot_pay_more_than_requested : Script ()
+test_settlement_cannot_pay_more_than_requested = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, requestCid) <- requestInterest env facility
+  request <- fromSome <$> queryContractId env.borrower requestCid
+
+  -- Alder's allocation carries principal plus interest, as in Revlon.
+  allocations <- Map.fromList <$> forA (legsOf request) \(legId, leg) -> do
+    let amount = if leg.receiver == env.alder then leg.amount + 50_000_000.0 else leg.amount
+    allocation <- allocate env request.settlement legId leg with amount
+    pure (leg.receiver, allocation)
+  positions <- positionsOf [env.alder, env.birch, env.cedar]
+
+  submitMustFail env.agent $ exerciseCmd facility Facility_Settle with
+    fraction = 1.0; positions; allocations
+  alderCash <- balanceOf env env.alder
+  alderCash === 0.0
+
+test_no_settlement_without_an_open_request : Script ()
+test_no_settlement_without_an_open_request = do
+  env <- setup
+  facility <- betweenPeriods env
+  positions <- positionsOf [env.alder, env.birch, env.cedar]
+  submitMustFail env.agent $ exerciseCmd facility Facility_Settle with
+    fraction = 1.0; positions; allocations = Map.empty
+
+test_prepayment_waits_for_the_period_to_close : Script ()
+test_prepayment_waits_for_the_period_to_close = do
+  env <- setup
+  facility <- activeFacility env
+  notice <- submit env.borrower $ createCmd PrepaymentNotice with
+    borrower = env.borrower
+    agent = env.agent
+    facilityId = dealId
+    amount = 10_000_000.0
+  (allocateBefore, settleBefore) <- deadlines
+  submitMustFail env.agent $ exerciseCmd facility Facility_AcceptPrepayment with
+    noticeCid = notice; allocateBefore; settleBefore

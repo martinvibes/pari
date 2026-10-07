@@ -1,0 +1,141 @@
+-- | Interest: ACT/360 maths, one atomic payment to every lender, and pro-rata
+-- short payments that cannot favour any lender.
+module Pari.Test.Interest where
+
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.Date (Month(..), date)
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+import DA.TextMap qualified as TextMap
+import DA.Time (time)
+import Daml.Script
+
+import Pari.Facility
+import Pari.Interest
+import Pari.Position
+import Pari.Util
+
+import Pari.Test.Setup
+
+-- Expected interest for 91 days at 7.80% (ACT/360), rounded down to cents.
+alderDue, birchDue, cedarDue : Decimal
+alderDue = 985_833.33   -- 50m * 7.80% * 91/360 = 985,833.333...
+birchDue = 591_500.00   -- 30m * 7.80% * 91/360
+cedarDue = 394_333.33   -- 20m * 7.80% * 91/360 = 394,333.333...
+
+test_interest_maths : Script ()
+test_interest_maths = do
+  allInRate 350 0.0430 === 0.0780
+  accrual 50_000_000.0 0.0780 (date 2026 Sep 15) (date 2026 Dec 15) === alderDue
+  -- Short accruals still round down.
+  accrual 1_000.0 0.0780 (date 2026 Sep 15) (date 2026 Sep 16) === 0.21
+  proRata 100.0 Map.empty === Map.empty
+
+test_pro_rata_shares_sum_exactly : Script ()
+test_pro_rata_shares_sum_exactly = do
+  [a, b, c] <- mapA allocateParty ["A", "B", "C"]
+  -- Thirds round down to 33.33; the leftover cent goes to one holder.
+  let thirds = proRata 100.0 (Map.fromList [(a, 3.0), (b, 3.0), (c, 3.0)])
+  sum (Map.values thirds) === 100.0
+  all (\s -> s == 33.33 || s == 33.34) (Map.values thirds) === True
+  let uneven = proRata 25_000_000.0 (Map.fromList [(a, 50_000_000.0), (b, 30_000_000.0), (c, 20_000_000.0)])
+  Map.toList uneven === [(a, 12_500_000.0), (b, 7_500_000.0), (c, 5_000_000.0)]
+
+test_interest_paid_to_every_lender_in_one_step : Script ()
+test_interest_paid_to_every_lender_in_one_step = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, requestCid) <- requestInterest env facility
+
+  request <- fromSome <$> queryContractId env.borrower requestCid
+  Map.fromList [(leg.receiver, leg.amount) | (_, leg) <- TextMap.toList request.legs] ===
+    Map.fromList [(env.alder, alderDue), (env.birch, birchDue), (env.cedar, cedarDue)]
+
+  facility <- pay env facility 1.0
+
+  alderCash <- balanceOf env env.alder
+  alderCash === alderDue
+  birchCash <- balanceOf env env.birch
+  birchCash === birchDue
+  cedarCash <- balanceOf env env.cedar
+  cedarCash === cedarDue
+  borrowerCash <- balanceOf env env.borrower
+  borrowerCash === 105_000_000.0 - (alderDue + birchDue + cedarDue)
+
+  state <- facilityOf env facility
+  state.paidThrough === firstPeriodEnd
+  state.period === None
+  state.pending === None
+  forA_ (Map.values state.register) \entry -> do
+    entry.carried === 0.0
+    entry.accrualStart === firstPeriodEnd
+
+  -- Each lender holds a receipt for its own payment only.
+  receipts <- query @Receipt env.alder
+  map (\(_, r) -> (r.lender, r.due, r.paid)) receipts === [(env.alder, alderDue, alderDue)]
+
+test_short_payment_is_shared_pro_rata : Script ()
+test_short_payment_is_shared_pro_rata = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env facility
+
+  -- The borrower can fund only half: every lender gets half of what it is owed.
+  facility <- pay env facility 0.5
+
+  alderCash <- balanceOf env env.alder
+  alderCash === 492_916.66
+  birchCash <- balanceOf env env.birch
+  birchCash === 295_750.00
+  cedarCash <- balanceOf env env.cedar
+  cedarCash === 197_166.66
+
+  -- The unpaid half stays owed and rolls into the next period's request.
+  state <- facilityOf env facility
+  fmap (.carried) state.register ===
+    Map.fromList [(env.alder, 492_916.67), (env.birch, 295_750.00), (env.cedar, 197_166.67)]
+
+test_borrower_cannot_favour_a_lender : Script ()
+test_borrower_cannot_favour_a_lender = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, requestCid) <- requestInterest env facility
+  request <- fromSome <$> queryContractId env.borrower requestCid
+
+  -- Alder is paid in full while Birch and Cedar get half.
+  allocations <- Map.fromList <$> forA (legsOf request) \(legId, leg) -> do
+    let amount = if leg.receiver == env.alder then leg.amount else floorCents (leg.amount * 0.5)
+    allocation <- allocate env request.settlement legId leg with amount
+    pure (leg.receiver, allocation)
+  positions <- positionsOf [env.alder, env.birch, env.cedar]
+
+  forA_ [0.5, 1.0] \fraction ->
+    submitMustFail env.agent $ exerciseCmd facility Facility_Settle with
+      fraction; positions; allocations
+
+  alderCash <- balanceOf env env.alder
+  alderCash === 0.0
+
+test_every_lender_is_paid_or_none_is : Script ()
+test_every_lender_is_paid_or_none_is = do
+  env <- setup
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, requestCid) <- requestInterest env facility
+  request <- fromSome <$> queryContractId env.borrower requestCid
+  allocations <- Map.fromList <$> forA (legsOf request) \(legId, leg) -> do
+    allocation <- allocate env request.settlement legId leg
+    pure (leg.receiver, allocation)
+  positions <- positionsOf [env.alder, env.birch, env.cedar]
+
+  -- Leaving Cedar out of the settlement aborts it for everyone.
+  submitMustFail env.agent $ exerciseCmd facility Facility_Settle with
+    fraction = 1.0
+    positions = Map.delete env.cedar positions
+    allocations = Map.delete env.cedar allocations
+  alderCash <- balanceOf env env.alder
+  alderCash === 0.0

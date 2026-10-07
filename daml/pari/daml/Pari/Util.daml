@@ -1,0 +1,24 @@
+-- | Small helpers shared across the Pari model.
+module Pari.Util
+  ( require
+  , floorCents
+  , isCents
+  , legIdFor
+  ) where
+
+-- | Abort the transaction with a readable message unless the condition holds.
+require : CanAssert m => Text -> Bool -> m ()
+require msg ok = assertMsg ("Pari: " <> msg) ok
+
+-- | Round an amount down to whole cents. Pari never rounds a payment up, so
+-- nobody is ever asked to pay more than the terms imply.
+floorCents : Decimal -> Decimal
+floorCents x = intToDecimal (floor (x * 100.0)) / 100.0
+
+-- | True when the amount has no fractional cents.
+isCents : Decimal -> Bool
+isCents x = floorCents x == x
+
+-- | Transfer legs are keyed by the receiving (or paying) lender's party id.
+legIdFor : Party -> Text
+legIdFor = partyToText

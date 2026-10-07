@@ -1,0 +1,57 @@
+-- | The borrower's disqualified-institutions (DQ) list and buyer screening.
+module Pari.Screening
+  ( DqList(..)
+  , DqList_Update(..)
+  , DqList_Screen(..)
+  , ScreeningResult(..)
+  ) where
+
+import DA.Set (Set)
+import DA.Set qualified as Set
+
+-- | Institutions the borrower refuses as lenders (competitors, distressed
+-- buyers). Shared with the agent only: neither lenders nor prospective
+-- buyers ever see the list, and screening never reveals it.
+template DqList
+  with
+    borrower : Party
+    agent : Party
+    facilityId : Text
+    disqualified : Set Party
+  where
+    signatory borrower
+    observer agent
+
+    choice DqList_Update : ContractId DqList
+      with
+        newList : Set Party
+      controller borrower
+      do create this with disqualified = newList
+
+    -- | Screen a prospective buyer. The result is visible to the borrower and
+    -- agent only; the buyer is not an informee of this choice.
+    nonconsuming choice DqList_Screen : ContractId ScreeningResult
+      with
+        candidate : Party
+      controller agent
+      do
+        now <- getTime
+        create ScreeningResult with
+          borrower
+          agent
+          facilityId
+          candidate
+          cleared = not (Set.member candidate disqualified)
+          screenedAt = now
+
+-- | Outcome of one screening, consumed by the trade it clears.
+template ScreeningResult
+  with
+    borrower : Party
+    agent : Party
+    facilityId : Text
+    candidate : Party
+    cleared : Bool
+    screenedAt : Time
+  where
+    signatory borrower, agent

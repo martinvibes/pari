@@ -1,0 +1,66 @@
+-- | Information walls: MNPI reaches private-side lenders only.
+module Pari.Test.Disclosure where
+
+import DA.Assert ((===))
+import Daml.Script
+
+import Pari.Disclosure
+
+import Pari.Test.Setup
+
+postDocument : Env -> Text -> Text -> Bool -> Script (ContractId Document)
+postDocument env docId title mnpi = submit env.borrower $ createCmd Document with
+  borrower = env.borrower
+  agent = env.agent
+  facilityId = dealId
+  docId
+  title
+  uri = "https://dataroom.example/" <> docId
+  sha256 = "sha256:" <> docId
+  mnpi
+
+elect : Env -> Party -> Side -> Script (ContractId InfoElection)
+elect env lender side = submit lender $ createCmd InfoElection with
+  lender
+  agent = env.agent
+  facilityId = dealId
+  side
+
+test_mnpi_reaches_private_side_only : Script ()
+test_mnpi_reaches_private_side_only = do
+  env <- setup
+  _ <- closeFacility env
+  alderElection <- elect env env.alder PrivateSide
+  birchElection <- elect env env.birch PublicSide
+  accounts <- postDocument env "q3-accounts" "Q3 management accounts" True
+  presentation <- postDocument env "lender-deck" "Public lender presentation" False
+
+  _ <- submit env.agent $ exerciseCmd accounts Document_Share with electionCid = alderElection
+  submitMustFail env.agent $ exerciseCmd accounts Document_Share with electionCid = birchElection
+  _ <- submit env.agent $ exerciseCmd presentation Document_Share with electionCid = birchElection
+
+  alderDocs <- query @DocumentAccess env.alder
+  map (\(_, d) -> d.docId) alderDocs === ["q3-accounts"]
+  birchDocs <- query @DocumentAccess env.birch
+  map (\(_, d) -> d.docId) birchDocs === ["lender-deck"]
+
+test_crossing_the_wall_is_the_lenders_choice : Script ()
+test_crossing_the_wall_is_the_lenders_choice = do
+  env <- setup
+  _ <- closeFacility env
+  birchElection <- elect env env.birch PublicSide
+  accounts <- postDocument env "q3-accounts" "Q3 management accounts" True
+
+  -- The agent cannot put Birch over the wall.
+  submitMustFail env.agent $ createCmd InfoElection with
+    lender = env.birch
+    agent = env.agent
+    facilityId = dealId
+    side = PrivateSide
+
+  -- Birch can, and then receives MNPI.
+  birchElection <- submit env.birch $ exerciseCmd birchElection InfoElection_Change with
+    newSide = PrivateSide
+  _ <- submit env.agent $ exerciseCmd accounts Document_Share with electionCid = birchElection
+  birchDocs <- query @DocumentAccess env.birch
+  map (\(_, d) -> d.docId) birchDocs === ["q3-accounts"]

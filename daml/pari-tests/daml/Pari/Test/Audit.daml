@@ -1,0 +1,119 @@
+-- | The borrower's auditor: follows the register through every payment and
+-- trade, acts on nothing, and holds no trade price, DQ list or document.
+--
+-- These tests check the contracts the auditor holds. The web app's smoke test
+-- checks the stronger claim on a running ledger: across every event the
+-- auditor witnesses, none is a trade offer or ticket, the DQ list or a
+-- document. Of screening it witnesses one thing: recording a trade uses up the
+-- buyer's clearance, which the borrower sees too and the register implies.
+module Pari.Test.Audit where
+
+import DA.Assert ((===))
+import DA.List (sort)
+import DA.Map qualified as Map
+import DA.Time (time)
+import Daml.Script
+
+import Pari.Disclosure
+import Pari.Facility
+import Pari.Position
+import Pari.Screening
+import Pari.Trade
+
+import Pari.Test.Disclosure (postDocument)
+import Pari.Test.Setup
+import Pari.Test.Trading (agreeTrade, settleTrade)
+
+-- | The fixture's deal with its first period fixed, audited by a new party.
+audited : Script (Env, Party, ContractId Facility)
+audited = do
+  env <- setup
+  auditor <- allocateParty "Auditor"
+  facility <- activeFacility env
+  facility <- appoint env auditor facility
+  pure (env, auditor, facility)
+
+appoint : Env -> Party -> ContractId Facility -> Script (ContractId Facility)
+appoint env auditor facility = submit env.borrower $ exerciseCmd facility Facility_AppointAuditor with
+  newAuditor = auditor
+
+test_auditor_follows_the_register : Script ()
+test_auditor_follows_the_register = do
+  (env, auditor, facility) <- audited
+
+  Some state <- queryContractId auditor facility
+  sort (Map.keys state.register) === sort [env.alder, env.birch, env.cedar]
+  outstanding state === 100_000_000.0
+
+  -- Each payment restates the facility, and the auditor sees the new state.
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env facility
+  facility <- pay env facility 1.0
+  Some state <- queryContractId auditor facility
+  state.paidThrough === firstPeriodEnd
+
+test_only_the_borrower_appoints_the_auditor : Script ()
+test_only_the_borrower_appoints_the_auditor = do
+  env <- setup
+  auditor <- allocateParty "Auditor"
+  facility <- activeFacility env
+
+  submitMustFail env.agent $ exerciseCmd facility Facility_AppointAuditor with newAuditor = auditor
+  submitMustFail env.alder $ exerciseCmd facility Facility_AppointAuditor with newAuditor = auditor
+  -- A lender cannot be the auditor: it would see every other lender's position.
+  submitMustFail env.borrower $ exerciseCmd facility Facility_AppointAuditor with newAuditor = env.birch
+
+  facility <- appoint env auditor facility
+  Some state <- queryContractId auditor facility
+  state.auditor === Some auditor
+
+test_auditor_acts_on_nothing : Script ()
+test_auditor_acts_on_nothing = do
+  (env, auditor, facility) <- audited
+  (allocateBefore, settleBefore) <- deadlines
+  (alderPosition, _) <- positionOf env.alder
+
+  -- Each choice below succeeds for its own controller in this state.
+  submitMustFail auditor $ exerciseCmd facility Facility_RequestInterest with allocateBefore; settleBefore
+  submitMustFail auditor $ exerciseCmd facility Facility_AppointAuditor with newAuditor = env.rival
+  submitMustFail auditor $ exerciseCmd facility Facility_RemoveAuditor
+  submitMustFail auditor $ exerciseCmd alderPosition Position_Reduce with amount = 1.0; retain = True
+
+  _ <- submit env.borrower $ exerciseCmd facility Facility_RemoveAuditor
+  pure ()
+
+test_removed_auditor_sees_nothing_new : Script ()
+test_removed_auditor_sees_nothing_new = do
+  (env, auditor, facility) <- audited
+  facility <- submit env.borrower $ exerciseCmd facility Facility_RemoveAuditor
+
+  facilities <- query @Facility auditor
+  facilities === []
+  Some state <- queryContractId env.agent facility
+  state.auditor === None
+
+test_auditor_holds_no_price_dq_list_or_document : Script ()
+test_auditor_holds_no_price_dq_list_or_document = do
+  (env, auditor, facility) <- audited
+  _ <- postDocument env "q3-accounts" "Q3 management accounts" True
+  setTime (time midPeriod 9 0 0)
+  ticket <- agreeTrade env env.alder env.buyer 10_000_000.0 0.995
+  settled <- settleTrade env facility ticket
+
+  -- The auditor follows the register through the trade...
+  Some state <- queryContractId auditor settled.facilityCid
+  Map.member env.buyer state.register === True
+
+  -- ...but holds nothing of the trade, the screening or the data room.
+  offers <- query @TradeOffer auditor
+  offers === []
+  tickets <- query @TradeTicket auditor
+  tickets === []
+  lists <- query @DqList auditor
+  lists === []
+  screenings <- query @ScreeningResult auditor
+  screenings === []
+  documents <- query @Document auditor
+  documents === []
+  positions <- query @Position auditor
+  positions === []

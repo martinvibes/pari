@@ -1,0 +1,70 @@
+-- | Interest and pro-rata arithmetic. Pure functions only, so every number a
+-- lender receives can be recomputed from the terms and the register.
+module Pari.Interest
+  ( Period(..)
+  , Entry(..)
+  , allInRate
+  , accrual
+  , accrueTo
+  , interestDue
+  , proRata
+  ) where
+
+import DA.Date (subDate)
+import DA.List (maximumOn)
+import DA.Map (Map)
+import DA.Map qualified as Map
+
+import Pari.Util
+
+-- | An interest period with its fixed base rate (e.g. 0.0430 for 4.30%).
+data Period = Period with
+    start : Date
+    end : Date
+    baseRate : Decimal
+  deriving (Eq, Show)
+
+-- | One lender's line in the facility register.
+data Entry = Entry with
+    principal : Decimal
+      -- ^ Principal currently held.
+    accrualStart : Date
+      -- ^ Interest on `principal` accrues from this date.
+    carried : Decimal
+      -- ^ Interest already earned in the current period (before a trade) or
+      -- left unpaid by a short payment, still owed to this lender.
+  deriving (Eq, Show)
+
+-- | Base rate plus the facility margin.
+allInRate : Int -> Decimal -> Decimal
+allInRate marginBps baseRate = baseRate + intToDecimal marginBps / 10000.0
+
+-- | Simple interest on an ACT/360 basis, rounded down to cents.
+accrual : Decimal -> Decimal -> Date -> Date -> Decimal
+accrual principal rate from to =
+  floorCents (principal * rate * intToDecimal (subDate to from) / 360.0)
+
+-- | Move interest earned up to `asOf` into `carried` and restart accrual there.
+-- Used when a position changes hands mid-period, so the seller keeps exactly
+-- the interest earned while it held the loan.
+accrueTo : Decimal -> Date -> Entry -> Entry
+accrueTo rate asOf e = e with
+  carried = e.carried + accrual e.principal rate e.accrualStart asOf
+  accrualStart = asOf
+
+-- | Interest owed to an entry for a period ending on `end`.
+interestDue : Decimal -> Date -> Entry -> Decimal
+interestDue rate end e = (accrueTo rate end e).carried
+
+-- | Split `amount` across holders in proportion to their principal. Shares are
+-- rounded down to cents and the leftover cents go to the largest holder, so
+-- the shares always add up to exactly `amount`.
+proRata : Decimal -> Map Party Decimal -> Map Party Decimal
+proRata amount holdings
+  | Map.null holdings = Map.empty
+  | otherwise =
+      let total = sum (Map.values holdings)
+          shares = fmap (\held -> floorCents (amount * held / total)) holdings
+          leftover = amount - sum (Map.values shares)
+          (largest, _) = maximumOn snd (Map.toList holdings)
+      in Map.alter (fmap (+ leftover)) largest shares

@@ -1,0 +1,350 @@
+-- | Governance: the agent as a decentralized party, run by three independent
+-- operators under BitSafe's `GovernanceRules`. Any two of them can make the
+-- agent act; one alone cannot, and neither can anyone else.
+--
+-- The deal's other parties act as in the rest of the suite. Where a test
+-- only needs a deal in some state, it reaches that state with the fixture
+-- in `Pari.Test.Setup`; the deal itself is run by the operators end to end
+-- in `test_operators_run_the_deal_two_of_three`, and every other choice of
+-- the agent's in `test_every_other_agent_choice_runs_governed`.
+module Pari.Test.Governance where
+
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.List ((!!))
+import DA.Optional (fromSome)
+import DA.Set qualified as Set
+import DA.Text (isInfixOf)
+import DA.Time (hours, time)
+import Daml.Script
+
+import Splice.Api.Token.AllocationRequestV1 (AllocationRequest_Withdraw(..))
+import Splice.Api.Token.AllocationV1 (Allocation_Withdraw(..))
+
+import Governance.Action
+import Governance.Confirmation
+import Governance.ExecutionResult
+import Governance.Rules
+
+import Pari.Desk
+import Pari.Disclosure
+import Pari.Facility
+import Pari.Governance
+import Pari.Payment (PrepaymentNotice(..))
+import Pari.Screening
+import Pari.Settlement (mkLeg)
+import Pari.Syndication
+import Pari.Trade (tradeLegId)
+import Pari.Util (legIdFor)
+
+import Pari.Test.Disclosure (elect, postDocument)
+import Pari.Test.Interest (alderDue, birchDue, cedarDue)
+import Pari.Test.Setup
+import Pari.Test.Trading (agreeTrade)
+
+-- | The agent's operators, each on its own node, and the rules they share.
+data Operators = Operators with
+    desk : Party
+      -- ^ The agent's own operations desk.
+    coAgent : Party
+      -- ^ An independent co-agent, e.g. a fund administrator.
+    trustee : Party
+      -- ^ The successor agent named in the credit agreement.
+    rules : ContractId GovernanceRules
+
+-- | Two of three operators must confirm every action the agent takes.
+operatorsFor : Env -> Script Operators
+operatorsFor env = do
+  [desk, coAgent, trustee] <- mapA allocateParty ["OperationsDesk", "CoAgent", "Trustee"]
+  rules <- submit env.agent $ createCmd GovernanceRules with
+    governanceParty = env.agent
+    members = Set.fromList [desk, coAgent, trustee]
+    threshold = 2
+    actionConfirmationTimeout = hours 1
+    additionalProposers = None
+  pure Operators with ..
+
+-- | An operator reads as the agent, whose party its node hosts, and acts as
+-- itself.
+as : Env -> Party -> SubmitOptions
+as env operator = actAs operator <> readAs env.agent
+
+propose : Env -> Party -> AgentInstruction -> Script (ContractId GovernableAction)
+propose env proposer instruction = toInterfaceContractId <$>
+  submit proposer (createCmd AgentAction with agent = env.agent; proposer; instruction)
+
+confirm : Env -> Operators -> ContractId GovernableAction -> Party -> Script (ContractId GovernanceConfirmation)
+confirm env ops action confirmer = do
+  result <- submit (as env confirmer) $ exerciseCmd ops.rules GovernanceRules_ConfirmAction with
+    confirmer; actionProposalCid = action
+  pure result.confirmationCid
+
+execute : Operators -> Party -> ContractId GovernableAction -> [ContractId GovernanceConfirmation]
+  -> Commands ExecuteConfirmedActionResult
+execute ops executor actionProposalCid confirmations =
+  exerciseCmd ops.rules GovernanceRules_ExecuteConfirmedAction with executor; actionProposalCid; confirmations
+
+-- | Submits `commands`, which must fail for `reason`.
+refused : Text -> SubmitOptions -> Commands a -> Script ()
+refused reason options commands = do
+  result <- trySubmit options commands
+  case result of
+    Left err -> assertMsg ("expected " <> reason <> ", got " <> show err) (reason `isInfixOf` show err)
+    Right _ -> fail ("expected " <> reason <> ", but the submission succeeded")
+
+-- | `proposer` proposes and confirms; `seconder` confirms and executes.
+-- Returns the audit record the execution leaves.
+governed : Env -> Operators -> (Party, Party) -> AgentInstruction -> Script GovernanceExecutionResult
+governed env ops (proposer, seconder) instruction = do
+  action <- propose env proposer instruction
+  confirmations <- forA [proposer, seconder] (confirm env ops action)
+  result <- submit (as env seconder) $ execute ops seconder action confirmations
+  fromSome <$> queryContractId env.agent result.executionResultCid
+
+-- | Fix the first period's base rate on `facility`.
+fixAt : ContractId Facility -> Decimal -> AgentInstruction
+fixAt facility baseRate = FixRate with
+  facility
+  fixRate = Facility_FixRate with baseRate; periodEnd = firstPeriodEnd
+
+currentFacility : Env -> Script (ContractId Facility)
+currentFacility env = do
+  [(cid, _)] <- query @Facility env.agent
+  pure cid
+
+-- | The threshold, with real money: one operator's confirmation moves nothing,
+-- and a second, independent one pays every lender in one transaction.
+test_settlement_needs_two_of_three_operators : Script ()
+test_settlement_needs_two_of_three_operators = do
+  env <- setup
+  ops <- operatorsFor env
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env facility
+  settle <- fund env facility 1.0
+  action <- propose env ops.desk (Settle with facility; settle)
+
+  first <- confirm env ops action ops.desk
+  refused "Enough confirmations" (as env ops.desk) $ execute ops ops.desk action [first]
+  forA_ [env.alder, env.birch, env.cedar] \lender -> balanceOf env lender >>= (=== 0.0)
+
+  second <- confirm env ops action ops.coAgent
+  submit (as env ops.coAgent) $ execute ops ops.coAgent action [first, second]
+  balanceOf env env.alder >>= (=== alderDue)
+  balanceOf env env.birch >>= (=== birchDue)
+  balanceOf env env.cedar >>= (=== cedarDue)
+
+  [(_, result)] <- query @GovernanceExecutionResult env.agent
+  result.actionLabel === "PariSettle"
+  result.executor === ops.coAgent
+  result.confirmers === [ops.desk, ops.coAgent]
+
+-- | No operator is the agent: hosting its party lets an operator see what
+-- the agent sees, not act for it, and one operator cannot count twice.
+test_an_operator_alone_is_not_the_agent : Script ()
+test_an_operator_alone_is_not_the_agent = do
+  env <- setup
+  ops <- operatorsFor env
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env facility
+  settle <- fund env facility 1.0
+
+  forA_ [ops.desk, ops.coAgent, ops.trustee] \operator -> do
+    refused "Authorization failure" (as env operator) $ exerciseCmd facility settle
+    refused "Authorization failure" (as env operator) $ exerciseCmd facility Facility_CancelRequest
+  -- Nor can an operator propose in another operator's name, or the agent's.
+  refused "Authorization failure" (as env ops.desk) $ createCmd AgentAction with
+    agent = env.agent; proposer = ops.coAgent; instruction = CancelRequest with facility
+  refused "Template precondition violated" (as env ops.desk) $ createCmd AgentAction with
+    agent = env.agent; proposer = env.agent; instruction = CancelRequest with facility
+
+  action <- propose env ops.desk (Settle with facility; settle)
+  once <- confirm env ops action ops.desk
+  twice <- confirm env ops action ops.desk
+  refused "No duplicate confirmers" (as env ops.desk) $ execute ops ops.desk action [once, twice]
+  balanceOf env env.alder >>= (=== 0.0)
+
+-- | Only the operators propose and confirm. A lender's proposal is refused at
+-- the first confirmation, and a lender cannot confirm, even reading as the
+-- agent.
+test_only_operators_propose_and_confirm : Script ()
+test_only_operators_propose_and_confirm = do
+  env <- setup
+  ops <- operatorsFor env
+  facility <- activeFacility env
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- requestInterest env facility
+  settle <- fund env facility 1.0
+
+  outsiders <- propose env env.alder (Settle with facility; settle)
+  refused "Proposer is authorized" (as env ops.desk) $ exerciseCmd ops.rules GovernanceRules_ConfirmAction with
+    confirmer = ops.desk; actionProposalCid = outsiders
+
+  action <- propose env ops.desk (Settle with facility; settle)
+  refused "Confirmer is a governance member" (as env env.alder) $ exerciseCmd ops.rules GovernanceRules_ConfirmAction with
+    confirmer = env.alder; actionProposalCid = action
+
+-- | A confirmation counts for one proposal, for one hour, once.
+test_confirmations_are_bound_timed_and_single_use : Script ()
+test_confirmations_are_bound_timed_and_single_use = do
+  env <- setup
+  ops <- operatorsFor env
+  facility <- closeFacility env
+  action <- propose env ops.desk (fixAt facility sofr)
+  other <- propose env ops.trustee (fixAt facility 0.0999)
+
+  fromDesk <- confirm env ops action ops.desk
+  forOther <- confirm env ops other ops.coAgent
+  refused "same proposal" (as env ops.desk) $ execute ops ops.desk action [fromDesk, forOther]
+
+  passTime (hours 2)
+  late <- confirm env ops action ops.coAgent
+  refused "Confirmation has expired" (as env ops.coAgent) $ execute ops ops.coAgent action [fromDesk, late]
+
+  fresh <- confirm env ops action ops.desk
+  submit (as env ops.coAgent) $ execute ops ops.coAgent action [fresh, late]
+  refused "Could not find contract" (as env ops.coAgent) $ execute ops ops.coAgent action [fresh, late]
+  facility <- currentFacility env
+  deal <- facilityOf env facility
+  fmap (.baseRate) deal.period === Some sofr
+
+-- | Operators confirm the deal's state as they reviewed it. Of two competing
+-- proposals for the same facility, both confirmed, only the first to execute
+-- takes effect: the second named a facility that no longer exists.
+test_a_stale_proposal_cannot_execute : Script ()
+test_a_stale_proposal_cannot_execute = do
+  env <- setup
+  ops <- operatorsFor env
+  facility <- closeFacility env
+  right <- propose env ops.desk (fixAt facility sofr)
+  wrong <- propose env ops.trustee (fixAt facility 0.0999)
+  forRight <- forA [ops.desk, ops.coAgent] (confirm env ops right)
+  forWrong <- forA [ops.trustee, ops.coAgent] (confirm env ops wrong)
+
+  submit (as env ops.coAgent) $ execute ops ops.coAgent right forRight
+  refused "Could not find contract" (as env ops.coAgent) $ execute ops ops.coAgent wrong forWrong
+  deal <- currentFacility env >>= facilityOf env
+  fmap (.baseRate) deal.period === Some sofr
+
+-- | The whole deal, with the agent run by its operators: the facility is
+-- proposed, syndicated, closed, priced and paid, each step confirmed by a
+-- different pair. Every step leaves a record of who executed and confirmed.
+test_operators_run_the_deal_two_of_three : Script ()
+test_operators_run_the_deal_two_of_three = do
+  env <- setup
+  ops <- operatorsFor env
+  let pairs = [(ops.desk, ops.coAgent), (ops.coAgent, ops.trustee), (ops.trustee, ops.desk)]
+      pairFor n = pairs !! (n % 3)
+      step n = governed env ops (pairFor n)
+
+  proposed <- step 0 (ProposeFacility with borrower = env.borrower; terms = dealTerms env)
+  [(proposal, _)] <- query @FacilityProposal env.borrower
+  facility <- submit env.borrower $ exerciseCmd proposal FacilityProposal_Accept
+
+  (allocateBefore, settleBefore) <- deadlines
+  invited <- forA (zip [1, 2, 3] (syndicate env)) \(n, (lender, amount)) ->
+    step n (Invite with facility; invite = Facility_Invite with lender; amount; allocateBefore; settleBefore)
+  commitments <- forA (syndicate env) \(lender, amount) -> do
+    [(offer, _)] <- query @CommitmentOffer lender
+    commitmentCid <- submit lender $ exerciseCmd offer CommitmentOffer_Accept
+    commitment <- fromSome <$> queryContractId lender commitmentCid
+    allocation <- allocate env commitment.settlement (legIdFor lender) (mkLeg lender env.borrower amount env.usd)
+    pure (commitmentCid, allocation)
+  closed <- step 4 (Close with facility; close = Facility_Close with commitments)
+  balanceOf env env.borrower >>= (=== 105_000_000.0)
+
+  facility <- currentFacility env
+  priced <- step 5 (FixRate with facility; fixRate = Facility_FixRate with baseRate = sofr; periodEnd = firstPeriodEnd)
+  setTime (time firstPeriodEnd 9 0 0)
+  facility <- currentFacility env
+  (allocateBefore, settleBefore) <- deadlines
+  requested <- step 6 (RequestInterest with facility; request = Facility_RequestInterest with allocateBefore; settleBefore)
+  facility <- currentFacility env
+  settle <- fund env facility 1.0
+  paid <- step 7 (Settle with facility; settle)
+
+  balanceOf env env.alder >>= (=== alderDue)
+  balanceOf env env.birch >>= (=== birchDue)
+  balanceOf env env.cedar >>= (=== cedarDue)
+  balanceOf env env.borrower >>= (=== 105_000_000.0 - alderDue - birchDue - cedarDue)
+
+  let trail = [proposed] <> invited <> [closed, priced, requested, paid]
+  map (.actionLabel) trail ===
+    ["PariProposeFacility", "PariInvite", "PariInvite", "PariInvite", "PariClose", "PariFixRate", "PariRequestInterest", "PariSettle"]
+  forA_ (zip [0 .. 7] trail) \(n, result) -> do
+    let (proposer, seconder) = pairFor n
+    result.executor === seconder
+    result.confirmers === [proposer, seconder]
+
+-- | Every other choice the agent holds runs governed the same way: opening a
+-- desk, screening a buyer, settling a trade and declining one, sharing a
+-- document, withdrawing a payment request and accepting a prepayment.
+test_every_other_agent_choice_runs_governed : Script ()
+test_every_other_agent_choice_runs_governed = do
+  env <- setup
+  ops <- operatorsFor env
+  let pairs = [(ops.desk, ops.coAgent), (ops.coAgent, ops.trustee), (ops.trustee, ops.desk)]
+      step n = governed env ops (pairs !! (n % 3))
+  facility <- activeFacility env
+  setTime (time midPeriod 9 0 0)
+
+  opened <- step 0 OpenDesk
+  [desk] <- filter (/= env.desk) . map fst <$> query @AgentDesk env.agent
+
+  -- Delta buys 10m of Alder's loan, screened and settled by the operators.
+  ticketCid <- agreeTrade env env.alder env.buyer 10_000_000.0 0.995
+  ticket <- fromSome <$> queryContractId env.agent ticketCid
+  screened <- step 1 (Screen with dqList = env.dqList; screen = DqList_Screen with candidate = env.buyer)
+  [(screeningCid, _)] <- query @ScreeningResult env.agent
+  allocation <- allocate env ticket.settlement tradeLegId (mkLeg env.buyer env.alder ticket.cash env.usd)
+  (sellerPositionCid, _) <- positionOf env.alder
+  traded <- step 2 SettleTrade with
+    desk
+    settleTrade = Desk_SettleTrade with
+      facilityCid = facility
+      ticketCid
+      screeningCid
+      sellerPositionCid
+      buyerPositionCid = None
+      allocation
+  (_, delta) <- positionOf env.buyer
+  delta.principal === 10_000_000.0
+
+  -- Rival, on the DQ list, agrees a trade with Birch: the operators decline
+  -- it, and Rival takes its own cash back.
+  refusedCid <- agreeTrade env env.birch env.rival 5_000_000.0 0.995
+  refusedTicket <- fromSome <$> queryContractId env.rival refusedCid
+  (rivalAllocation, extraArgs) <- allocate env refusedTicket.settlement tradeLegId
+    (mkLeg env.rival env.birch refusedTicket.cash env.usd)
+  declined <- step 3 (DeclineTrade with ticket = refusedCid; withdraw = AllocationRequest_Withdraw with extraArgs = noExtraArgs)
+  submit env.rival $ exerciseCmd rivalAllocation Allocation_Withdraw with extraArgs
+  balanceOf env env.rival >>= (=== 20_000_000.0)
+
+  alderElection <- elect env env.alder PrivateSide
+  accounts <- postDocument env "q3-accounts" "Q3 management accounts" True
+  shared <- step 4 (ShareDocument with document = accounts; share = Document_Share with electionCid = alderElection)
+  alderDocs <- query @DocumentAccess env.alder
+  map (\(_, d) -> d.docId) alderDocs === ["q3-accounts"]
+
+  setTime (time firstPeriodEnd 9 0 0)
+  (facility, _) <- currentFacility env >>= requestInterest env
+  cancelled <- step 5 (CancelRequest with facility)
+  deal <- currentFacility env >>= facilityOf env
+  deal.pending === None
+
+  -- Pay the period, then take the borrower's 10% prepayment.
+  (facility, _) <- currentFacility env >>= requestInterest env
+  facility <- pay env facility 1.0
+  noticeCid <- submit env.borrower $ createCmd PrepaymentNotice with
+    borrower = env.borrower; agent = env.agent; facilityId = dealId; amount = 10_000_000.0
+  (allocateBefore, settleBefore) <- deadlines
+  accepted <- step 6 AcceptPrepayment with
+    facility
+    acceptPrepayment = Facility_AcceptPrepayment with noticeCid; allocateBefore; settleBefore
+  _ <- currentFacility env >>= \facility -> pay env facility 1.0
+  (_, alder) <- positionOf env.alder
+  alder.principal === 36_000_000.0
+
+  map (.actionLabel) [opened, screened, traded, declined, shared, cancelled, accepted] ===
+    ["PariOpenDesk", "PariScreen", "PariSettleTrade", "PariDeclineTrade", "PariShareDocument", "PariCancelRequest", "PariAcceptPrepayment"]

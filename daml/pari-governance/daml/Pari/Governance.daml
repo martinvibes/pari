@@ -1,0 +1,138 @@
+-- | The agent as a decentralized party, run by several operators.
+--
+-- The agent's party is hosted on each operator's node, and its namespace is
+-- owned by all of them together, so no single operator holds its keys. Every
+-- action the agent takes is an `AgentAction`: one operator proposes it, the
+-- operators confirm it on BitSafe's `GovernanceRules`, and it executes with
+-- the agent's authority only once their threshold is met.
+module Pari.Governance
+  ( AgentInstruction(..)
+  , AgentAction(..)
+  ) where
+
+import DA.Functor (void)
+
+import Splice.Api.Token.AllocationRequestV1 (AllocationRequest, AllocationRequest_Withdraw)
+
+import Governance.Action
+
+import Pari.Desk
+import Pari.Disclosure
+import Pari.Facility
+import Pari.Screening
+import Pari.Trade (TradeTicket)
+
+-- | Every action the agent takes, with its arguments. (The agent's other
+-- choices are steps inside these, such as `Commitment_Fund` within
+-- `Facility_Close`.) Each names the exact contract it acts on, so the
+-- operators confirm the state they reviewed: once that contract changes, the
+-- action can no longer execute.
+data AgentInstruction
+  = OpenDesk
+  | ProposeFacility with
+      borrower : Party
+      terms : Terms
+  | Invite with
+      facility : ContractId Facility
+      invite : Facility_Invite
+  | Close with
+      facility : ContractId Facility
+      close : Facility_Close
+  | FixRate with
+      facility : ContractId Facility
+      fixRate : Facility_FixRate
+  | RequestInterest with
+      facility : ContractId Facility
+      request : Facility_RequestInterest
+  | AcceptPrepayment with
+      facility : ContractId Facility
+      acceptPrepayment : Facility_AcceptPrepayment
+  | Settle with
+      facility : ContractId Facility
+      settle : Facility_Settle
+  | CancelRequest with
+      facility : ContractId Facility
+  | Screen with
+      dqList : ContractId DqList
+      screen : DqList_Screen
+  | SettleTrade with
+      desk : ContractId AgentDesk
+      settleTrade : Desk_SettleTrade
+  | DeclineTrade with
+      ticket : ContractId TradeTicket
+      withdraw : AllocationRequest_Withdraw
+  | ShareDocument with
+      document : ContractId Document
+      share : Document_Share
+  deriving (Eq, Show)
+
+-- | One operator's proposal that the agent take one action.
+template AgentAction
+  with
+    agent : Party
+      -- ^ The decentralized party the operators run together.
+    proposer : Party
+      -- ^ The operator proposing the action.
+    instruction : AgentInstruction
+  where
+    signatory proposer
+    observer agent
+    ensure proposer /= agent
+
+    interface instance GovernableAction for AgentAction where
+      view = GovernableActionView with
+        governanceParty = agent
+        proposer
+        actionLabel = "Pari" <> label instruction
+        description = describe instruction
+      executeImpl = perform agent instruction
+
+-- | Takes the action with the agent's authority, which `GovernanceRules`
+-- passes on only once the threshold of operators has confirmed it.
+perform : Party -> AgentInstruction -> Update ()
+perform agent = \case
+  OpenDesk -> void $ create AgentDesk with agent
+  ProposeFacility{borrower, terms} -> void $ create FacilityProposal with agent; borrower; terms
+  Invite{facility, invite} -> void $ exercise facility invite
+  Close{facility, close} -> void $ exercise facility close
+  FixRate{facility, fixRate} -> void $ exercise facility fixRate
+  RequestInterest{facility, request} -> void $ exercise facility request
+  AcceptPrepayment{facility, acceptPrepayment} -> void $ exercise facility acceptPrepayment
+  Settle{facility, settle} -> void $ exercise facility settle
+  CancelRequest{facility} -> void $ exercise facility Facility_CancelRequest
+  Screen{dqList, screen} -> void $ exercise dqList screen
+  SettleTrade{desk, settleTrade} -> void $ exercise desk settleTrade
+  DeclineTrade{ticket, withdraw} -> void $ exercise (toInterfaceContractId @AllocationRequest ticket) withdraw
+  ShareDocument{document, share} -> void $ exercise document share
+
+label : AgentInstruction -> Text
+label = \case
+  OpenDesk -> "OpenDesk"
+  ProposeFacility{} -> "ProposeFacility"
+  Invite{} -> "Invite"
+  Close{} -> "Close"
+  FixRate{} -> "FixRate"
+  RequestInterest{} -> "RequestInterest"
+  AcceptPrepayment{} -> "AcceptPrepayment"
+  Settle{} -> "Settle"
+  CancelRequest{} -> "CancelRequest"
+  Screen{} -> "Screen"
+  SettleTrade{} -> "SettleTrade"
+  DeclineTrade{} -> "DeclineTrade"
+  ShareDocument{} -> "ShareDocument"
+
+describe : AgentInstruction -> Text
+describe = \case
+  OpenDesk -> "Open the agent's settlement desk"
+  ProposeFacility{terms} -> "Propose facility " <> terms.facilityId <> " of " <> show terms.commitment
+  Invite{invite} -> "Invite " <> show invite.lender <> " to commit " <> show invite.amount
+  Close{close} -> "Close the facility with " <> show (length close.commitments) <> " funded commitments"
+  FixRate{fixRate} -> "Fix the base rate at " <> show fixRate.baseRate <> " to " <> show fixRate.periodEnd
+  RequestInterest{} -> "Request the period's interest from the borrower"
+  AcceptPrepayment{} -> "Accept the borrower's prepayment notice"
+  Settle{settle} -> "Settle the open payment request at " <> show settle.fraction <> " of what is due"
+  CancelRequest{} -> "Withdraw the open payment request"
+  Screen{screen} -> "Screen " <> show screen.candidate <> " against the borrower's DQ list"
+  SettleTrade{} -> "Settle a secondary trade and record the assignment"
+  DeclineTrade{} -> "Decline a secondary trade, releasing the buyer's cash"
+  ShareDocument{} -> "Share a data-room document with an electing lender"

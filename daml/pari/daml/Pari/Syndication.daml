@@ -1,0 +1,89 @@
+-- | Primary syndication: commitments that fund atomically at closing.
+module Pari.Syndication
+  ( CommitmentOffer(..)
+  , CommitmentOffer_Accept(..)
+  , CommitmentOffer_Decline(..)
+  , Commitment(..)
+  , Commitment_Fund(..)
+  , Funded(..)
+  ) where
+
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1 (ChoiceExecutionMetadata(..), emptyMetadata)
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+import Splice.Api.Token.AllocationV1 (SettlementInfo, TransferLeg)
+import Splice.Api.Token.AllocationRequestV1
+
+import Pari.Position
+import Pari.Settlement
+import Pari.Util
+
+-- | The agent's invitation, pre-approved by the borrower, for a lender to
+-- commit to the facility.
+template CommitmentOffer
+  with
+    agent : Party
+    borrower : Party
+    lender : Party
+    facilityId : Text
+    amount : Decimal
+    instrumentId : InstrumentId
+    settlement : SettlementInfo
+  where
+    signatory agent, borrower
+    observer lender
+    ensure amount > 0.0 && isCents amount
+
+    choice CommitmentOffer_Accept : ContractId Commitment
+      controller lender
+      do create Commitment with ..
+
+    choice CommitmentOffer_Decline : ()
+      controller lender
+      do pure ()
+
+-- | A lender's binding commitment. The lender funds it by allocating
+-- `amount` to the borrower; the agent executes every lender's funding leg in
+-- one transaction at closing, so the borrower is funded in full or not at all.
+template Commitment
+  with
+    agent : Party
+    borrower : Party
+    lender : Party
+    facilityId : Text
+    amount : Decimal
+    instrumentId : InstrumentId
+    settlement : SettlementInfo
+  where
+    signatory agent, borrower, lender
+
+    choice Commitment_Fund : Funded
+      with
+        allocation : AllocationInput
+      controller agent
+      do
+        settleLeg settlement (legIdFor lender) (fundingLeg this) allocation
+        positionCid <- create Position with agent; lender; facilityId; principal = amount
+        pure Funded with lender; facilityId; amount; positionCid
+
+    interface instance AllocationRequest for Commitment where
+      view = requestView settlement (TextMap.fromList [(legIdFor lender, fundingLeg this)])
+
+      allocationRequest_RejectImpl _self AllocationRequest_Reject{actor} = do
+        require "only the lender can withdraw its commitment" (actor == lender)
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+      allocationRequest_WithdrawImpl _self _arg =
+        pure ChoiceExecutionMetadata with meta = emptyMetadata
+
+-- | Result of funding one commitment.
+data Funded = Funded with
+    lender : Party
+    facilityId : Text
+    amount : Decimal
+    positionCid : ContractId Position
+  deriving (Eq, Show)
+
+fundingLeg : Commitment -> TransferLeg
+fundingLeg c = mkLeg c.lender c.borrower c.amount c.instrumentId

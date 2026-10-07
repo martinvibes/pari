@@ -1,0 +1,67 @@
+-- | Borrower payments: the agent's payment request and the borrower's
+-- prepayment notice.
+module Pari.Payment
+  ( PaymentKind(..)
+  , PaymentRequest(..)
+  , PrepaymentNotice(..)
+  , PrepaymentNotice_Accept(..)
+  ) where
+
+import DA.TextMap (TextMap)
+
+import Splice.Api.Token.AllocationV1 (SettlementInfo, TransferLeg)
+import Splice.Api.Token.AllocationRequestV1
+
+import Pari.Interest (Period)
+import Pari.Settlement (requestView)
+import Pari.Util
+
+data PaymentKind
+  = InterestPayment with period : Period
+  | PrincipalPayment
+  deriving (Eq, Show)
+
+-- | The agent's request that the borrower fund one payment: one CIP-56 leg
+-- from the borrower to each lender. Wallets see it as a standard
+-- `AllocationRequest`. It is visible to the agent and borrower only, so no
+-- lender learns what the others are owed.
+template PaymentRequest
+  with
+    agent : Party
+    borrower : Party
+    facilityId : Text
+    kind : PaymentKind
+    settlement : SettlementInfo
+    legs : TextMap TransferLeg
+  where
+    signatory agent
+    observer borrower
+
+    interface instance AllocationRequest for PaymentRequest where
+      view = requestView settlement legs
+
+      -- The borrower is bound by the facility; a shortfall is settled pro rata
+      -- through the facility instead of by rejecting the request.
+      allocationRequest_RejectImpl _self _arg =
+        fail "Pari: a payment request cannot be rejected; pay short through the facility instead"
+
+      -- The request is tracked by its facility, which withdraws it.
+      allocationRequest_WithdrawImpl _self _arg =
+        fail "Pari: withdraw payment requests through the facility"
+
+-- | The borrower's irrevocable notice to repay principal. Principal moves only
+-- against one of these: the agent has no way to originate a repayment.
+template PrepaymentNotice
+  with
+    borrower : Party
+    agent : Party
+    facilityId : Text
+    amount : Decimal
+  where
+    signatory borrower
+    observer agent
+    ensure amount > 0.0 && isCents amount
+
+    choice PrepaymentNotice_Accept : PrepaymentNotice
+      controller agent
+      do pure this
