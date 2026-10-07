@@ -12,6 +12,10 @@ and the borrower's auditor reconciles the deal from the ledger's own history.
 
 Built for HackCanton Season 3, track: RWA & Business Workflows.
 
+**Live demo: [pari-demo.up.railway.app](https://pari-demo.up.railway.app)**, the
+app on its own Canton sandbox with the demo deal seeded. It is one deal shared
+by every visitor, and a fresh one after each restart.
+
 ## Why
 
 Loan agency still runs on email, PDFs and spreadsheets.
@@ -119,6 +123,16 @@ Coin's own CIP-56 allocations. The smoke test passed there on 6 October, and
 that page lists the update ids of the closing, a trade, the interest payments
 and a prepayment.
 
+The live demo is [`deploy/Dockerfile`](deploy/Dockerfile): one container with
+the Canton sandbox, Pari's demo DAR from the
+[v0.2.0 release](https://github.com/martinvibes/pari/releases/tag/v0.2.0) and the
+web app, each download pinned by digest. Only the web app's port is published.
+
+```bash
+docker build -f deploy/Dockerfile -t pari-demo .
+docker run -p 3000:3000 pari-demo   # ready in about a minute
+```
+
 The demo server signs as every party so one browser can play the whole deal.
 Each screen still reads the ledger as its own party, and every action is
 submitted as the one party entitled to it, so the ledger enforces the same
@@ -133,6 +147,7 @@ daml/pari-demo/              Seed script for the demo deal on a sandbox, and the
 daml/pari-governance/        The agent's actions as BitSafe governable actions
 daml/pari-governance-tests/  Daml Script tests for the governed agent
 daml/dars/                   Vendored Splice and BitSafe packages (see its README)
+deploy/                      The hosted demo: one container, sandbox and web app
 docs/                        Architecture, authority matrix, governance and DevNet guides
 scripts/                     DevNet and LocalNet runners
 web/                         Website, docs and app (Next.js)
@@ -144,6 +159,7 @@ web/                         Website, docs and app (Next.js)
 |---|---|
 | Daml model and test suite | Done |
 | Web app for agent, lenders, borrower and buyers, on a local Canton sandbox | Done |
+| Hosted demo, on its own Canton sandbox | Done |
 | Deployment on the HackCanton DevNet | Done |
 | The borrower's auditor, with an audit trail rebuilt and re-checked from the ledger | Done |
 | A hundred lenders per transaction, tested and timed on a Canton sandbox | Done |
