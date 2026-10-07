@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
 import { Tag } from "@/components/Tag";
 
@@ -15,7 +16,7 @@ const STATUS = [
   { item: "A hundred lenders per transaction, tested and timed on a Canton sandbox", done: true },
   { item: "Settlement in Canton Coin, on DevNet", done: true },
   { item: "Settlement in a USD stablecoin (e.g. USDCx)", done: false },
-  { item: "Agent hosted as a decentralized party across independent operators", done: false },
+  { item: "Agent hosted as a decentralized party across independent operators, two of three, on LocalNet", done: true },
 ];
 
 export default function SecurityPage() {
@@ -42,9 +43,9 @@ export default function SecurityPage() {
             witnesses that clearance; it never receives the price, the DQ list or a document.
           </li>
           <li>
-            <strong>One agent party.</strong> The model treats the agent as one party. Hosting it as
-            a decentralized party with a threshold across independent operators is a deployment
-            concern and does not change the model.
+            <strong>One agent party in the app.</strong> The web app and the deal on DevNet run the
+            agent as one party. On LocalNet it runs as a decentralized party across three
+            operators, two of three; see <Link href="/docs/governance">The agent, two of three</Link>.
           </li>
           <li>
             <strong>Fixed-rate periods.</strong> The agent fixes each period&rsquo;s base rate. There

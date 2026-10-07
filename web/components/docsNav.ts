@@ -33,6 +33,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
       { href: "/docs/settlement", label: "CIP-56 settlement" },
       { href: "/docs/trading", label: "Trading and screening" },
       { href: "/docs/privacy", label: "Who sees what" },
+      { href: "/docs/governance", label: "The agent, two of three" },
     ],
   },
   {

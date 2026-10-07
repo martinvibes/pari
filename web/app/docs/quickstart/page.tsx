@@ -37,8 +37,8 @@ cd pari
 make test`}</code>
         </pre>
         <p>
-          <code>make test</code> builds both Daml packages and runs every script in{" "}
-          <code>daml/pari-tests</code>. Each guarantee in the README maps to a named test there, and
+          <code>make test</code> builds the Daml packages and runs every script in{" "}
+          <code>daml/pari-tests</code> and <code>daml/pari-governance-tests</code>. Each guarantee in the README maps to a named test there, and
           the <Link href="/docs/authority">authority matrix</Link> lists which test covers which
           limit on the agent.
         </p>

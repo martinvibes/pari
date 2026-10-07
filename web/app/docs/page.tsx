@@ -68,6 +68,11 @@ export default function IntroductionPage() {
             <strong>MNPI walls.</strong> Material non-public information reaches only lenders that
             elected the private side.
           </li>
+          <li>
+            <strong>No single firm is the agent.</strong> On LocalNet, three independent operators
+            run the agent with BitSafe&rsquo;s Decentralization Manager, and any two must confirm
+            each action. See <Link href="/docs/governance">The agent, two of three</Link>.
+          </li>
         </ul>
 
         <h2>How the pieces fit</h2>
@@ -92,9 +97,8 @@ export default function IntroductionPage() {
 
       <div className="mt-5">
         <Callout label="Hackathon build · unaudited" signal>
-          Pari was built for HackCanton Season 3. The Daml model and its test suite are complete;
-          the web app and the DevNet deployment are in progress. It has <strong>not</strong> been
-          audited. See <Link href="/docs/security">Limits and status</Link>.
+          Pari was built for HackCanton Season 3. The Daml model, its tests, the web app and the
+          DevNet deployment are done. It has <strong>not</strong> been audited. See <Link href="/docs/security">Limits and status</Link>.
         </Callout>
       </div>
 
