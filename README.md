@@ -306,7 +306,7 @@ contract              25   roles, one action at a time, credited ≤ paid in, pa
 46 tests passing
 ```
 
-Money is whole cents in integers everywhere. Interest is ACT/360, rounded down to the cent; when a payment is shared pro rata, the leftover cents go to the largest holder. The expected figures (985,833.33, 591,500.00, 394,333.33, total 1,971,666.66, and 65,000.00 kept by the seller) are the same ones the Canton tests use.
+Money is whole cents in integers everywhere. Interest is ACT/360, rounded down to the cent. A short payment pays each lender the same fraction of what it is owed, rounded down to the cent, and a cent lost to rounding goes back to the borrower, never to a lender. The expected figures (985,833.33, 591,500.00, 394,333.33, total 1,971,666.66, and 65,000.00 kept by the seller) are the same ones the Canton tests use.
 
 ## On testnet
 
