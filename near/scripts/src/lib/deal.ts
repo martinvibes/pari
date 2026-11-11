@@ -37,7 +37,7 @@ export const POSITIONS: Record<string, bigint> = {
 
 /** Test USDC minted to each party at setup, in cents. */
 export const FUNDING: Partial<Record<Persona, bigint>> = {
-  northwind: 5_000_000_00n,
+  northwind: 25_000_000_00n,
   delta: 20_000_000_00n,
   rival: 20_000_000_00n,
 };

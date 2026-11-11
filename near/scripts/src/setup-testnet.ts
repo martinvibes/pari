@@ -188,11 +188,21 @@ for (const persona of PERSONAS) {
 }
 
 step("Test USDC balances");
+// Until someone pays in or withdraws, each party's wallet is put back to its
+// opening balance, so a new deal does not start with the last deal's money.
+const record = await view<{ action: string }[]>(LEDGER, "history", { from_index: 0, limit: 1000 });
+const untouched = !record.some((line) => line.action === "deposit" || line.action === "withdraw");
 for (const accountId of [LEDGER, ...PERSONAS.map(accountOf)]) {
   const persona = PERSONAS.find((p) => accountOf(p) === accountId);
   const wanted = (persona ? FUNDING[persona] ?? 0n : 0n) * UNITS_PER_CENT;
   const registered = await view<unknown>(USDC, "storage_balance_of", { account_id: accountId });
   const balance = BigInt(await view<string>(USDC, "ft_balance_of", { account_id: accountId }));
+  if (persona && untouched && balance > wanted) {
+    if (!(await view<unknown>(USDC, "storage_balance_of", { account_id: ROOT }))) await call(ROOT, USDC, "mint", { account_id: ROOT, amount: "0" });
+    await call(accountId, USDC, "ft_transfer", { receiver_id: ROOT, amount: (balance - wanted).toString() }, 1n);
+    done(`${accountId} back to ${money(wanted / UNITS_PER_CENT)}`);
+    continue;
+  }
   if (registered && balance >= wanted) {
     done(`${accountId} holds ${money(balance / UNITS_PER_CENT)}`);
     continue;
