@@ -26,6 +26,7 @@ globalThis.fetch = async (input, init) => {
     try {
       const response = await plainFetch(input, init);
       if (response.status !== 429 || attempt === 6) return response;
+      console.warn(`  (the RPC is rate limiting; trying again in ${2 ** attempt} s)`);
     } catch (error) {
       if (attempt === 6 || !(error instanceof TypeError)) throw error;
     }
