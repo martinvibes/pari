@@ -4,42 +4,62 @@
 mod common;
 
 use common::*;
-use pari_core::books::Books;
 use pari_core::proofs;
-use pari_core::protocol::{handle, Input};
+use pari_core::protocol::{handle, Input, Stored};
 use pari_core::seal::{self, SecretKey};
 use serde_json::{json, Value};
 
-/// The enclave side of a deal: the stored books and the enclave's key.
+/// A deal's two sides: what the enclave stores, and what the rules contract holds.
 struct Enclave {
     key: SecretKey,
-    books: Option<Books>,
+    stored: Stored,
+    /// The contract's side: the fingerprint from the last answer it received,
+    /// and how many requests it has made.
+    root: Option<String>,
+    turn: u64,
     /// Everything that has gone on the public chain: inputs and replies.
     public: String,
 }
 
 impl Enclave {
     fn new() -> Enclave {
-        Enclave { key: SecretKey::from([7u8; 32]), books: None, public: String::new() }
+        Enclave { key: SecretKey::from([7u8; 32]), stored: Stored::default(), root: None, turn: 0, public: String::new() }
     }
 
-    fn root(&self) -> Option<String> {
-        self.books.as_ref().map(Books::root)
-    }
-
-    /// Sends a command the way the rules contract does. `secret` is sealed to
-    /// the enclave before it leaves the caller.
-    fn call(&mut self, caller: &str, command: Value, secret: Option<Value>) -> Value {
+    /// What the rules contract sends for a command. `secret` is sealed to the
+    /// enclave before it leaves the caller.
+    fn request(&mut self, caller: &str, command: Value, secret: Option<Value>) -> Value {
         let enclave_key = seal::public_key(&seal::public_b64(&self.key)).unwrap();
         let sealed = secret.map(|s| seal::seal(&enclave_key, s.to_string().as_bytes()).unwrap());
-        let input = json!({ "deal": "test-deal", "caller": caller, "prev_root": self.root(), "command": command, "sealed": sealed });
+        self.turn += 1;
+        json!({ "deal": "test-deal", "caller": caller, "prev_root": self.root, "turn": self.turn, "command": command, "sealed": sealed })
+    }
+
+    /// The enclave runs a request and stores what it changed.
+    fn run(&mut self, input: Value) -> Value {
         self.public.push_str(&input.to_string());
-        let reply = handle(self.books.as_ref(), serde_json::from_value::<Input>(input).unwrap(), &self.key);
+        let reply = handle(&self.stored, serde_json::from_value::<Input>(input).unwrap(), &self.key);
         if let Some(next) = reply.save {
-            self.books = Some(next);
+            self.stored = next;
         }
         self.public.push_str(&reply.output.to_string());
         reply.output
+    }
+
+    /// A command, and the contract receiving the enclave's answer to it.
+    fn call(&mut self, caller: &str, command: Value, secret: Option<Value>) -> Value {
+        let input = self.request(caller, command, secret);
+        let reply = self.run(input);
+        if reply["ok"] == true {
+            self.root = reply["root"].as_str().map(String::from);
+        }
+        reply
+    }
+
+    /// A command the enclave answers after the contract has stopped waiting.
+    fn call_too_late(&mut self, caller: &str, command: Value, secret: Option<Value>) -> Value {
+        let input = self.request(caller, command, secret);
+        self.run(input)
     }
 }
 
@@ -140,9 +160,10 @@ fn test_a_party_proves_one_fact_and_shows_nothing_else() {
 #[test]
 fn test_a_commitment_is_new_with_every_answer_and_confirms_no_guess() {
     let (mut enclave, alder, _) = open_deal();
-    // The same books answered twice: the same root, and a new commitment.
-    let first = enclave.call(LEDGER, json!({ "cmd": "sync" }), None);
-    let second = enclave.call(LEDGER, json!({ "cmd": "sync" }), None);
+    // The same command answered twice gives the same books, and a new commitment.
+    let request = json!({ "cmd": "request_interest", "expected_total": "197166666" });
+    let first = enclave.call_too_late(AGENT, request.clone(), None);
+    let second = enclave.call(AGENT, request, None);
     assert_eq!(first["root"], second["root"]);
     assert_ne!(first["commitments"][ALDER], second["commitments"][ALDER]);
 
@@ -157,24 +178,68 @@ fn test_a_commitment_is_new_with_every_answer_and_confirms_no_guess() {
 #[test]
 fn test_the_wrong_total_is_refused_and_the_books_do_not_move() {
     let (mut enclave, _, _) = open_deal();
-    let before = enclave.root();
+    let before = enclave.root.clone();
     let reply = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "90000000000" }), None);
     assert_eq!(reply["ok"], false);
     assert_eq!(reply["refused"], "You entered 900,000,000.00; the register says 1,971,666.66.");
     assert_eq!(reply["root"].as_str().map(String::from), before);
-    assert_eq!(enclave.root(), before);
+
+    // The next command builds on the same books.
+    let right = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "197166666" }), None);
+    assert_eq!(right["ok"], true);
 }
 
 #[test]
-fn test_a_stale_root_is_refused_and_sync_reports_the_current_one() {
+fn test_books_the_enclave_does_not_hold_are_refused() {
     let (mut enclave, _, _) = open_deal();
-    let stale = json!({ "deal": "test-deal", "caller": AGENT, "prev_root": "00", "command": { "cmd": "request_interest", "expected_total": "197166666" }, "sealed": null });
-    let reply = handle(enclave.books.as_ref(), serde_json::from_value(stale).unwrap(), &enclave.key);
-    assert_eq!(reply.output["ok"], false);
-    assert!(reply.save.is_none());
+    enclave.root = Some("00".into());
+    let reply = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "197166666" }), None);
+    assert_eq!(reply["ok"], false);
+    assert_eq!(reply["refused"], "the contract names books the enclave does not hold");
+}
 
-    let synced = enclave.call(LEDGER, json!({ "cmd": "sync" }), None);
-    assert_eq!(synced["root"].as_str().map(String::from), enclave.root());
+// NEAR stops waiting for the enclave after about two minutes. An answer that
+// comes later never reaches the contract, so it must count for nothing.
+
+#[test]
+fn test_an_answer_the_contract_never_received_is_not_built_on() {
+    let (mut enclave, _, _) = open_deal();
+    let delta = view_key(4);
+    assert_eq!(enclave.call(DELTA, json!({ "cmd": "register_view_key", "pubkey": seal::public_b64(&delta) }), None)["ok"], true);
+
+    // Delta pays in. The enclave credits it, too late: the contract has
+    // already returned Delta's USDC.
+    let pay_in = json!({ "cmd": "deposit", "party": DELTA, "amount": "1200000000", "purpose": { "kind": "cash" } });
+    let late = enclave.call_too_late(LEDGER, pay_in, None);
+    assert_eq!(open(&late, DELTA, &delta)["cash"], "1200000000");
+
+    // The next command builds on the books the contract holds. Delta has no cash in them.
+    let next = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "197166666" }), None);
+    assert_eq!(next["ok"], true);
+    assert_eq!(open(&next, DELTA, &delta)["cash"], "0");
+    let withdraw = enclave.call(DELTA, json!({ "cmd": "withdraw", "amount": "1200000000" }), None);
+    assert_eq!(withdraw["ok"], false);
+}
+
+#[test]
+fn test_a_late_run_cannot_undo_an_answer_the_contract_received() {
+    let (mut enclave, alder, _) = open_deal();
+    // The contract gives up on one request and makes another, which is answered in time.
+    let pay_in = json!({ "cmd": "deposit", "party": DELTA, "amount": "1200000000", "purpose": { "kind": "cash" } });
+    let abandoned = enclave.request(LEDGER, pay_in, None);
+    let received = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "197166666" }), None);
+    assert_eq!(received["public"]["request_id"], 1);
+
+    // Only now does the enclave get to the request the contract gave up on.
+    let late = enclave.run(abandoned);
+    assert_eq!(late["ok"], false);
+    assert_eq!(late["refused"], "the contract has stopped waiting for this request");
+
+    // The answer the contract received still stands, and the deal goes on from it.
+    let pay = json!({ "cmd": "deposit", "party": BORROWER, "amount": "197166666", "purpose": { "kind": "pay", "request_id": 1 } });
+    assert_eq!(enclave.call(LEDGER, pay, None)["ok"], true);
+    let settled = enclave.call(AGENT, json!({ "cmd": "settle", "request_id": 1 }), None);
+    assert_eq!(open(&settled, ALDER, &alder)["payments"][0]["paid"], "98583333");
 }
 
 #[test]

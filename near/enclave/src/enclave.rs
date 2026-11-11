@@ -6,8 +6,7 @@
 //! every other caller as well.
 
 use outlayer::{encryption_keys, env, storage};
-use pari_core::books::Books;
-use pari_core::protocol::{handle, Input};
+use pari_core::protocol::{handle, Input, Stored};
 use pari_core::seal::SecretKey;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -21,7 +20,7 @@ static OUTLAYER_MANIFEST: [u8; include_bytes!("../manifest.json").len()] = *incl
 const LEDGER: &str = env!("PARI_LEDGER");
 
 const KEY_PATH: &str = "enclave";
-const BOOKS_AAD: &[u8] = b"pari:books:v1";
+const BOOKS_AAD: &[u8] = b"pari:books:v2";
 const X25519_LABEL: &[u8] = b"pari:enclave-x25519:v1";
 
 pub fn run() {
@@ -44,24 +43,23 @@ fn answer() -> Result<Value, String> {
         return Err("a deal id is up to 64 letters, digits and dashes".into());
     }
     let key = format!("books:{}", input.deal);
-    let books = load(&key)?;
-    let reply = handle(books.as_ref(), input, &enclave_key()?);
+    let reply = handle(&load(&key)?, input, &enclave_key()?);
     if let Some(next) = &reply.save {
         save(&key, next)?;
     }
     Ok(reply.output)
 }
 
-fn load(key: &str) -> Result<Option<Books>, String> {
+fn load(key: &str) -> Result<Stored, String> {
     let Some(sealed) = storage::get_worker(key).map_err(|e| e.to_string())? else {
-        return Ok(None);
+        return Ok(Stored::default());
     };
     let bytes = encryption_keys::decrypt(KEY_PATH, None, &sealed, BOOKS_AAD).map_err(|e| e.to_string())?;
-    serde_json::from_slice(&bytes).map(Some).map_err(|e| format!("stored books: {e}"))
+    serde_json::from_slice(&bytes).map_err(|e| format!("stored books: {e}"))
 }
 
-fn save(key: &str, books: &Books) -> Result<(), String> {
-    let bytes = serde_json::to_vec(books).map_err(|e| e.to_string())?;
+fn save(key: &str, stored: &Stored) -> Result<(), String> {
+    let bytes = serde_json::to_vec(stored).map_err(|e| e.to_string())?;
     let sealed = encryption_keys::encrypt(KEY_PATH, None, &bytes, BOOKS_AAD).map_err(|e| e.to_string())?;
     storage::set_worker(key, &sealed).map_err(|e| e.to_string())
 }

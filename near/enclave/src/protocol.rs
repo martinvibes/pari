@@ -1,8 +1,9 @@
 //! What the rules contract sends the enclave and what it gets back.
 //!
-//! In:  `{ deal, caller, prev_root, command, sealed }`. `command` is public;
-//!      `sealed` is a box only the enclave can open, holding the command's
-//!      secret fields (a trade's price, the DQ list, the opening positions).
+//! In:  `{ deal, caller, prev_root, turn, command, sealed }`. `command` is
+//!      public; `sealed` is a box only the enclave can open, holding the
+//!      command's secret fields (a trade's price, the DQ list, the opening
+//!      positions).
 //! Out: `{ ok: true, root, seq, public, payouts, envelopes, commitments }`, or
 //!      `{ ok: false, refused, root }` with the books untouched.
 //!
@@ -13,7 +14,7 @@
 use crate::books::{step, Books, Command};
 use crate::seal::{self, SecretKey};
 use crate::{proofs, views};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 #[derive(Deserialize)]
@@ -22,15 +23,40 @@ pub struct Input {
     pub deal: String,
     /// The account the rules contract vouches for.
     pub caller: String,
-    /// The fingerprint the contract holds. The books must match it.
+    /// The fingerprint the contract holds: the books to build on.
     pub prev_root: Option<String>,
+    /// How many requests the contract had made before this one.
+    pub turn: u64,
     pub command: Map<String, Value>,
     pub sealed: Option<String>,
 }
 
+/// What the enclave keeps for one deal.
+///
+/// The enclave answers before it can know whether the contract received the
+/// answer: NEAR stops waiting after about two minutes, and an answer that
+/// comes later is dropped. So the enclave never builds on its own last
+/// answer. It builds on the books whose fingerprint the contract sends, and
+/// the contract holds a fingerprint only if it received the answer.
+#[derive(Default, Serialize, Deserialize)]
+pub struct Stored {
+    /// The newest books the contract has shown it holds.
+    pub received: Option<Books>,
+    /// The enclave's latest answer. The contract may never have received it.
+    pub offered: Option<Offer>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Offer {
+    /// The request this answers. The contract makes one request at a time, so
+    /// it has stopped waiting for every request with a lower number.
+    pub turn: u64,
+    pub books: Books,
+}
+
 pub struct Reply {
-    /// The new books to store, when the command changed them.
-    pub save: Option<Books>,
+    /// What to store, when the command changed the books.
+    pub save: Option<Stored>,
     pub output: Value,
 }
 
@@ -40,25 +66,23 @@ impl Reply {
     }
 }
 
-pub fn handle(books: Option<&Books>, input: Input, enclave: &SecretKey) -> Reply {
-    let root = books.map(Books::root);
-    match input.command.get("cmd").and_then(Value::as_str) {
-        // Anyone may learn the key that secrets are sealed to.
-        Some("pubkey") => {
-            return Reply { save: None, output: json!({ "ok": true, "root": root, "public": { "pubkey": seal::public_b64(enclave) } }) }
-        }
-        // Lets the contract catch up if a callback was lost after the books moved.
-        Some("sync") => {
-            return match books {
-                Some(books) => Reply { save: None, output: answer(&input.deal, books, json!({}), json!([])) },
-                None => Reply::refused("the deal has not been set up", None),
-            }
-        }
-        _ => {}
+pub fn handle(stored: &Stored, input: Input, enclave: &SecretKey) -> Reply {
+    // Anyone may learn the key that secrets are sealed to.
+    if input.command.get("cmd").and_then(Value::as_str) == Some("pubkey") {
+        return Reply { save: None, output: json!({ "ok": true, "public": { "pubkey": seal::public_b64(enclave) } }) };
     }
-    if input.prev_root != root {
-        return Reply::refused("the books have moved on; sync and try again", root);
+    let root = input.prev_root.clone();
+    let offered = stored.offered.as_ref();
+    // A request the contract no longer waits for must not replace the answer
+    // to a later one, which the contract may have received.
+    if offered.is_some_and(|offer| input.turn < offer.turn) {
+        return Reply::refused("the contract has stopped waiting for this request", root);
     }
+    let books = match offered {
+        _ if root == stored.received.as_ref().map(Books::root) => stored.received.as_ref(),
+        Some(offer) if root == Some(offer.books.root()) => Some(&offer.books),
+        _ => return Reply::refused("the contract names books the enclave does not hold", root),
+    };
     let command = match parse(input.command, input.sealed.as_deref(), enclave) {
         Ok(command) => command,
         Err(reason) => return Reply::refused(reason, root),
@@ -66,7 +90,8 @@ pub fn handle(books: Option<&Books>, input: Input, enclave: &SecretKey) -> Reply
     match step(books, &input.caller, command) {
         Ok((next, outcome)) => {
             let output = answer(&input.deal, &next, outcome.public, json!(outcome.payouts));
-            Reply { save: Some(next), output }
+            let save = Stored { received: books.cloned(), offered: Some(Offer { turn: input.turn, books: next }) };
+            Reply { save: Some(save), output }
         }
         Err(refusal) => Reply::refused(refusal.0, root),
     }
