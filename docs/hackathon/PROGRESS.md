@@ -8,13 +8,39 @@ Baseline: tag `pre-hackathon` = 3c11dbc (the Canton build, 2026-10-07).
 | Part | State |
 | --- | --- |
 | Setup (branch, tag, folders) | done |
-| Spike 1: contract → OutLayer → callback, private storage | in progress |
-| Spike 2: sealed envelopes | in progress |
+| Spike 1: contract → OutLayer → callback, private storage | **pass** |
+| Spike 2: sealed envelopes | **pass** |
 | P0-a enclave logic | not started |
 | P0-b rules contract | not started |
 | P0-c web NEAR mode | not started |
 | P0-d leak test | not started |
 | P0-e trade with DQ screening | not started |
+
+## Spike results (2026-11-11, testnet)
+
+Run with `npm run spike` in `near/scripts`. Contract `spike.paridesk.testnet`,
+OutLayer project `paridesk.testnet/pari-spike`, build pinned by sha256
+`9979ef7c3736f633e654017c0508d4474328de979e472ab3fc8c4eb9d892fc8c`.
+
+**Spike 1: pass.** Two contract-initiated runs returned consecutive counts from worker storage.
+
+- count 1: [DzZnpLjC…](https://testnet.nearblocks.io/txns/DzZnpLjC9v2BxKX2UXNu9evKTvE7xfM8x8kt4WdPojvv), count 2: [Asmj6Xdb…](https://testnet.nearblocks.io/txns/Asmj6XdbBvddWwQ9sfpDavYMeGqkHhUd7RWFav5F3qPB)
+- rerun, 5 → 6: [GtD9XsAo…](https://testnet.nearblocks.io/txns/GtD9XsAo9AKw7YXQjx7Kszzoh2sxNzxnch1TQcJYCRgk), [44Rcwzt1…](https://testnet.nearblocks.io/txns/44Rcwzt1nASFfw7RW8sVCQDKacnBBKLEYrmGjgDvoFRa)
+- Latency, request to callback: 11 to 16 blocks, 6.3 to 9.8 s typical (one run 27 blocks, 15.8 s). Wall time to finality 10 to 14 s.
+- Callback payload: the module's JSON output as-is (`{"ok":true,"result":{...}}`), or `null` when the run fails.
+- Deposit: 0.01 NEAR attached covers the 0.007 NEAR estimate for {10B instructions, 128 MB, 60 s}; the rest is refunded to the payer. A failed run costs 0.001 NEAR.
+- Code hash: the callback does not report it. The contract pins the build by passing `version_key` (the wasm sha256) in `source`.
+- The module saw `predecessor = spike.paridesk.testnet`, `signer = paridesk.testnet`, and the transaction hash.
+
+**Spike 2: pass.** The enclave derives an X25519 key from a keystore key it never sees, opens a libsodium sealed box, and seals its reply to the client's key.
+
+- enclave public key: [2BYZ3oun…](https://testnet.nearblocks.io/txns/2BYZ3ounffPHkbyjt2ey5crspKQ7sNERcD2FSNqXv9hi)
+- sealed round trip: [4G9Wz1Fv…](https://testnet.nearblocks.io/txns/4G9Wz1FvciyYiZNdGS5XN6tMwNUmF6fQS8BNvC3LNiQm). The script searched the whole transaction (args, logs, return values, base64-decoded) for the secret price and the DQ entry: none found.
+- Rust `crypto_box` 0.9.1 (`seal`) and TS `libsodium-wrappers` 0.8.4 interoperate.
+
+**Gotcha: FastFS.** `outlayer upload` can report success while the gateway never serves the file (first upload [J7sYWyuM…](https://testnet.nearblocks.io/txns/J7sYWyuMSnBeTpHv5SX23xBmpdSgPXkYdNqLnq8xuhu3) stayed 404 for 30+ minutes). Uploading the same bytes again ([B2HHDPiA…](https://testnet.nearblocks.io/txns/B2HHDPiAKGFjpP7dXAgJhJZqp1L6kcqwKxY5QvDz94Pk)) served within seconds. Always check the URL's sha256 before deploying a version.
+
+Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txns/G1ZSCUNefRpokiTrv38xHcvSUuucGY3LuhcL4A59NjqD), create_project [Adeiu9uj…](https://testnet.nearblocks.io/txns/Adeiu9ujRRR91eaHuyrpGtJJ2JUadmTL8RqGmJjU9VvQ), spike account [4xQky8eW…](https://testnet.nearblocks.io/txns/4xQky8eWpuBw9CgqP3ceEJzcZXnvYKGEe4BcG6ocTPMo), spike deploy [Dw1tMpyo…](https://testnet.nearblocks.io/txns/Dw1tMpyow6SBXFD34QhRV4frPP6ujnabQJrZ2A3Ucjmf).
 
 ## Cut
 
