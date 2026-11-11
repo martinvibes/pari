@@ -1,0 +1,26 @@
+[package]
+name = "pari-spike-enclave"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Go/no-go spike: OutLayer worker storage and sealed envelopes, callable only by the spike contract"
+publish = false
+
+[[bin]]
+name = "pari-spike-enclave"
+path = "src/main.rs"
+
+[dependencies]
+outlayer = { version = "0.2", features = ["encryption-keys"] }
+crypto_box = { version = "0.9.1", default-features = false, features = ["alloc", "salsa20", "seal", "rand_core"] }
+getrandom = "0.3"
+sha2 = "0.10"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1

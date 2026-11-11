@@ -1,0 +1,5 @@
+{
+  "display": { "name": "Pari spike enclave" },
+  "capabilities": { "network": [] },
+  "encryption_keys": [{ "path": "enclave", "caller": "predecessor" }]
+}
