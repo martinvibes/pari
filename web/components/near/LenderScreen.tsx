@@ -7,7 +7,7 @@ import { DealFacts, NearUnavailable, Sealed, seatOf, Sides, TradeStatus } from "
 import type { PartyView } from "@/lib/near/books";
 import { cents, showCents, showPrice, showRate } from "@/lib/near/money";
 import { isPartyView, isUnavailable, viewAs, type Seen } from "@/lib/near/session";
-import { addMonths, clampDate, formatDate } from "@/lib/pari/dates";
+import { addDays, clampDate, formatDate } from "@/lib/pari/dates";
 import { formatCents } from "@/lib/pari/money";
 import { LENDERS, type Persona } from "@/lib/pari/personas";
 
@@ -164,7 +164,7 @@ function Sell({ persona, view, principal }: { persona: Persona; view: PartyView;
           </Field>
         </div>
         <Field label="Trade date">
-          <input name="date" type="date" defaultValue={clampDate(addMonths(from, 1), from, to)} min={from} max={to} className="field" required />
+          <input name="date" type="date" defaultValue={clampDate(addDays(from, 30), from, to)} min={from} max={to} className="field" required />
         </Field>
       </ActionForm>
       <p className="text-xs leading-relaxed text-ash">
