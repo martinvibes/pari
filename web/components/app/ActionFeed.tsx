@@ -28,6 +28,25 @@ type Entry = {
   /** Milliseconds from submit to the ledger's answer. */
   took?: number;
   updateIds?: string[];
+  links?: Array<{ label: string; href: string }>;
+};
+
+/** The words for the ledger the app is running on. */
+export type FeedWording = {
+  /** Heading while the action runs, and the line under it. */
+  pending: string;
+  waiting: string;
+  /** Heading when a rule refused the action. */
+  refused: string;
+  /** What a refused or failed action left behind. */
+  unchanged: string;
+};
+
+const CANTON: FeedWording = {
+  pending: "Submitting to Canton",
+  waiting: "Waiting for Canton to confirm and commit the transaction.",
+  refused: "Ledger rule not met",
+  unchanged: "Nothing was committed: the ledger is as it was.",
 };
 
 type Feed = {
@@ -43,10 +62,10 @@ export function useActionFeed(): Feed {
   return feed;
 }
 
-const LOOK: Record<State, { heading: string; text: string; tint: string; bar: string; dwell: number }> = {
-  pending: { heading: "Submitting to Canton", text: "text-amber", tint: "bg-amber/10 ring-amber/30", bar: "text-amber", dwell: 0 },
+const LOOK: Record<State, { heading?: string; text: string; tint: string; bar: string; dwell: number }> = {
+  pending: { text: "text-amber", tint: "bg-amber/10 ring-amber/30", bar: "text-amber", dwell: 0 },
   ok: { heading: "Committed", text: "text-mint", tint: "bg-mint/10 ring-mint/30", bar: "bg-mint", dwell: 9000 },
-  refused: { heading: "Ledger rule not met", text: "text-rose", tint: "bg-rose/10 ring-rose/30", bar: "bg-rose", dwell: 14000 },
+  refused: { text: "text-rose", tint: "bg-rose/10 ring-rose/30", bar: "bg-rose", dwell: 14000 },
   failed: { heading: "Failed", text: "text-rose", tint: "bg-rose/10 ring-rose/30", bar: "bg-rose", dwell: 14000 },
 };
 
@@ -85,10 +104,12 @@ function Elapsed({ since }: { since: number }) {
   return <>{seconds(Math.max(0, now - since))}</>;
 }
 
-function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {
+function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWording; onClose: () => void }) {
   const look = LOOK[entry.state];
   const pending = entry.state === "pending";
   const ids = entry.updateIds ?? [];
+  const links = entry.links ?? [];
+  const heading = look.heading ?? (pending ? wording.pending : wording.refused);
 
   return (
     <div className="receipt-enter group card pointer-events-auto w-full max-w-md overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.7)] sm:w-[27rem]">
@@ -114,7 +135,7 @@ function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <p className={`text-[12px] font-semibold uppercase tracking-[0.12em] ${look.text}`}>{look.heading}</p>
+            <p className={`text-[12px] font-semibold uppercase tracking-[0.12em] ${look.text}`}>{heading}</p>
             <span className="flex items-center gap-3">
               <span className="font-mono text-[12px] tabular-nums text-ash">
                 {pending ? <Elapsed since={entry.startedAt} /> : seconds(entry.took ?? 0)}
@@ -136,7 +157,7 @@ function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {
 
           <p className="mt-1.5 text-[15px] font-semibold text-paper">{entry.label}</p>
           <p className="mt-1 text-[14px] leading-relaxed text-smoke">
-            {pending ? "Waiting for Canton to confirm and commit the transaction." : entry.message}
+            {pending ? wording.waiting : entry.message}
           </p>
 
           {entry.state === "ok" && ids.length > 0 ? (
@@ -149,8 +170,22 @@ function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {
           ) : null}
 
           {entry.state === "refused" || entry.state === "failed" ? (
-            <p className="mt-3 border-t border-white/[0.08] pt-3 text-[13px] text-pewter">
-              Nothing was committed: the ledger is as it was.
+            <p className="mt-3 border-t border-white/[0.08] pt-3 text-[13px] text-pewter">{wording.unchanged}</p>
+          ) : null}
+
+          {links.length > 0 ? (
+            <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-white/[0.08] pt-3 text-[13px]">
+              {links.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky underline decoration-sky/40 underline-offset-4 transition hover:text-paper"
+                >
+                  {link.label} on the explorer
+                </a>
+              ))}
             </p>
           ) : null}
         </div>
@@ -159,7 +194,7 @@ function Receipt({ entry, onClose }: { entry: Entry; onClose: () => void }) {
   );
 }
 
-export function ActionFeed({ children }: { children: React.ReactNode }) {
+export function ActionFeed({ children, wording = CANTON }: { children: React.ReactNode; wording?: FeedWording }) {
   const [entry, setEntry] = useState<Entry | null>(null);
   const nextId = useRef(0);
 
@@ -169,13 +204,13 @@ export function ActionFeed({ children }: { children: React.ReactNode }) {
     return id;
   }, []);
 
-  const settle = useCallback((id: number, { ok, message, updateIds }: ActionResult) => {
+  const settle = useCallback((id: number, { ok, message, updateIds, links }: ActionResult) => {
     const refused = !ok && message.startsWith("Pari: ");
     const state = ok ? "ok" : refused ? "refused" : "failed";
     const shown = refused ? message.charAt(6).toUpperCase() + message.slice(7) : message;
     setEntry((current) =>
       current?.id === id
-        ? { ...current, state, message: shown, took: Date.now() - current.startedAt, updateIds }
+        ? { ...current, state, message: shown, took: Date.now() - current.startedAt, updateIds, links }
         : current,
     );
   }, []);
@@ -191,7 +226,7 @@ export function ActionFeed({ children }: { children: React.ReactNode }) {
         aria-live="polite"
         className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex justify-end sm:inset-x-auto sm:bottom-6 sm:right-6"
       >
-        {entry ? <Receipt key={entry.id} entry={entry} onClose={close} /> : null}
+        {entry ? <Receipt key={entry.id} entry={entry} wording={wording} onClose={close} /> : null}
       </div>
     </FeedContext.Provider>
   );

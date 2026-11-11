@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { BorrowerScreen } from "@/components/near/BorrowerScreen";
+import { BACKEND } from "@/lib/backend";
 import { ReleaseCash } from "@/components/app/ReleaseCash";
 import { Party } from "@/components/app/party";
 import { Empty, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
@@ -24,6 +26,7 @@ import type * as P from "@/lib/pari/types";
 export const metadata: Metadata = { title: "Borrower" };
 
 export default async function BorrowerPage() {
+  if (BACKEND === "near") return <BorrowerScreen />;
   const northwind = persona("northwind");
   const view = await viewAs(northwind);
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;

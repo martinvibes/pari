@@ -2,6 +2,8 @@
 
 import type { Metadata } from "next";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { AuditorScreen } from "@/components/near/AuditorScreen";
+import { BACKEND } from "@/lib/backend";
 import { Party } from "@/components/app/party";
 import { LedgerId } from "@/components/app/LedgerId";
 import { Empty, FACILITY_TONE, Facts, PageHeader, Panel, Stats, TableScroll, Tag, type Tone } from "@/components/app/ui";
@@ -31,6 +33,7 @@ const FINDING_TAG: Record<Finding["state"], { tone: Tone; text: string }> = {
 };
 
 export default async function AuditorPage() {
+  if (BACKEND === "near") return <AuditorScreen />;
   const view = await viewAs(persona("auditor"));
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
   let audit: Audit;

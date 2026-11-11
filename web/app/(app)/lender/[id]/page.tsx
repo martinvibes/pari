@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { LenderScreen } from "@/components/near/LenderScreen";
+import { BACKEND } from "@/lib/backend";
 import { ReleaseCash } from "@/components/app/ReleaseCash";
 import { Party } from "@/components/app/party";
 import { Empty, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
@@ -36,6 +38,7 @@ export function generateMetadata({ params }: Params): Metadata {
 
 export default async function LenderPage({ params }: Params) {
   const persona = lenderPersona(params.id);
+  if (BACKEND === "near") return <LenderScreen persona={persona} />;
   const view = await viewAs(persona);
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
   const unit = cashUnit(view.cast);

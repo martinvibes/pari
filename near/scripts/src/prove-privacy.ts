@@ -209,11 +209,15 @@ function bytes(n: number): string {
   return `${n.toLocaleString("en-US")} bytes`;
 }
 
-/** The deal the newest run file is for. */
+/** The newest deal on this ledger that the end-to-end script played right through. */
 function latestRun(): string {
-  const files = existsSync(RUNS_DIR) ? readdirSync(RUNS_DIR).filter((f) => f.endsWith(".json")) : [];
-  const newest = files.sort((a, b) => a.localeCompare(b, "en", { numeric: true })).at(-1);
-  return newest ? newest.replace(/\.json$/, "") : fail("no runs recorded in near/runs; run `npm run e2e` first");
+  const deals = existsSync(RUNS_DIR) ? readdirSync(RUNS_DIR).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, "")) : [];
+  const played = deals.filter((deal) => {
+    const log = readRun(deal);
+    return log?.ledger === LEDGER && log.transactions.some((t) => t.step === "settle_trade");
+  });
+  const newest = played.sort((a, b) => a.localeCompare(b, "en", { numeric: true })).at(-1);
+  return newest ?? fail(`no full run recorded for ${LEDGER} in near/runs; run \`npm run e2e\` first`);
 }
 
 interface Attestation {

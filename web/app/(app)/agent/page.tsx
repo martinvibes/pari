@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import * as act from "@/app/(app)/actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { AgentScreen } from "@/components/near/AgentScreen";
+import { BACKEND } from "@/lib/backend";
 import { Party } from "@/components/app/party";
 import { Empty, FACILITY_TONE, Facts, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import type { Contract } from "@/lib/ledger/client";
@@ -35,6 +37,7 @@ import type * as P from "@/lib/pari/types";
 export const metadata: Metadata = { title: "Agent" };
 
 export default async function AgentPage() {
+  if (BACKEND === "near") return <AgentScreen />;
   const view = await viewAs(persona("agent"));
   if (isUnavailable(view)) return <LedgerUnavailable problem={view} />;
   const unit = cashUnit(view.cast);

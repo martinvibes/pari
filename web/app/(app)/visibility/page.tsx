@@ -2,6 +2,8 @@
 
 import type { Metadata } from "next";
 import { LedgerUnavailable } from "@/components/app/LedgerUnavailable";
+import { VisibilityScreen } from "@/components/near/VisibilityScreen";
+import { BACKEND } from "@/lib/backend";
 import { Party } from "@/components/app/party";
 import { PageHeader, Panel, TableScroll, Tag } from "@/components/app/ui";
 import { PRIVACY_CHECKS } from "@/lib/pari/checks";
@@ -29,6 +31,7 @@ const ROWS: Array<{ label: string; note: string; count: (s: Snapshot) => number 
 ];
 
 export default async function VisibilityPage() {
+  if (BACKEND === "near") return <VisibilityScreen />;
   const views = await Promise.all(PERSONAS.map((persona) => viewAs(persona)));
   const problem = views.find(isUnavailable);
   if (problem) return <LedgerUnavailable problem={problem} />;

@@ -14,7 +14,13 @@ import type { Side } from "@/lib/pari/types";
 // reports the ledger's verdict, including the model's own refusal reasons and,
 // when it commits, the update id of each transaction.
 
-export type ActionResult = { ok: boolean; message: string; updateIds?: string[] };
+export type ActionResult = {
+  ok: boolean;
+  message: string;
+  updateIds?: string[];
+  /** Where to see the transaction, e.g. on a public explorer. */
+  links?: Array<{ label: string; href: string }>;
+};
 type Action = (previous: ActionResult | null, form: FormData) => Promise<ActionResult>;
 
 async function run(work: (cast: Cast) => Promise<string>): Promise<ActionResult> {

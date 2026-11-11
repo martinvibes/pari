@@ -4,9 +4,11 @@ import Link from "next/link";
 import { AppBackground } from "@/components/AppBackground";
 import { Wordmark } from "@/components/Logo";
 import { PageTransition } from "@/components/PageTransition";
-import { ActionFeed } from "@/components/app/ActionFeed";
+import { ActionFeed, type FeedWording } from "@/components/app/ActionFeed";
 import { CastNav, LensLink } from "@/components/app/CastNav";
+import { BACKEND } from "@/lib/backend";
 import { LEDGER } from "@/lib/ledger/config";
+import { NEAR } from "@/lib/near/config";
 import { SITE } from "@/lib/site";
 
 // Every screen reads the ledger live as its own party.
@@ -16,12 +18,22 @@ export const metadata = {
   title: { template: "%s · Pari", default: "Pari" },
 };
 
+// On NEAR every action runs the books inside the enclave before the contract
+// answers, so the receipt says what the wait is for.
+const NEAR_WORDING: FeedWording = {
+  pending: "Sent to NEAR",
+  waiting: "The contract is running the books in the enclave and checking the answer. On testnet this takes about half a minute.",
+  refused: "Refused",
+  unchanged: "Nothing changed: the books and the money are as they were.",
+};
+
 // Chrome for the working app: a top bar with the deal's cast seated by role
 // and the privacy lens apart from it, a slim status line with the network and
 // the demo-mode disclosure, and a quiet footer.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const near = BACKEND === "near";
   return (
-    <ActionFeed>
+    <ActionFeed wording={near ? NEAR_WORDING : undefined}>
       <div className="relative flex min-h-screen flex-col bg-ink text-paper">
         <AppBackground />
         <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/80 backdrop-blur-xl">
@@ -40,12 +52,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-[13px] leading-relaxed sm:flex-nowrap sm:px-6">
               <span className="inline-flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-mint">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-pill bg-mint shadow-[0_0_8px_rgba(61,220,151,0.8)] motion-reduce:animate-none" />
-                {LEDGER.network}
+                {near ? NEAR.network : LEDGER.network}
               </span>
               <span aria-hidden className="hidden h-3.5 w-px shrink-0 bg-white/15 sm:block" />
               <p className="min-w-0 flex-1 basis-full text-pewter sm:basis-auto">
-                <span className="font-semibold text-amber">Demo mode.</span> One server signs for every party, so
-                one browser walks the deal; each screen still reads the ledger as its own party.
+                <span className="font-semibold text-amber">Demo mode.</span>{" "}
+                {near
+                  ? "This server holds a testnet key for every party, so one browser walks the deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope."
+                  : "One server signs for every party, so one browser walks the deal; each screen still reads the ledger as its own party."}
               </p>
               <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-[12px] text-ash lg:inline-flex">
                 Keys <kbd className="kbd">1</kbd>
