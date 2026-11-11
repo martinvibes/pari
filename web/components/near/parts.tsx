@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Party } from "@/components/app/party";
 import { Facts, PageHeader, Panel, TableScroll, Tag, type Tone } from "@/components/app/ui";
+import { Prove } from "@/components/near/Prove";
 import type { DealView, Entry, PublicState, Request, Trade } from "@/lib/near/books";
 import { accountUrl, NEAR } from "@/lib/near/config";
 import { cents, interestDue, showCents } from "@/lib/near/money";
@@ -84,10 +85,18 @@ export function Explore({ href, children }: { href: string; children: React.Reac
 }
 
 /** The party's envelope as the chain holds it: bytes anyone can fetch and
- *  only this party's key can open. */
+ *  only this party's key can open. Next to it the chain holds a commitment,
+ *  which lets the party show one fact from the envelope and nothing else. */
 export function Sealed({ seen }: { seen: Seen }) {
-  const { envelope, persona, chain } = seen;
+  const { envelope, persona, chain, view } = seen;
   const bytes = Buffer.from(envelope.sealed, "base64").length;
+  const provable =
+    view.role === "party"
+      ? [...(view.position ? [{ item: "position", label: "Prove what you hold" }] : []), { item: "cash", label: "Prove your cash" }]
+      : [
+          { item: "register", label: "Prove the register" },
+          { item: "outstanding", label: "Prove the outstanding total" },
+        ];
   return (
     <Panel
       title="Your envelope on the chain"
@@ -100,6 +109,24 @@ export function Sealed({ seen }: { seen: Seen }) {
         <Explore href={accountUrl(NEAR.ledger)}>{NEAR.ledger}</Explore>. The books&apos; fingerprint on the chain is{" "}
         <span className="font-mono text-smoke">{short(chain.root)}</span>.
       </p>
+      {envelope.commitment ? (
+        <div className="space-y-3 border-t border-white/10 pt-6">
+          <p className="label-data">Show one fact, and nothing else</p>
+          <p className="max-w-prose text-[13px] leading-relaxed text-pewter">
+            Next to the envelope the chain holds a commitment, <span className="font-mono text-smoke">{short(envelope.commitment)}</span>: the
+            enclave&apos;s hash over every fact inside. With it {persona.name} can hand one fact to an outsider, a bank or a regulator, who
+            checks it against NEAR with no key and learns nothing else.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {provable.map(({ item, label }) => (
+              <Prove key={item} persona={persona.id} item={item} label={label} />
+            ))}
+            <Link href="/verify" className="btn-ghost border-transparent text-pewter hover:border-transparent hover:text-paper">
+              Check a proof
+            </Link>
+          </div>
+        </div>
+      ) : null}
     </Panel>
   );
 }

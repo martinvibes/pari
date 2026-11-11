@@ -3,8 +3,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { ActionResult } from "@/app/(app)/actions";
 import { accountOf, OPERATORS, txUrl } from "@/lib/near/config";
+import { cutProof, encodeProof } from "@/lib/near/disclosure";
 import { parseBasisPoints, parseCents, showRate } from "@/lib/near/money";
 import * as ops from "@/lib/near/operations";
 import { formatDate } from "@/lib/pari/dates";
@@ -162,3 +164,12 @@ export const withdraw: Action = async (_, form) =>
     const { hash } = await ops.withdraw(personaField(form, "persona"), amount);
     return { hash, message: `Withdrew ${formatCents(amount)} of test USDC to your own NEAR account. A withdrawal is public.` };
   });
+
+// Proofs --------------------------------------------------------------------------
+
+/** A party cuts the proof of one fact from its own envelope, and the browser
+ *  opens the page where anyone can check it. Nothing is sent to the chain. */
+export async function shareProof(form: FormData): Promise<void> {
+  const proof = await cutProof(personaField(form, "persona"), field(form, "item"));
+  redirect(`/verify?proof=${encodeProof(proof)}`);
+}

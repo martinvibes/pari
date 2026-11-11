@@ -4,6 +4,7 @@ import * as act from "@/app/(app)/near-actions";
 import { ActionForm } from "@/components/app/ActionForm";
 import { Empty, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { DealFacts, NearUnavailable, Sealed, seatOf, Sides, TradeStatus } from "@/components/near/parts";
+import { Prove } from "@/components/near/Prove";
 import type { PartyView } from "@/lib/near/books";
 import { cents, showCents, showPrice, showRate } from "@/lib/near/money";
 import { isPartyView, isUnavailable, viewAs, type Seen } from "@/lib/near/session";
@@ -45,7 +46,7 @@ export async function LenderScreen({ persona }: { persona: Persona }) {
       />
 
       <div className="grid gap-6 lg:grid-cols-12">
-        <Payments view={view} />
+        <Payments persona={persona} view={view} />
         <Cash persona={persona} cash={cents(view.cash)} wallet={wallet} holdsLoan={principal > 0n} />
       </div>
 
@@ -59,15 +60,12 @@ export async function LenderScreen({ persona }: { persona: Persona }) {
   );
 }
 
-function Payments({ view }: { view: PartyView }) {
+function Payments({ persona, view }: { persona: Persona; view: PartyView }) {
+  const rate = view.rate_bps === null ? "Interest you were paid." : `Interest at ${showRate(view.rate_bps)} all-in, ACT/360.`;
   return (
     <Panel
       title="Your payments"
-      note={
-        view.rate_bps === null
-          ? "Interest you were paid. Other lenders' payments are not in this envelope."
-          : `Interest at ${showRate(view.rate_bps)} all-in, ACT/360. Other lenders' payments are not in this envelope.`
-      }
+      note={`${rate} Other lenders' payments are not in this envelope. Prove hands one payment to an outsider, who can check it against the chain and sees no other.`}
       className="lg:col-span-7"
     >
       {view.payments.length === 0 ? (
@@ -81,17 +79,26 @@ function Payments({ view }: { view: PartyView }) {
                 <th className="text-right">Due</th>
                 <th className="text-right">Paid (USDC)</th>
                 <th>Status</th>
+                <th aria-hidden />
               </tr>
             </thead>
             <tbody>
-              {[...view.payments].reverse().map((payment) => (
-                <tr key={payment.request_id}>
-                  <td className="whitespace-nowrap">Interest to {formatDate(payment.period_end)}</td>
-                  <td className="text-right text-smoke">{showCents(payment.due)}</td>
-                  <td className="text-right">{payment.paid === null ? "" : showCents(payment.paid)}</td>
-                  <td>{payment.status === "settled" ? <Tag tone="ok">Paid</Tag> : <Tag tone="wait">Requested</Tag>}</td>
-                </tr>
-              ))}
+              {view.payments
+                .map((payment, index) => ({ payment, index }))
+                .reverse()
+                .map(({ payment, index }) => (
+                  <tr key={payment.request_id}>
+                    <td className="whitespace-nowrap">Interest to {formatDate(payment.period_end)}</td>
+                    <td className="text-right text-smoke">{showCents(payment.due)}</td>
+                    <td className="text-right">{payment.paid === null ? "" : showCents(payment.paid)}</td>
+                    <td>{payment.status === "settled" ? <Tag tone="ok">Paid</Tag> : <Tag tone="wait">Requested</Tag>}</td>
+                    <td>
+                      <div className="flex justify-end">
+                        {payment.status === "settled" ? <Prove persona={persona.id} item={`payments.${index}`} /> : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </TableScroll>
