@@ -36,3 +36,12 @@ next-env.d.ts
 
 # LocalNet state written by scripts/localnet.sh (DecMan keys and databases)
 /.localnet/
+
+# Local build brief for the coding agent (would load as the judges' Claude Code instructions)
+/CLAUDE.md
+
+# Rust build output (NEAR contract and enclave)
+target/
+
+# NEAR testnet keys written by near/scripts/setup-testnet.ts
+/near/.keys/
