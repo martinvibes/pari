@@ -250,7 +250,7 @@ How to read it:
 - **Reading what anyone can read.** Every transaction of the run (arguments, logs, receipts, return values) and the contract's whole storage, fetched from public NEAR nodes. Base64 is decoded before searching.
 - **Secrets searched for.** Each figure is searched for as a whole number in every way it could be written (cents, dollars with and without commas, token base units). The network's own gas and fee fields are left out, because on testnet the gas price happens to equal one of the deal's figures.
 - **Public by design.** The same search does find the things Pari publishes on purpose, which shows the search works.
-- **Control.** On a machine that holds the parties' keys, the test opens the envelopes and finds every secret inside them. So the secrets are in the data; they are just sealed.
+- **Control.** On a machine that holds the parties' keys, the test opens the envelopes and finds every secret inside them. So the secrets are in the data; they are just sealed. Without the keys this part prints `Control skipped`, and the rest runs the same.
 - **The enclave.** The contract pins one build of the enclave program by its sha256. Each run comes with an Intel TDX attestation from OutLayer, which you can fetch by transaction hash.
 
 ## Why this needs NEAR
