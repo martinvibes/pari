@@ -69,7 +69,26 @@ async function log(entry: RunEntry): Promise<void> {
   record((await state()).deal_id, LEDGER, entry);
 }
 
-/** Sends one function call signed by `signerId` and decodes what it returned. */
+// NEAR waits about two minutes for the enclave. When no answer comes in that
+// time the contract records that nothing changed, returns any deposit, and
+// frees the deal for the next action. Sending the action again is then safe:
+// the enclave builds only on books the contract has shown it received, so an
+// answer that arrives too late counts for nothing.
+const UNANSWERED = "the enclave did not answer";
+const ATTEMPTS = 4;
+
+type Receipts = { receipts_outcome: { outcome: { executor_id: string; logs: string[] } }[] };
+
+function unanswered(tx: Receipts): boolean {
+  return tx.receipts_outcome.some(({ outcome }) => outcome.executor_id === LEDGER && outcome.logs.some((line) => line.includes(UNANSWERED)));
+}
+
+function again(what: string, hash: string): void {
+  console.warn(`  (the enclave did not answer ${what} in time and nothing changed; sending it again)\n    ${txUrl(hash)}`);
+}
+
+/** Sends one function call signed by `signerId` and decodes what it returned.
+ *  An action the enclave did not answer in time is sent again. */
 export async function call<T>(
   signerId: string,
   contractId: string,
@@ -77,21 +96,30 @@ export async function call<T>(
   args: Record<string, unknown>,
   deposit: bigint = 0n,
 ): Promise<Sent<T>> {
-  const tx = await transact(signerId, contractId, methodName, args, deposit);
-  const hash = tx.transaction.hash;
-  if (contractId === LEDGER || contractId === DAO || args.receiver_id === LEDGER) await log({ step: methodName, signer: signerId, hash });
-  return { hash, url: txUrl(hash), result: decoded<T>((tx.status as { SuccessValue?: string }).SuccessValue) as T };
+  for (let attempt = 1; ; attempt += 1) {
+    const tx = await transact(signerId, contractId, methodName, args, deposit);
+    const hash = tx.transaction.hash;
+    if (contractId === LEDGER || contractId === DAO || args.receiver_id === LEDGER) await log({ step: methodName, signer: signerId, hash });
+    if (attempt === ATTEMPTS || !unanswered(tx)) {
+      return { hash, url: txUrl(hash), result: decoded<T>((tx.status as { SuccessValue?: string }).SuccessValue) as T };
+    }
+    again(methodName, hash);
+  }
 }
 
 /** One action on the deal, signed by the party entitled to it. When the agent
- *  is the DAO, its action is proposed and approved by two of the operators. */
+ *  is the DAO, its action is proposed and approved by two of the operators,
+ *  and proposed afresh if the enclave did not answer in time. */
 export async function act(signerId: string, method: string, args: Record<string, unknown> = {}): Promise<Sent<Outcome>> {
   if (signerId !== DAO) return call<Outcome>(signerId, LEDGER, method, args);
-  const { result: id } = await propose(method, args);
-  await approve(OPERATORS[0]!, id);
-  const ran = await approve(OPERATORS[1]!, id);
-  if (!ran.result) throw new Error(`the DAO's call to ${method} did not reach the ledger (${ran.url})`);
-  return { ...ran, result: ran.result };
+  for (let attempt = 1; ; attempt += 1) {
+    const { result: id } = await propose(method, args);
+    await approve(OPERATORS[0]!, id);
+    const ran = await approve(OPERATORS[1]!, id);
+    if (!ran.result) throw new Error(`the DAO's call to ${method} did not reach the ledger (${ran.url})`);
+    if (attempt === ATTEMPTS || !ran.unanswered) return { ...ran, result: ran.result };
+    again(method, ran.hash);
+  }
 }
 
 /** The first operator proposes one of the agent's actions to the DAO. Nothing
@@ -105,8 +133,9 @@ export async function propose(method: string, args: Record<string, unknown> = {}
 }
 
 /** One operator approves a proposal. The second approval makes the DAO call
- *  the ledger in the same transaction; `result` is then the ledger's answer. */
-export async function approve(operator: string, id: number): Promise<Sent<Outcome | null>> {
+ *  the ledger in the same transaction; `result` is then the ledger's answer,
+ *  and `unanswered` says the enclave gave none in time. */
+export async function approve(operator: string, id: number): Promise<Sent<Outcome | null> & { unanswered: boolean }> {
   const { kind } = await view<{ kind: { FunctionCall: { actions: { method_name: string }[] } } }>(DAO, "get_proposal", { id });
   const tx = await transact(operator, DAO, "act_proposal", { id, action: "VoteApprove", proposal: kind }, 0n);
   const answer = tx.receipts_outcome
@@ -117,7 +146,7 @@ export async function approve(operator: string, id: number): Promise<Sent<Outcom
   const hash = tx.transaction.hash;
   const ran = answer ? { ran: kind.FunctionCall.actions[0]!.method_name } : {};
   await log({ step: "act_proposal", signer: operator, hash, ...ran });
-  return { hash, url: txUrl(hash), result: answer ?? null };
+  return { hash, url: txUrl(hash), result: answer ?? null, unanswered: unanswered(tx) };
 }
 
 /** Seals a command's secret fields so only the enclave can read them. */
