@@ -208,6 +208,17 @@ fn test_the_callback_applies_the_root_and_the_envelopes() {
     assert!(args.contains(r#"\"prev_root\":\"root-1\""#));
 }
 
+#[test]
+fn test_a_view_key_is_published_once_the_enclave_accepts_it() {
+    let mut ledger = ledger();
+    as_caller(ALDER);
+    ledger.register_view_key("a2V5".into()).detach();
+    assert!(ledger.view_key(account(ALDER)).is_none());
+    as_caller(LEDGER);
+    ledger.on_result(Action::RegisterViewKey { pubkey: "a2V5".into() }, account(ALDER), applied(1, json!({ "party": ALDER }), json!([])));
+    assert_eq!(ledger.view_key(account(ALDER)).map(String::as_str), Some("a2V5"));
+}
+
 // ----- the Revlon rules, held by the contract alone -----
 
 #[test]

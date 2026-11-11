@@ -116,6 +116,9 @@ impl Ledger {
             return Err("a payout came back from an action that pays nothing out".into());
         }
         match action {
+            Action::RegisterViewKey { pubkey } => {
+                self.view_keys.insert(caller.clone(), pubkey.clone());
+            }
             Action::RequestInterest => {
                 let (Some(id), Some(total)) = (public["request_id"].as_u64(), cents(&public["total"])) else {
                     return Err("the request came back without a number or a total".into());

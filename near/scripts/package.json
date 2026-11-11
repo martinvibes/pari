@@ -4,6 +4,8 @@
   "type": "module",
   "description": "Testnet setup, deploy, end-to-end run and the leak test for Pari on NEAR",
   "scripts": {
+    "setup": "tsx src/setup-testnet.ts",
+    "e2e": "tsx src/e2e.ts",
     "spike": "tsx src/spike.ts",
     "typecheck": "tsc --noEmit"
   },
