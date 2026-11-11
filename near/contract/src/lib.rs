@@ -19,7 +19,7 @@ mod events;
 #[cfg(test)]
 mod tests;
 
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde_json::{json, Value};
 use near_sdk::store::{LookupMap, Vector};
 use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError, PromiseOrValue};
@@ -189,6 +189,19 @@ impl Ledger {
             requests: BTreeMap::new(),
             held: 0,
             parties: BTreeSet::new(),
+        }
+    }
+
+    /// Removes storage left behind by deals that have ended, so the contract
+    /// stores the current deal only and anyone can still read all of it in one
+    /// call. Like `new`, only the contract's own key can call this. The
+    /// current deal is out of its reach: its keys are refused.
+    #[private]
+    pub fn sweep(&mut self, keys: Vec<Base64VecU8>) {
+        let current = format!("{}/", self.deal_id).into_bytes();
+        for key in keys {
+            require!(key.0 != b"STATE" && !key.0.starts_with(&current), "that key belongs to the current deal");
+            env::storage_remove(&key.0);
         }
     }
 

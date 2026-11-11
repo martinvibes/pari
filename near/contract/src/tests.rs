@@ -147,6 +147,31 @@ fn test_the_contract_vouches_for_the_caller_and_pins_the_enclave_build() {
     assert_eq!(input, json!({ "deal": "deal-1", "caller": ALDER, "prev_root": null, "command": { "cmd": "offer_trade" }, "sealed": "c2VhbGVk" }));
 }
 
+#[test]
+fn test_storage_left_by_an_ended_deal_can_be_swept() {
+    let mut ledger = ledger();
+    as_caller(LEDGER);
+    env::storage_write(b"deal-0/envelopes-alder", b"sealed");
+    ledger.sweep(vec![b"deal-0/envelopes-alder".to_vec().into()]);
+    assert!(!env::storage_has_key(b"deal-0/envelopes-alder"));
+}
+
+#[test]
+#[should_panic(expected = "that key belongs to the current deal")]
+fn test_the_current_deal_cannot_be_swept() {
+    let mut ledger = ledger();
+    as_caller(LEDGER);
+    ledger.sweep(vec![b"deal-1/history".to_vec().into()]);
+}
+
+#[test]
+#[should_panic(expected = "that key belongs to the current deal")]
+fn test_the_contract_s_own_state_cannot_be_swept() {
+    let mut ledger = ledger();
+    as_caller(LEDGER);
+    ledger.sweep(vec![b"STATE".to_vec().into()]);
+}
+
 // ----- the lock -----
 
 #[test]
