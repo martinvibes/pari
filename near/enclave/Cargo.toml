@@ -6,6 +6,19 @@ license = "Apache-2.0"
 description = "Pari's private books: the deal rules that run inside the OutLayer enclave"
 
 [dependencies]
+base64 = "0.22"
+# libsodium-compatible sealed boxes (X25519 + XSalsa20-Poly1305).
+crypto_box = { version = "0.9.1", default-features = false, features = ["alloc", "salsa20", "seal", "rand_core"] }
+getrandom = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+outlayer = { version = "0.2", features = ["encryption-keys"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1

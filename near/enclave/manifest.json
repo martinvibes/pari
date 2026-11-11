@@ -1,0 +1,5 @@
+{
+  "display": { "name": "Pari core" },
+  "capabilities": { "network": [] },
+  "encryption_keys": [{ "path": "enclave", "caller": "predecessor" }]
+}
