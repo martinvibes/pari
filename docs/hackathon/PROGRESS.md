@@ -10,7 +10,7 @@ Baseline: tag `pre-hackathon` = 3c11dbc (the Canton build, 2026-10-07).
 | Setup (branch, tag, folders) | done |
 | Spike 1: contract → OutLayer → callback, private storage | **pass** |
 | Spike 2: sealed envelopes | **pass** |
-| P0-a enclave logic | not started |
+| P0-a enclave logic | deal rules done: `cargo test` in `near/enclave`, 17 tests green with the golden numbers. Enclave entry point next |
 | P0-b rules contract | not started |
 | P0-c web NEAR mode | not started |
 | P0-d leak test | not started |
