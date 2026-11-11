@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "server-only";
-import { read } from "@/lib/near/chain";
+import { read, readAt } from "@/lib/near/chain";
 import { accountOf, DAO_FACTORY, NEAR, UNITS_PER_CENT, viewKey } from "@/lib/near/config";
 import { open } from "@/lib/near/seal";
 
@@ -105,8 +105,9 @@ export type PublicState = {
 /** One line of the contract's public record. */
 export type PublicRecord = { seq: number; at_ms: number; action: string; caller: string; ok: boolean; detail: string };
 
-/** A party's view as the chain holds it: sealed to that party's key. */
-export type Envelope = { seq: number; sealed: string };
+/** A party's view as the chain holds it: sealed to that party's key, next to
+ *  the enclave's commitment to every fact in it (see lib/near/proofs.ts). */
+export type Envelope = { seq: number; sealed: string; commitment: string };
 
 export function publicState(): Promise<PublicState> {
   return read<PublicState>(NEAR.ledger, "state");
@@ -118,6 +119,12 @@ export function publicRecord(): Promise<PublicRecord[]> {
 
 export function envelopeOf(account: string): Promise<Envelope | null> {
   return read<Envelope | null>(NEAR.ledger, "envelope", { account_id: account });
+}
+
+/** A party's envelope and the block it was read at: the latest, or `block`. */
+export async function envelopeAt(account: string, block?: number): Promise<{ envelope: Envelope | null; block: number }> {
+  const { value, block: at } = await readAt<Envelope | null>(NEAR.ledger, "envelope", { account_id: account }, block);
+  return { envelope: value, block: at };
 }
 
 /** The account that plays a persona in this deal. The agent's is the one the

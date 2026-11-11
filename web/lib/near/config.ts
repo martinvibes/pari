@@ -15,6 +15,8 @@ export const NEAR = {
   /** The network's name, as the app's header shows it. */
   network: "NEAR testnet",
   rpcUrl: process.env.NEAR_RPC_URL ?? "https://rpc.testnet.fastnear.com",
+  /** A node that keeps every block, for checking a proof of any age. */
+  archivalRpcUrl: process.env.NEAR_ARCHIVAL_RPC_URL ?? "https://archival-rpc.testnet.fastnear.com",
   explorerUrl: (process.env.NEAR_EXPLORER_URL ?? "https://testnet.nearblocks.io").replace(/\/$/, ""),
   root,
   /** The rules contract. */
