@@ -91,10 +91,13 @@ async function ensureEnclaveVersion(hash: string, url: string): Promise<void> {
   done(`version ${hash.slice(0, 12)}… added to ${PROJECT_ID}`);
 }
 
-/** Starts the deal on the contract, pinned to this enclave build. */
-async function ensureDeal(hash: string, fresh: boolean): Promise<PublicState> {
+/**
+ * Starts the deal on the contract, pinned to this enclave build. `previous` is
+ * the deal that was there before this run deployed anything: the enclave keeps
+ * each deal's books by its id, so a new deal needs the next number.
+ */
+async function ensureDeal(previous: PublicState | null, hash: string, fresh: boolean): Promise<PublicState> {
   const current = await state().catch(() => null);
-  const number = current ? Number(current.deal_id.split("-").pop()) : 0;
   if (current && !fresh && current.version_key === hash) {
     done(`deal ${current.deal_id} is live on ${LEDGER}`);
     return current;
@@ -102,7 +105,11 @@ async function ensureDeal(hash: string, fresh: boolean): Promise<PublicState> {
   if (current && !fresh) {
     throw new Error(`${LEDGER} pins enclave build ${current.version_key}, not this one. Run with --fresh to start a new deal.`);
   }
-  const deal_id = `northwind-${number + 1}`;
+  if (previous && !current && !fresh) {
+    throw new Error(`this build of the contract cannot read deal ${previous.deal_id}. Run with --fresh to start a new deal.`);
+  }
+  const number = previous ? Number(previous.deal_id.split("-").pop()) : 0;
+  const deal_id = process.env.PARI_DEAL ?? `northwind-${number + 1}`;
   const args = {
     owner: ROOT, deal_id, outlayer: OUTLAYER, project_id: PROJECT_ID, version_key: hash, usdc: USDC, terms: TERMS,
     agent: accountOf("agent"), borrower: accountOf("northwind"),
@@ -136,8 +143,9 @@ const hash = sha256(enclave);
 await ensureEnclaveVersion(hash, await publish(enclave));
 
 step("Rules contract");
+const previous = await state().catch(() => null);
 await ensureCode(LEDGER, build("ledger"));
-let deal = await ensureDeal(hash, fresh);
+let deal = await ensureDeal(previous, hash, fresh);
 
 if (!deal.enclave_key) {
   await expectOk("enclave key published", act(ROOT, "fetch_enclave_key"));

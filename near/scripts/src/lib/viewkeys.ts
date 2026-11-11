@@ -22,3 +22,9 @@ export async function viewKeyFor(accountId: string): Promise<ViewKey> {
   writeFileSync(FILE, JSON.stringify({ ...keys, [accountId]: created }, null, 2), { mode: 0o600 });
   return created;
 }
+
+/** Whether this machine holds a view key for every one of `accounts`. */
+export function haveViewKeys(accounts: string[]): boolean {
+  const keys = load();
+  return accounts.every((account) => account in keys);
+}

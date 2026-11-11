@@ -6,6 +6,7 @@
   "scripts": {
     "setup": "tsx src/setup-testnet.ts",
     "e2e": "tsx src/e2e.ts",
+    "prove:privacy": "tsx src/prove-privacy.ts",
     "spike": "tsx src/spike.ts",
     "typecheck": "tsc --noEmit"
   },

@@ -1,0 +1,141 @@
+{
+  "deal_id": "northwind-2",
+  "ledger": "ledger.paridesk.testnet",
+  "transactions": [
+    {
+      "step": "new",
+      "signer": "ledger.paridesk.testnet",
+      "hash": "34k85YaT62rzaGst37T1HPbk4JXYBQvgqy8CVxhjhsrq"
+    },
+    {
+      "step": "fetch_enclave_key",
+      "signer": "paridesk.testnet",
+      "hash": "G3zurAYyDLxB2t5HFc85zMuZiTgtpP6dyWfuReKRviop"
+    },
+    {
+      "step": "init_deal",
+      "signer": "paridesk.testnet",
+      "hash": "GmqZqrrcwvMfVgyo4QytVqj1Xx5t6TuQsCCDBYmK1pmY"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "agent.paridesk.testnet",
+      "hash": "HNPzadMHNfB4P2ranT15eUZWhFtrrFCFtxJ6W92tDgD5"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "4XVyoANMLHYXbeX8z8pjagyPtQmUjLL8TLigoga1nDup"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "alder.paridesk.testnet",
+      "hash": "3XKQRMFkrWstXj9yU4TiU5svpnhoEL3BYtcG3deMRChH"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "birch.paridesk.testnet",
+      "hash": "6k5zLYBQDqkisj6oTQ6vRepCiy9p8WuNjdpq9QfuanTj"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "cedar.paridesk.testnet",
+      "hash": "89XfUFxYmJwKh9pfhwpyXcoZ3iGSuafqxaGdzsxfuC34"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "delta.paridesk.testnet",
+      "hash": "ChepJwWb8TgNAZv5jFPtjdmEWxgaYRGVNqJdQ1egQ3rP"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "rival.paridesk.testnet",
+      "hash": "EPuxq1NuNKjrWkTzpmWLPuiq2t5DAxS3sGDzTBHSmmWp"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "auditor.paridesk.testnet",
+      "hash": "DZB49hJS5of8LXsBCArG2gs1VggiU7D24wxTuATSPkrR"
+    },
+    {
+      "step": "fix_rate",
+      "signer": "agent.paridesk.testnet",
+      "hash": "DxMmBzdsJmaofmGP9enszVFGpF6cXe9ZRMiu7FGzSKQs"
+    },
+    {
+      "step": "request_interest",
+      "signer": "agent.paridesk.testnet",
+      "hash": "8B9d6hyj7Z58hYXV3p5Vg4XYaGpZBwKiaUPfNckQyDxH"
+    },
+    {
+      "step": "request_interest",
+      "signer": "agent.paridesk.testnet",
+      "hash": "8mTAUZar42yQTRcnGogpKoN5jmca3xDTGgJvgcdsSbn2"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "2fB7brRJhvxXnQ4GQDpPWTnCXoDFmGVaQDGfcNeBnZjM"
+    },
+    {
+      "step": "settle",
+      "signer": "agent.paridesk.testnet",
+      "hash": "EY1T5XbcU9V1qbAeRv7C9AvSbgG27c4dS7xqtJgmmdzK"
+    },
+    {
+      "step": "withdraw",
+      "signer": "alder.paridesk.testnet",
+      "hash": "4mMiTm5E9ChTSEtP6PztmG6gTHpf6jQLCCHuBQdSFCDQ"
+    },
+    {
+      "step": "fix_rate",
+      "signer": "agent.paridesk.testnet",
+      "hash": "8UXUhme2KPeMoWDQdiDe66GUEh6iqcFbzjigxUD2RDHu"
+    },
+    {
+      "step": "set_dq",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "Ak8sUVR8Hu258GguvvzHixuKx9wHVyMDjPT3p4iU7p82"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "rival.paridesk.testnet",
+      "hash": "BhJcvzDxvXFLm8ZK9sbGpaS7Yead8a9iZ9tBopGsY5ky"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "delta.paridesk.testnet",
+      "hash": "H1eiaKvbrrUNWZKwCdWM2bkJNPgn3osoT8PwDeCsY2Ed"
+    },
+    {
+      "step": "offer_trade",
+      "signer": "alder.paridesk.testnet",
+      "hash": "C7qzskh2LPSotNJ8buLYfS72ZSsxUFdoV2XQdoeeTABy"
+    },
+    {
+      "step": "accept_trade",
+      "signer": "rival.paridesk.testnet",
+      "hash": "66HVT93sSE4cZXRjnWYc7QMvZN7YedAxoZNoCAjXGy7H"
+    },
+    {
+      "step": "settle_trade",
+      "signer": "agent.paridesk.testnet",
+      "hash": "RTD6xSC6mQpSEXyULtHM4hnTK2os5xK4vdfMgfHgQEX"
+    },
+    {
+      "step": "offer_trade",
+      "signer": "alder.paridesk.testnet",
+      "hash": "matVrpeo2F8NzpUD3RmY9jAjaXiP1HQy375HNhJTmTG"
+    },
+    {
+      "step": "accept_trade",
+      "signer": "delta.paridesk.testnet",
+      "hash": "GbuqY7dy5crGcYFfAsYJ2ENNTVWqZjpGMdUBoN3Ybwep"
+    },
+    {
+      "step": "settle_trade",
+      "signer": "agent.paridesk.testnet",
+      "hash": "24nr5EA1DdRfZbFQqN5tPF5WPE9dzXk2ho67XQ31jYoC"
+    }
+  ]
+}

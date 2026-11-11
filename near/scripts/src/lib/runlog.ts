@@ -18,10 +18,10 @@ export interface RunLog {
   transactions: RunEntry[];
 }
 
-const DIR = join(dirname(fileURLToPath(import.meta.url)), "../../../runs");
+export const RUNS_DIR = join(dirname(fileURLToPath(import.meta.url)), "../../../runs");
 
 export function runFile(dealId: string): string {
-  return join(DIR, `${dealId}.json`);
+  return join(RUNS_DIR, `${dealId}.json`);
 }
 
 export function readRun(dealId: string): RunLog | null {
@@ -31,6 +31,6 @@ export function readRun(dealId: string): RunLog | null {
 export function record(dealId: string, ledger: string, entry: RunEntry): void {
   const run = readRun(dealId) ?? { deal_id: dealId, ledger, transactions: [] };
   run.transactions.push(entry);
-  mkdirSync(DIR, { recursive: true });
+  mkdirSync(RUNS_DIR, { recursive: true });
   writeFileSync(runFile(dealId), `${JSON.stringify(run, null, 2)}\n`);
 }

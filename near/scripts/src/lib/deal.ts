@@ -42,6 +42,31 @@ export const FUNDING: Partial<Record<Persona, bigint>> = {
   rival: 20_000_000_00n,
 };
 
+/** First-period interest at 7.80% for 91 days: what each lender is owed, in cents. */
+export const FIRST_PERIOD_DUE: Record<string, bigint> = {
+  [accountOf("alder")]: 985_833_33n,
+  [accountOf("birch")]: 591_500_00n,
+  [accountOf("cedar")]: 394_333_33n,
+};
+export const FIRST_PERIOD_TOTAL = 1_971_666_66n;
+/** What the agent types by mistake: Revlon's $900m. */
+export const MISTYPED_TOTAL = 900_000_000_00n;
+/** Alder takes part of its interest out as USDC. Withdrawals are public. */
+export const WITHDRAWAL = 500_000_00n;
+
+export const SECOND_PERIOD_END = "2027-03-15";
+/** Alder sells 10m to Delta at 99.5, thirty days into the second period. */
+export const TRADE = {
+  date: "2027-01-14",
+  par: 10_000_000_00n,
+  price_ppm: 995_000,
+  cash: 9_950_000_00n,
+  /** Interest Alder earned up to the trade date and keeps: 30 days on 50m. */
+  seller_carried: 325_000_00n,
+};
+/** What each buyer pays into the deal before trading. Deposits are public. */
+export const BUYER_CASH = 12_000_000_00n;
+
 /** Test USDC has 6 decimals; the books keep cents. */
 export const UNITS_PER_CENT = 10_000n;
 

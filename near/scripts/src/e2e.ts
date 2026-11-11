@@ -5,28 +5,34 @@
 //
 // 1. First period: the agent fixes the rate, mistypes the total (refused),
 //    requests the right total, the borrower pays, one settlement pays three
-//    lenders, and Alder withdraws its interest as USDC.
+//    lenders, and Alder withdraws part of its interest as USDC.
 // 2. Second period: Rival (on the borrower's DQ list) tries to buy and is not
 //    settled; Delta buys 10m from Alder at a sealed price, cash against loan.
 
 import { isDeepStrictEqual } from "node:util";
-import { accountOf, BASE_RATE_BPS, FIRST_PERIOD_END, LEDGER, money, UNITS_PER_CENT, USDC, type Persona } from "./lib/deal.js";
+import {
+  accountOf,
+  BASE_RATE_BPS,
+  BUYER_CASH,
+  FIRST_PERIOD_DUE as DUE,
+  FIRST_PERIOD_END,
+  FIRST_PERIOD_TOTAL as TOTAL,
+  LEDGER,
+  MISTYPED_TOTAL as MISTYPED,
+  money,
+  SECOND_PERIOD_END,
+  TRADE,
+  UNITS_PER_CENT,
+  USDC,
+  WITHDRAWAL,
+  type Persona,
+} from "./lib/deal.js";
 import { act, openEnvelope, payIn, sealForEnclave, state, view, type Outcome, type Sent } from "./lib/ledger.js";
 import { viewKeyFor } from "./lib/viewkeys.js";
 
 const [agent, borrower, alder, birch, cedar, delta, rival, auditor] = (
   ["agent", "northwind", "alder", "birch", "cedar", "delta", "rival", "auditor"] satisfies Persona[]
 ).map(accountOf) as [string, string, string, string, string, string, string, string];
-
-// First-period interest at 7.80% for 91 days, in cents.
-const DUE = { [alder]: 985_833_33n, [birch]: 591_500_00n, [cedar]: 394_333_33n };
-const TOTAL = 1_971_666_66n;
-const MISTYPED = 900_000_000_00n;
-
-const SECOND_PERIOD_END = "2027-03-15";
-const TRADE_DATE = "2027-01-14"; // 30 days into the second period
-const TRADE = { par: 10_000_000_00n, price_ppm: 995_000, cash: 9_950_000_00n };
-const BUYER_CASH = 20_000_000_00n;
 
 /** A party's opened envelope. Amounts are cents in strings. */
 interface View {
@@ -90,9 +96,10 @@ const audit = await seen(auditor);
 check(isDeepStrictEqual(audit.requests?.[0]?.paid, Object.fromEntries(Object.entries(DUE).map(([l, c]) => [l, c.toString()]))), "the auditor sees every lender's payment");
 
 const before = await usdcOf(alder);
-await ok(`Alder withdraws ${money(DUE[alder]!)}`, act(alder, "withdraw", { amount: DUE[alder]!.toString() }));
-check((await usdcOf(alder)) - before === DUE[alder]!, "Alder's wallet received exactly that in test USDC");
-check((await seen(alder)).cash === "0", "Alder's cash in the books is now zero");
+const alderCash = DUE[alder]! - WITHDRAWAL;
+await ok(`Alder withdraws ${money(WITHDRAWAL)}`, act(alder, "withdraw", { amount: WITHDRAWAL.toString() }));
+check((await usdcOf(alder)) - before === WITHDRAWAL, "Alder's wallet received exactly that in test USDC");
+check((await seen(alder)).cash === alderCash.toString(), `Alder's cash in the books is now ${money(alderCash)}`);
 
 console.log("\nSecond period: a trade, screened against the borrower's DQ list");
 
@@ -105,7 +112,7 @@ for (const buyer of [rival, delta]) {
 }
 
 async function trade(buyer: string): Promise<{ id: number; settled: boolean }> {
-  const offer = { buyer, par: TRADE.par.toString(), price_ppm: TRADE.price_ppm, trade_date: TRADE_DATE };
+  const offer = { buyer, par: TRADE.par.toString(), price_ppm: TRADE.price_ppm, trade_date: TRADE.date };
   const offered = await ok(`Alder offers ${money(TRADE.par)} to ${buyer} (sealed)`, act(alder, "offer_trade", { sealed: await sealForEnclave(offer) }));
   const id = Number(offered.public?.trade_id);
   await ok(`${buyer} accepts`, act(buyer, "accept_trade", { trade_id: id }));
@@ -128,13 +135,17 @@ check(deltaView.cash === (BUYER_CASH - TRADE.cash).toString(), `Delta paid ${mon
 check(deltaView.trades?.[0]?.price_ppm === TRADE.price_ppm, "Delta sees the price in its own envelope");
 const sellerView = await seen(alder);
 check(sellerView.position?.principal === "4000000000", "Alder holds 40,000,000.00");
-check(sellerView.position?.carried === "32500000", "Alder keeps the 30 days of interest it earned: 325,000.00 (65,000.00 of it on the part sold)");
-check(sellerView.cash === TRADE.cash.toString(), `Alder received ${money(TRADE.cash)}`);
+check(sellerView.position?.carried === TRADE.seller_carried.toString(), `Alder keeps the 30 days of interest it earned: ${money(TRADE.seller_carried)} (65,000.00 of it on the part sold)`);
+check(sellerView.cash === (alderCash + TRADE.cash).toString(), `Alder received ${money(TRADE.cash)}`);
 for (const party of [borrower, auditor]) {
   const theirs = JSON.stringify(await seen(party));
   check(theirs.includes(delta) && !theirs.includes("price_ppm"), `${party} sees the trade but not the price`);
 }
 check(!JSON.stringify(await seen(auditor)).includes("dq_list"), "the auditor does not see the DQ list");
+
+const record = await view<{ action: string; caller: string; ok: boolean; detail: string }[]>(LEDGER, "history", { limit: 200 });
+check(record.some((line) => !line.ok && line.caller === agent && line.detail.includes(money(MISTYPED))), "the chain's public record shows the refusal");
+check(!JSON.stringify(record).includes(TRADE.price_ppm.toString()), "and no line of it mentions the trade price");
 
 const final = await state();
 check(final.frozen === null, "no money rule was ever broken");
