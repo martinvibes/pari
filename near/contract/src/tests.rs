@@ -145,7 +145,8 @@ fn test_the_contract_vouches_for_the_caller_and_pins_the_enclave_build() {
     let args: Value = near_sdk::serde_json::from_str(&args).unwrap();
     assert_eq!(args["source"]["Project"], json!({ "project_id": "paridesk.testnet/pari-core", "version_key": "abc123" }));
     let input: Value = near_sdk::serde_json::from_str(args["input_data"].as_str().unwrap()).unwrap();
-    assert_eq!(input, json!({ "deal": "deal-1", "caller": ALDER, "prev_root": null, "command": { "cmd": "offer_trade" }, "sealed": "c2VhbGVk" }));
+    let sent = json!({ "deal": "deal-1", "caller": ALDER, "prev_root": null, "turn": 0, "command": { "cmd": "offer_trade" }, "sealed": "c2VhbGVk" });
+    assert_eq!(input, sent);
 }
 
 #[test]
@@ -214,6 +215,37 @@ fn test_the_lock_is_released_on_refusal_and_on_failure() {
     ledger.on_result(Action::RequestInterest, account(AGENT), Err(PromiseError::Failed));
     assert_eq!(ledger.state()["in_flight"], Value::Null);
     assert_eq!(ledger.state()["root"], Value::Null);
+}
+
+/// What the contract last sent the enclave.
+fn sent() -> Value {
+    let (_, args) = calls().into_iter().find(|(m, _)| m == "request_execution").expect("a call to OutLayer");
+    let args: Value = near_sdk::serde_json::from_str(&args).unwrap();
+    near_sdk::serde_json::from_str(args["input_data"].as_str().unwrap()).unwrap()
+}
+
+#[test]
+fn test_an_unanswered_request_changes_nothing_and_the_next_is_numbered_after_it() {
+    let mut ledger = with_open_request();
+    as_caller(AGENT);
+    ledger.settle(1).detach();
+    let first = sent();
+
+    // NEAR stopped waiting: the callback runs with no answer.
+    as_caller(LEDGER);
+    let outcome = ledger.on_result(Action::Settle { request_id: 1 }, account(AGENT), Ok(None));
+    assert_eq!(outcome, json!({ "ok": false, "refused": "the enclave did not answer; nothing changed" }));
+    assert_eq!(ledger.state()["root"], "root-1");
+    assert_eq!(ledger.state()["requests"]["1"]["settled"], false);
+
+    // The next request names the same books and a higher number, so the
+    // enclave builds on what this contract holds and drops a late answer.
+    as_caller(AGENT);
+    ledger.settle(1).detach();
+    let second = sent();
+    assert_eq!(second["prev_root"], "root-1");
+    assert_eq!(second["prev_root"], first["prev_root"]);
+    assert_eq!(second["turn"].as_u64(), first["turn"].as_u64().map(|turn| turn + 1));
 }
 
 // ----- applying an answer -----

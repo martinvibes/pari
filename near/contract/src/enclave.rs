@@ -26,7 +26,6 @@ impl Action {
         match self {
             Action::EnclaveKey => "enclave_key",
             Action::InitDeal => "init_deal",
-            Action::Sync => "sync",
             Action::RegisterViewKey { .. } => "register_view_key",
             Action::FixRate => "fix_rate",
             Action::RequestInterest => "request_interest",
@@ -54,7 +53,10 @@ impl Ledger {
         require!(self.in_flight.is_none(), "another action is in flight; try again in a moment");
         self.in_flight = Some(action.name().to_string());
 
-        let input = json!({ "deal": self.deal_id, "caller": caller, "prev_root": self.root, "command": command, "sealed": sealed });
+        // The enclave builds on the books this contract holds, and tells requests
+        // apart by their number: the record gains one line for every request.
+        let turn = self.history.len();
+        let input = json!({ "deal": self.deal_id, "caller": caller, "prev_root": self.root, "turn": turn, "command": command, "sealed": sealed });
         let source = json!({ "Project": { "project_id": self.project_id, "version_key": self.version_key } });
         let limits = json!({ "max_instructions": 10_000_000_000u64, "max_memory_mb": 128, "max_execution_seconds": 60 });
         let gas = env::prepaid_gas().saturating_sub(env::used_gas()).saturating_sub(GAS_CALLBACK).saturating_sub(GAS_OWN);

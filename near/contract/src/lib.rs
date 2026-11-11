@@ -100,7 +100,6 @@ pub struct Record {
 pub enum Action {
     EnclaveKey,
     InitDeal,
-    Sync,
     RegisterViewKey { pubkey: String },
     FixRate,
     RequestInterest,
@@ -228,13 +227,6 @@ impl Ledger {
             "auditor": auditor,
         });
         self.run(Action::InitDeal, env::current_account_id(), command, Some(sealed))
-    }
-
-    /// Re-reads the fingerprint and envelopes from the enclave, in case a
-    /// callback was lost after the books had moved.
-    pub fn sync(&mut self) -> Promise {
-        self.only(&self.owner, "the owner syncs");
-        self.run(Action::Sync, env::current_account_id(), json!({ "cmd": "sync" }), None)
     }
 
     /// Releases a lock left by a callback that never ran.

@@ -61,7 +61,6 @@ const ROWS: Array<{ label: string; note: string; onChain: (chain: PublicState, r
 const ACTIONS: Record<string, string> = {
   enclave_key: "Enclave key published",
   init_deal: "Deal loaded, sealed",
-  sync: "Books re-read",
   register_view_key: "View key registered",
   fix_rate: "Rate fixed",
   request_interest: "Interest requested",
