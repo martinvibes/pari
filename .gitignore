@@ -49,3 +49,4 @@ target/
 # Logs of deals played on NEAR testnet. The one the leak test reads by default is kept.
 /near/runs/*
 !/near/runs/northwind-4.json
+!/near/runs/northwind-5.json
