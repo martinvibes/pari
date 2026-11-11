@@ -30,6 +30,18 @@ export function readRun(dealId: string): RunLog | null {
   return existsSync(runFile(dealId)) ? (JSON.parse(readFileSync(runFile(dealId), "utf8")) as RunLog) : null;
 }
 
+/** The proof the end-to-end run leaves for each deal: see verify-proof.ts. */
+export const PROOFS_DIR = join(RUNS_DIR, "../proofs");
+
+export function proofFile(dealId: string): string {
+  return join(PROOFS_DIR, `${dealId}.json`);
+}
+
+export function saveProof(dealId: string, proof: object): void {
+  mkdirSync(PROOFS_DIR, { recursive: true });
+  writeFileSync(proofFile(dealId), `${JSON.stringify(proof, null, 2)}\n`);
+}
+
 export function record(dealId: string, ledger: string, entry: RunEntry): void {
   const run = readRun(dealId) ?? { deal_id: dealId, ledger, transactions: [] };
   run.transactions.push(entry);

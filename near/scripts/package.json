@@ -7,6 +7,7 @@
     "setup": "tsx src/setup-testnet.ts",
     "e2e": "tsx src/e2e.ts",
     "prove:privacy": "tsx src/prove-privacy.ts",
+    "verify:proof": "tsx src/verify-proof.ts",
     "demo:env": "tsx src/demo-env.ts",
     "spike": "tsx src/spike.ts",
     "typecheck": "tsc --noEmit"

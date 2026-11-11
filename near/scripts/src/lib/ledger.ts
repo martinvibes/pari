@@ -1,9 +1,10 @@
-// Calling the rules contract: public reads, actions signed by one party, and
-// opening a party's envelope.
+// Calling the rules contract: public reads, actions signed by one party,
+// opening a party's envelope, and checking a proof cut from one.
 
 import { teraToGas } from "near-api-js";
 import { DAO, LEDGER, OPERATORS, UNITS_PER_CENT, USDC } from "./deal.js";
-import { accountFor, provider, txUrl } from "./network.js";
+import { accountFor, archive, provider, txUrl } from "./network.js";
+import { commitmentOf, prove, read, type Fact, type Proof } from "./proofs.js";
 import { record, type RunEntry } from "./runlog.js";
 import { open, seal, type ViewKey } from "./seal.js";
 
@@ -168,6 +169,65 @@ export function payIn(signerId: string, cents: bigint, purpose: Record<string, u
 
 /** Reads a party's latest envelope from the chain and opens it with that party's key. */
 export async function openEnvelope<T>(accountId: string, key: ViewKey): Promise<T | null> {
-  const envelope = await view<{ seq: number; sealed: string } | null>(LEDGER, "envelope", { account_id: accountId });
+  const envelope = await view<Envelope | null>(LEDGER, "envelope", { account_id: accountId });
   return envelope ? (JSON.parse(await open(envelope.sealed, key)) as T) : null;
+}
+
+/** What the chain holds for one party: its sealed view, and the enclave's
+ *  commitment to every fact in it. */
+export interface Envelope {
+  seq: number;
+  sealed: string;
+  commitment: string;
+}
+
+/** A party's envelope as the chain holds it now, or held it at `block`. An
+ *  archival node answers for a block of any age. */
+async function envelopeAt(accountId: string, block?: number): Promise<{ envelope: Envelope | null; block: number }> {
+  const [node, blockQuery] = block === undefined ? [provider, { finality: "final" as const }] : [archive, { blockId: block }];
+  const args = { account_id: accountId };
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const answer = await node.callFunctionRaw({ contractId: LEDGER, method: "envelope", args, blockQuery });
+      return { envelope: JSON.parse(Buffer.from(answer.result).toString()) as Envelope | null, block: answer.block_height };
+    } catch (error) {
+      // A block that became final a second ago may not have reached the archival node yet.
+      if (attempt === 3 || (error as Error).name !== "UnknownBlockError") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
+/**
+ * A party opens its latest envelope and cuts the proof of one fact from it:
+ * `position`, `cash`, `payments.0`. The proof names the block it was read at,
+ * so it can be checked after the deal has moved on.
+ */
+export async function proveFact(accountId: string, key: ViewKey, item: string): Promise<Proof> {
+  const [{ deal_id }, { envelope, block }] = await Promise.all([state(), envelopeAt(accountId)]);
+  if (!envelope) throw new Error(`the chain holds no envelope for ${accountId}`);
+  const mine = JSON.parse(await open(envelope.sealed, key)) as Record<string, unknown>;
+  if (commitmentOf(deal_id, mine) !== envelope.commitment) throw new Error(`${accountId}'s envelope does not hash to the chain's commitment`);
+  return prove(mine, item, { ledger: LEDGER, deal: deal_id, block });
+}
+
+export type Verdict = { holds: true; fact: Fact; at: Date; latest: boolean } | { holds: false; why: string };
+
+/**
+ * Checks a proof the way an outsider does, with no keys: the fact and its salt
+ * must hash into the proof's list, and the chain must have held that list's
+ * hash as the party's commitment at the block the proof names.
+ */
+export async function checkProof(proof: Proof): Promise<Verdict> {
+  const shown = read(proof);
+  if (!shown) return { holds: false, why: "the fact, its salt and the list of hashes do not belong together" };
+  if (proof.ledger !== LEDGER) return { holds: false, why: `the proof names ${proof.ledger}, and this deal's rules contract is ${LEDGER}` };
+  const { fact, commitment } = shown;
+  const then = await envelopeAt(fact.party, proof.block).catch(() => null);
+  if (!then) return { holds: false, why: `NEAR's archive could not be asked about block ${proof.block}` };
+  if (then.envelope?.commitment !== commitment) {
+    return { holds: false, why: `at block ${proof.block} the chain did not hold this commitment for ${fact.party}` };
+  }
+  const [{ header }, now] = await Promise.all([archive.viewBlock({ blockId: proof.block }), envelopeAt(fact.party)]);
+  return { holds: true, fact, at: new Date(Number(BigInt(header.timestamp_nanosec) / 1_000_000n)), latest: now.envelope?.commitment === commitment };
 }
