@@ -206,7 +206,7 @@ impl Books {
     /// The fingerprint published on chain after every command.
     pub fn root(&self) -> String {
         let bytes = serde_json::to_vec(self).expect("books serialize to JSON");
-        Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+        crate::proofs::hex(&Sha256::digest(bytes))
     }
 
     pub fn outstanding(&self) -> Cents {

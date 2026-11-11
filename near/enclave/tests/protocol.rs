@@ -5,6 +5,7 @@ mod common;
 
 use common::*;
 use pari_core::books::Books;
+use pari_core::proofs;
 use pari_core::protocol::{handle, Input};
 use pari_core::seal::{self, SecretKey};
 use serde_json::{json, Value};
@@ -95,6 +96,62 @@ fn test_each_party_opens_only_its_own_envelope() {
     // Birch cannot open Alder's envelope, and parties without a key get none.
     assert!(seal::open(&birch, reply["envelopes"][ALDER].as_str().unwrap()).is_err());
     assert_eq!(reply["envelopes"].as_object().unwrap().len(), 2);
+    assert_eq!(reply["commitments"].as_object().unwrap().len(), 2);
+}
+
+/// What an outsider does with a proof: hash the fact with its salt, find the
+/// result at its place in the list, hash the list and compare.
+fn proves(fact: &str, salt: &[u8], hashes: &[[u8; 32]], index: usize, commitment: &Value) -> bool {
+    hashes.get(index) == Some(&proofs::fact_hash(salt, fact)) && *commitment == proofs::commitment(hashes)
+}
+
+#[test]
+fn test_a_party_proves_one_fact_and_shows_nothing_else() {
+    let (mut enclave, alder, _) = open_deal();
+    let reply = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "197166666" }), None);
+    let mine = open(&reply, ALDER, &alder);
+    let seed = mine["proof_seed"].as_str().expect("a seed in the envelope");
+
+    // Alder rebuilds its facts from its own envelope and arrives at the public commitment.
+    let facts = proofs::facts("test-deal", &mine);
+    let hashes = proofs::hashes("test-deal", &mine, seed);
+    let published = &reply["commitments"][ALDER];
+    assert_eq!(*published, proofs::commitment(&hashes));
+
+    // It shows one fact: what it is owed for the first period.
+    let index = facts.iter().position(|fact| fact.item == "payments.0").expect("a first payment");
+    let fact = &facts[index].text;
+    let value = json!({ "due": "98583333", "paid": null, "period_end": "2026-12-15", "request_id": 1, "status": "open" });
+    let shown = json!({ "deal": "test-deal", "item": "payments.0", "party": ALDER, "seq": mine["seq"], "value": value });
+    assert_eq!(serde_json::from_str::<Value>(fact).unwrap(), shown);
+    let salt = proofs::salt(seed, "payments.0");
+    assert!(proves(fact, &salt, &hashes, index, published));
+
+    // The proof names no other fact: not Alder's position, and nothing of Birch's.
+    let proof = format!("{fact}{}{}", proofs::hex(&salt), hashes.iter().map(|hash| proofs::hex(hash)).collect::<String>());
+    assert!(!proof.contains("5000000000") && !proof.contains(BIRCH) && !proof.contains(seed));
+
+    // One cent more, another fact's salt, or another party's commitment proves nothing.
+    assert!(!proves(&fact.replace("98583333", "98583334"), &salt, &hashes, index, published));
+    assert!(!proves(fact, &proofs::salt(seed, "cash"), &hashes, index, published));
+    assert!(!proves(fact, &salt, &hashes, index, &reply["commitments"][BIRCH]));
+}
+
+#[test]
+fn test_a_commitment_is_new_with_every_answer_and_confirms_no_guess() {
+    let (mut enclave, alder, _) = open_deal();
+    // The same books answered twice: the same root, and a new commitment.
+    let first = enclave.call(LEDGER, json!({ "cmd": "sync" }), None);
+    let second = enclave.call(LEDGER, json!({ "cmd": "sync" }), None);
+    assert_eq!(first["root"], second["root"]);
+    assert_ne!(first["commitments"][ALDER], second["commitments"][ALDER]);
+
+    // Someone who guesses every fact in Alder's view still cannot confirm one
+    // against the chain: the hashes depend on the seed inside the envelope.
+    let mine = open(&second, ALDER, &alder);
+    let guessed = proofs::hashes("test-deal", &mine, &proofs::new_seed());
+    assert_ne!(second["commitments"][ALDER], proofs::commitment(&guessed));
+    assert!(!enclave.public.contains(mine["proof_seed"].as_str().unwrap()));
 }
 
 #[test]

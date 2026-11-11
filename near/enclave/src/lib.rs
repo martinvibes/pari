@@ -7,6 +7,7 @@
 pub mod books;
 pub mod interest;
 pub mod money;
+pub mod proofs;
 pub mod protocol;
 pub mod seal;
 pub mod views;
