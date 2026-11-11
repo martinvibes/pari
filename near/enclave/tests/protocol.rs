@@ -4,6 +4,7 @@
 mod common;
 
 use common::*;
+use pari_core::books::Books;
 use pari_core::proofs;
 use pari_core::protocol::{handle, Input, Stored};
 use pari_core::seal::{self, SecretKey};
@@ -194,19 +195,44 @@ fn test_the_enclave_and_the_proof_checker_agree_on_a_known_view() {
 #[test]
 fn test_a_commitment_is_new_with_every_answer_and_confirms_no_guess() {
     let (mut enclave, alder, _) = open_deal();
-    // The same command answered twice gives the same books, and a new commitment.
+    // The same command answered twice gives Alder the same view, and a new commitment.
     let request = json!({ "cmd": "request_interest", "expected_total": "197166666" });
     let first = enclave.call_too_late(AGENT, request.clone(), None);
     let second = enclave.call(AGENT, request, None);
-    assert_eq!(first["root"], second["root"]);
+    assert_eq!(open(&first, ALDER, &alder)["payments"], open(&second, ALDER, &alder)["payments"]);
     assert_ne!(first["commitments"][ALDER], second["commitments"][ALDER]);
 
     // Someone who guesses every fact in Alder's view still cannot confirm one
     // against the chain: the hashes depend on the seed inside the envelope.
     let mine = open(&second, ALDER, &alder);
-    let guessed = proofs::hashes("test-deal", &mine, &proofs::new_seed());
+    let guessed = proofs::hashes("test-deal", &mine, &proofs::random_hex());
     assert_ne!(second["commitments"][ALDER], proofs::commitment(&guessed));
     assert!(!enclave.public.contains(mine["proof_seed"].as_str().unwrap()));
+}
+
+#[test]
+fn test_a_fingerprint_confirms_no_guess_at_the_books() {
+    // Two deals loaded the same way hold the same books, to the cent.
+    let (mut one, _, _) = open_deal();
+    let (other, _, _) = open_deal();
+    let books = |enclave: &Enclave| enclave.stored.offered.as_ref().unwrap().books.clone();
+    let (mine, theirs) = (books(&one), books(&other));
+    assert_eq!(Books { blind: String::new(), ..mine.clone() }, Books { blind: String::new(), ..theirs });
+
+    // Their fingerprints differ all the same. Each carries 32 random bytes
+    // drawn inside the enclave, so someone who guesses every position cannot
+    // confirm the guess by hashing it.
+    assert_ne!(one.root, other.root);
+    assert_eq!(mine.blind.len(), 64);
+
+    // Those bytes are new with every answer and never leave the enclave: they
+    // are not on the chain, nor in the agent's envelope, which holds the rest.
+    let agent = view_key(6);
+    let reply = one.call(AGENT, json!({ "cmd": "register_view_key", "pubkey": seal::public_b64(&agent) }), None);
+    let now = books(&one);
+    assert_ne!(now.blind, mine.blind);
+    assert!(!one.public.contains(&mine.blind) && !one.public.contains(&now.blind));
+    assert!(!open(&reply, AGENT, &agent).to_string().contains(&now.blind));
 }
 
 #[test]

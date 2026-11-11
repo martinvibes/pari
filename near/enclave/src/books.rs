@@ -109,6 +109,10 @@ pub struct Books {
     pub dq: BTreeSet<String>,
     /// Each party's X25519 public key (base64) for its sealed view.
     pub view_keys: BTreeMap<String, String>,
+    /// 32 random bytes in hex, which the enclave draws again with every
+    /// answer. They are in the fingerprint and in no view, so nobody can
+    /// confirm a guess at the books by hashing the guess.
+    pub blind: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -200,6 +204,7 @@ impl Books {
             trades: Vec::new(),
             dq: BTreeSet::new(),
             view_keys: BTreeMap::new(),
+            blind: String::new(),
         })
     }
 

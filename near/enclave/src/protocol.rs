@@ -88,7 +88,8 @@ pub fn handle(stored: &Stored, input: Input, enclave: &SecretKey) -> Reply {
         Err(reason) => return Reply::refused(reason, root),
     };
     match step(books, &input.caller, command) {
-        Ok((next, outcome)) => {
+        Ok((mut next, outcome)) => {
+            next.blind = proofs::random_hex();
             let output = answer(&input.deal, &next, outcome.public, json!(outcome.payouts));
             let save = Stored { received: books.cloned(), offered: Some(Offer { turn: input.turn, books: next }) };
             Reply { save: Some(save), output }
@@ -121,7 +122,7 @@ fn answer(deal: &str, books: &Books, public: Value, payouts: Value) -> Value {
     let mut commitments = Map::new();
     for (party, mut view) in views::all(books) {
         let Some(key) = books.view_keys.get(&party).and_then(|key| seal::public_key(key).ok()) else { continue };
-        let seed = proofs::new_seed();
+        let seed = proofs::random_hex();
         let commitment = proofs::commitment(&proofs::hashes(deal, &view, &seed));
         view[proofs::SEED_FIELD] = Value::String(seed);
         let Ok(sealed) = seal::seal(&key, view.to_string().as_bytes()) else { continue };

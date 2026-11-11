@@ -47,11 +47,12 @@ pub fn facts(deal: &str, view: &Value) -> Vec<Fact> {
     facts
 }
 
-/// A fresh random seed, in hex. The enclave draws one for every envelope.
-pub fn new_seed() -> String {
-    let mut seed = [0u8; 32];
-    getrandom::fill(&mut seed).expect("host randomness unavailable");
-    hex(&seed)
+/// 32 fresh random bytes, in hex. With every answer the enclave draws them
+/// once for each envelope's seed and once for the fingerprint's blind.
+pub fn random_hex() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).expect("host randomness unavailable");
+    hex(&bytes)
 }
 
 /// One fact's salt: HMAC-SHA256 of its item, keyed by the seed's text. Showing
