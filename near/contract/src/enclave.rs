@@ -100,9 +100,10 @@ impl Ledger {
         self.root = reply["root"].as_str().map(String::from);
         self.seq = reply["seq"].as_u64().unwrap_or(self.seq);
         if let Some(envelopes) = reply["envelopes"].as_object() {
-            for (party, sealed) in envelopes {
-                if let (Ok(party), Some(sealed)) = (party.parse::<AccountId>(), sealed.as_str()) {
-                    self.envelopes.insert(party.clone(), Envelope { seq: self.seq, sealed: sealed.to_string() });
+            for (name, sealed) in envelopes {
+                if let (Ok(party), Some(sealed)) = (name.parse::<AccountId>(), sealed.as_str()) {
+                    let commitment = reply["commitments"][name].as_str().unwrap_or_default().to_string();
+                    self.envelopes.insert(party.clone(), Envelope { seq: self.seq, sealed: sealed.to_string(), commitment });
                     self.parties.insert(party);
                 }
             }

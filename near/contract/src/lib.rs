@@ -72,6 +72,9 @@ pub struct PublicRequest {
 pub struct Envelope {
     pub seq: u64,
     pub sealed: String,
+    /// The enclave's fingerprint of every fact in the view. With it the party
+    /// can prove one fact to an outsider and show nothing else.
+    pub commitment: String,
 }
 
 /// One line of the deal's public record: who did what, and what the chain
@@ -397,7 +400,8 @@ impl Ledger {
         self.history.iter().skip(from_index.unwrap_or(0) as usize).take(limit.unwrap_or(100) as usize).collect()
     }
 
-    /// A party's latest envelope. Anyone can read it; only the party can open it.
+    /// A party's latest envelope and its commitment. Anyone can read them;
+    /// only the party can open the envelope.
     pub fn envelope(&self, account_id: AccountId) -> Option<&Envelope> {
         self.envelopes.get(&account_id)
     }

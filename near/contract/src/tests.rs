@@ -54,6 +54,7 @@ fn applied(seq: u64, public: Value, payouts: Value) -> Result<Option<Value>, Pro
         "public": public,
         "payouts": payouts,
         "envelopes": { ALDER: format!("sealed-{seq}") },
+        "commitments": { ALDER: format!("commitment-{seq}") },
     })))
 }
 
@@ -223,7 +224,8 @@ fn test_the_callback_applies_the_root_and_the_envelopes() {
     let state = ledger.state();
     assert_eq!((state["root"].as_str(), state["seq"].as_u64()), (Some("root-1"), Some(1)));
     assert_eq!(state["requests"]["1"], json!({ "total": TOTAL.to_string(), "funded": "0", "credited": "0", "settled": false }));
-    assert_eq!(ledger.envelope(account(ALDER)).map(|e| (e.seq, e.sealed.as_str())), Some((1, "sealed-1")));
+    let envelope = ledger.envelope(account(ALDER)).expect("an envelope for Alder");
+    assert_eq!((envelope.seq, envelope.sealed.as_str(), envelope.commitment.as_str()), (1, "sealed-1", "commitment-1"));
     assert!(ledger.envelope(account(RIVAL)).is_none());
 
     // The next command carries the fingerprint, so the enclave can refuse a stale one.
