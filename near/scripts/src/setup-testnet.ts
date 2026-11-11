@@ -119,6 +119,23 @@ async function ensureDeal(previous: PublicState | null, hash: string, fresh: boo
   return state();
 }
 
+/**
+ * Removes what ended deals left in the contract's storage. A node refuses to
+ * serve a contract's storage once it is large, and the leak test reads all of it.
+ */
+async function sweepEndedDeals(dealId: string): Promise<void> {
+  const { values } = await provider.viewContractState({ contractId: LEDGER, prefix: "" });
+  const stale = values
+    .map((entry) => entry.key)
+    .filter((key) => {
+      const text = Buffer.from(key, "base64").toString("latin1");
+      return text !== "STATE" && !text.startsWith(`${dealId}/`);
+    });
+  if (stale.length === 0) return done("no storage left by ended deals");
+  for (let i = 0; i < stale.length; i += 100) await call(LEDGER, LEDGER, "sweep", { keys: stale.slice(i, i + 100) });
+  done(`swept ${stale.length} storage keys left by ended deals`);
+}
+
 async function expectOk(what: string, sent: Promise<{ url: string; result: { ok: boolean; refused?: string } }>): Promise<void> {
   const { url, result } = await sent;
   if (!result?.ok) throw new Error(`${what} was refused: ${result?.refused ?? "no answer"} (${url})`);
@@ -146,6 +163,7 @@ step("Rules contract");
 const previous = await state().catch(() => null);
 await ensureCode(LEDGER, build("ledger"));
 let deal = await ensureDeal(previous, hash, fresh);
+await sweepEndedDeals(deal.deal_id);
 
 if (!deal.enclave_key) {
   await expectOk("enclave key published", act(ROOT, "fetch_enclave_key"));

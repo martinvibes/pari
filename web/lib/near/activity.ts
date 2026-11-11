@@ -29,11 +29,14 @@ export function transactionsOf(dealId: string): Record<string, string> {
   return { ...scriptTransactions(dealId), ...load()[dealId] };
 }
 
-/** The transactions `near/scripts` sent when it set the deal up: every one
- *  after the first (`new`) wrote one line of the record, in order. */
+/** Steps that start a deal or tidy storage, and write no line of the record. */
+const UNRECORDED = new Set(["new", "sweep"]);
+
+/** The transactions `near/scripts` sent when it set the deal up: each of the
+ *  others wrote one line of the record, in order. */
 function scriptTransactions(dealId: string): Record<string, string> {
   const file = join(process.cwd(), "..", "near", "runs", `${dealId}.json`);
   if (!existsSync(file)) return {};
   const run = JSON.parse(readFileSync(file, "utf8")) as { transactions: Array<{ step: string; hash: string }> };
-  return Object.fromEntries(run.transactions.filter((t) => t.step !== "new").map((t, index) => [index, t.hash]));
+  return Object.fromEntries(run.transactions.filter((t) => !UNRECORDED.has(t.step)).map((t, index) => [index, t.hash]));
 }
