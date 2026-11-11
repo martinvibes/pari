@@ -50,12 +50,9 @@ function audit(view: DealView, chain: PublicState): Finding[] {
     const paid = sum(Object.values(request.paid));
     const total = cents(request.total);
     const legs = Object.entries(request.legs);
-    // A short payment pays every lender the same fraction, to the cent; spare cents go to the largest holder.
-    const proRata = legs.every(([lender, due]) => {
-      const share = (cents(due) * paid) / total;
-      const got = cents(request.paid[lender]);
-      return got >= share && got <= share + BigInt(legs.length) && got <= cents(due);
-    });
+    // A short payment pays every lender the same fraction of what it is owed, rounded down to the cent.
+    const funded = cents(request.funded);
+    const proRata = legs.every(([lender, due]) => cents(request.paid[lender]) === (cents(due) * funded) / total);
     findings.push({
       claim: `Interest to ${formatDate(request.period_end)}: the lenders' payments add up to the one total on the chain`,
       detail: `${plural(legs.length, "lender")} paid ${formatCents(paid)} of ${formatCents(total)} requested. The chain shows ${showCents(onChain?.credited)} credited from ${showCents(onChain?.funded)} paid in.`,
