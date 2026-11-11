@@ -1,6 +1,6 @@
 //! What the rules contract sends the enclave and what it gets back.
 //!
-//! In:  `{ caller, prev_root, command, sealed }`. `command` is public;
+//! In:  `{ deal, caller, prev_root, command, sealed }`. `command` is public;
 //!      `sealed` is a box only the enclave can open, holding the command's
 //!      secret fields (a trade's price, the DQ list, the opening positions).
 //! Out: `{ ok: true, root, seq, public, payouts, envelopes }`, or
@@ -16,6 +16,8 @@ use serde_json::{json, Map, Value};
 
 #[derive(Deserialize)]
 pub struct Input {
+    /// Names the books in the enclave's storage. Fixed by the rules contract.
+    pub deal: String,
     /// The account the rules contract vouches for.
     pub caller: String,
     /// The fingerprint the contract holds. The books must match it.

@@ -34,7 +34,7 @@ fn as_caller(caller: &str) {
 }
 
 fn ledger() -> Ledger {
-    as_caller(OWNER);
+    as_caller(LEDGER);
     let terms = Terms {
         facility_id: "NORTHWIND-TLB-2026".into(),
         name: "Northwind Logistics Term Loan B".into(),
@@ -42,7 +42,7 @@ fn ledger() -> Ledger {
         closing: "2026-09-15".into(),
         maturity: "2031-09-15".into(),
     };
-    Ledger::new(account(OUTLAYER), "paridesk.testnet/pari-core".into(), Some("abc123".into()), account(USDC), terms, account(AGENT), account(BORROWER))
+    Ledger::new(account(OWNER), "deal-1".into(), account(OUTLAYER), "paridesk.testnet/pari-core".into(), Some("abc123".into()), account(USDC), terms, account(AGENT), account(BORROWER))
 }
 
 /// An answer the enclave gives when a command is applied.
@@ -144,7 +144,7 @@ fn test_the_contract_vouches_for_the_caller_and_pins_the_enclave_build() {
     let args: Value = near_sdk::serde_json::from_str(&args).unwrap();
     assert_eq!(args["source"]["Project"], json!({ "project_id": "paridesk.testnet/pari-core", "version_key": "abc123" }));
     let input: Value = near_sdk::serde_json::from_str(args["input_data"].as_str().unwrap()).unwrap();
-    assert_eq!(input, json!({ "caller": ALDER, "prev_root": null, "command": { "cmd": "offer_trade" }, "sealed": "c2VhbGVk" }));
+    assert_eq!(input, json!({ "deal": "deal-1", "caller": ALDER, "prev_root": null, "command": { "cmd": "offer_trade" }, "sealed": "c2VhbGVk" }));
 }
 
 // ----- the lock -----

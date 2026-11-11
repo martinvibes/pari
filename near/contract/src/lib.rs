@@ -22,7 +22,7 @@ mod tests;
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::{json, Value};
 use near_sdk::store::LookupMap;
-use near_sdk::{env, ext_contract, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseError, PromiseOrValue};
+use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError, PromiseOrValue};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The books keep cents; test USDC has 6 decimals.
@@ -39,14 +39,6 @@ const GAS_PAYOUT_CALLBACK: Gas = Gas::from_tgas(8);
 #[allow(dead_code)]
 trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
-}
-
-#[near(serializers = [borsh])]
-#[derive(BorshStorageKey)]
-enum Prefix {
-    Envelopes,
-    ViewKeys,
-    Owed,
 }
 
 /// The public terms of the facility.
@@ -109,6 +101,8 @@ pub enum Action {
 pub struct Ledger {
     /// Sets the deal up. Cannot move money or act for any party.
     owner: AccountId,
+    /// Names this deal's books inside the enclave.
+    deal_id: String,
     outlayer: AccountId,
     /// The enclave program, `owner/name` on OutLayer.
     project_id: String,
@@ -140,8 +134,13 @@ pub struct Ledger {
 
 #[near]
 impl Ledger {
-    #[init]
+    /// Starts a deal. Only the contract's own key can call this, and that key
+    /// could redeploy the contract anyway. A new `deal_id` starts fresh books.
+    #[init(ignore_state)]
+    #[private]
     pub fn new(
+        owner: AccountId,
+        deal_id: String,
         outlayer: AccountId,
         project_id: String,
         version_key: Option<String>,
@@ -151,7 +150,11 @@ impl Ledger {
         borrower: AccountId,
     ) -> Self {
         Self {
-            owner: env::predecessor_account_id(),
+            envelopes: LookupMap::new(format!("{deal_id}/envelopes").into_bytes()),
+            view_keys: LookupMap::new(format!("{deal_id}/view_keys").into_bytes()),
+            owed: LookupMap::new(format!("{deal_id}/owed").into_bytes()),
+            owner,
+            deal_id,
             outlayer,
             project_id,
             version_key,
@@ -167,9 +170,6 @@ impl Ledger {
             requests: BTreeMap::new(),
             held: 0,
             parties: BTreeSet::new(),
-            envelopes: LookupMap::new(Prefix::Envelopes),
-            view_keys: LookupMap::new(Prefix::ViewKeys),
-            owed: LookupMap::new(Prefix::Owed),
         }
     }
 
@@ -339,6 +339,8 @@ impl Ledger {
     /// Everything the public chain knows about the deal.
     pub fn state(&self) -> Value {
         json!({
+            "deal_id": self.deal_id,
+            "owner": self.owner,
             "terms": self.terms,
             "agent": self.agent,
             "borrower": self.borrower,

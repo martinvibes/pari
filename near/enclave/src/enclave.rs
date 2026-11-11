@@ -21,7 +21,6 @@ static OUTLAYER_MANIFEST: [u8; include_bytes!("../manifest.json").len()] = *incl
 const LEDGER: &str = env!("PARI_LEDGER");
 
 const KEY_PATH: &str = "enclave";
-const BOOKS_KEY: &str = "books";
 const BOOKS_AAD: &[u8] = b"pari:books:v1";
 const X25519_LABEL: &[u8] = b"pari:enclave-x25519:v1";
 
@@ -41,26 +40,30 @@ fn answer() -> Result<Value, String> {
         return Err(format!("only {LEDGER} may run the books"));
     }
     let input: Input = env::input_json().map_err(|e| format!("bad input: {e}"))?.ok_or("no input")?;
-    let books = load()?;
+    if input.deal.is_empty() || input.deal.len() > 64 || !input.deal.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        return Err("a deal id is up to 64 letters, digits and dashes".into());
+    }
+    let key = format!("books:{}", input.deal);
+    let books = load(&key)?;
     let reply = handle(books.as_ref(), input, &enclave_key()?);
     if let Some(next) = &reply.save {
-        save(next)?;
+        save(&key, next)?;
     }
     Ok(reply.output)
 }
 
-fn load() -> Result<Option<Books>, String> {
-    let Some(sealed) = storage::get_worker(BOOKS_KEY).map_err(|e| e.to_string())? else {
+fn load(key: &str) -> Result<Option<Books>, String> {
+    let Some(sealed) = storage::get_worker(key).map_err(|e| e.to_string())? else {
         return Ok(None);
     };
     let bytes = encryption_keys::decrypt(KEY_PATH, None, &sealed, BOOKS_AAD).map_err(|e| e.to_string())?;
     serde_json::from_slice(&bytes).map(Some).map_err(|e| format!("stored books: {e}"))
 }
 
-fn save(books: &Books) -> Result<(), String> {
+fn save(key: &str, books: &Books) -> Result<(), String> {
     let bytes = serde_json::to_vec(books).map_err(|e| e.to_string())?;
     let sealed = encryption_keys::encrypt(KEY_PATH, None, &bytes, BOOKS_AAD).map_err(|e| e.to_string())?;
-    storage::set_worker(BOOKS_KEY, &sealed).map_err(|e| e.to_string())
+    storage::set_worker(key, &sealed).map_err(|e| e.to_string())
 }
 
 /// X25519 secret = sha256(MAC under the keystore's key). The module sees only

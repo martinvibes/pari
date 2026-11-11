@@ -31,7 +31,7 @@ impl Enclave {
     fn call(&mut self, caller: &str, command: Value, secret: Option<Value>) -> Value {
         let enclave_key = seal::public_key(&seal::public_b64(&self.key)).unwrap();
         let sealed = secret.map(|s| seal::seal(&enclave_key, s.to_string().as_bytes()).unwrap());
-        let input = json!({ "caller": caller, "prev_root": self.root(), "command": command, "sealed": sealed });
+        let input = json!({ "deal": "test-deal", "caller": caller, "prev_root": self.root(), "command": command, "sealed": sealed });
         self.public.push_str(&input.to_string());
         let reply = handle(self.books.as_ref(), serde_json::from_value::<Input>(input).unwrap(), &self.key);
         if let Some(next) = reply.save {
@@ -111,7 +111,7 @@ fn test_the_wrong_total_is_refused_and_the_books_do_not_move() {
 #[test]
 fn test_a_stale_root_is_refused_and_sync_reports_the_current_one() {
     let (mut enclave, _, _) = open_deal();
-    let stale = json!({ "caller": AGENT, "prev_root": "00", "command": { "cmd": "request_interest", "expected_total": "197166666" }, "sealed": null });
+    let stale = json!({ "deal": "test-deal", "caller": AGENT, "prev_root": "00", "command": { "cmd": "request_interest", "expected_total": "197166666" }, "sealed": null });
     let reply = handle(enclave.books.as_ref(), serde_json::from_value(stale).unwrap(), &enclave.key);
     assert_eq!(reply.output["ok"], false);
     assert!(reply.save.is_none());
