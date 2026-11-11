@@ -20,17 +20,21 @@ export const EXPLORER_URL = process.env.NEAR_EXPLORER_URL ?? "https://testnet.ne
 // public RPC answers 429 when it is rate limited. near-api-js retries neither.
 // Sending the same request again is safe: a read changes nothing, and a signed
 // transaction has one hash however often it is sent.
+// A free RPC can stay rate limited for minutes after a long run of reads, so
+// the waits grow to a minute each and add up to about four minutes.
+const ATTEMPTS = 9;
+const waitSeconds = (attempt: number) => Math.min(2 ** attempt, 60);
 const plainFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   for (let attempt = 1; ; attempt += 1) {
     try {
       const response = await plainFetch(input, init);
-      if (response.status !== 429 || attempt === 6) return response;
-      console.warn(`  (the RPC is rate limiting; trying again in ${2 ** attempt} s)`);
+      if (response.status !== 429 || attempt === ATTEMPTS) return response;
+      console.warn(`  (the RPC is rate limiting; trying again in ${waitSeconds(attempt)} s)`);
     } catch (error) {
-      if (attempt === 6 || !(error instanceof TypeError)) throw error;
+      if (attempt === ATTEMPTS || !(error instanceof TypeError)) throw error;
     }
-    await new Promise((resolve) => setTimeout(resolve, 2 ** attempt * 1000));
+    await new Promise((resolve) => setTimeout(resolve, waitSeconds(attempt) * 1000));
   }
 };
 
