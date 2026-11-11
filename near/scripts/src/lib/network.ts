@@ -11,9 +11,14 @@ import { Account, JsonRpcProvider, type KeyPairString } from "near-api-js";
 export const NETWORK = "testnet";
 // Public testnet RPC (docs.near.org/api/rpc/providers); OutLayer uses the same.
 export const RPC_URL = process.env.NEAR_RPC_URL ?? "https://rpc.testnet.fastnear.com";
+// Ordinary nodes drop a transaction after a few days and an archival node keeps
+// it: checked on 2026-11-11 with an eight-day-old testnet transaction.
+export const ARCHIVAL_RPC_URL = process.env.NEAR_ARCHIVAL_RPC_URL ?? "https://archival-rpc.testnet.fastnear.com";
 export const EXPLORER_URL = process.env.NEAR_EXPLORER_URL ?? "https://testnet.nearblocks.io";
 
 export const provider = new JsonRpcProvider({ url: RPC_URL });
+/** Reads transactions of any age. */
+export const archive = new JsonRpcProvider({ url: ARCHIVAL_RPC_URL });
 
 export function txUrl(hash: string): string {
   return `${EXPLORER_URL}/txns/${hash}`;

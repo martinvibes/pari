@@ -23,7 +23,7 @@ import {
   WITHDRAWAL,
 } from "./lib/deal.js";
 import { openEnvelope, state, view } from "./lib/ledger.js";
-import { provider, txUrl } from "./lib/network.js";
+import { archive, provider, txUrl } from "./lib/network.js";
 import { readRun, RUNS_DIR, type RunEntry } from "./lib/runlog.js";
 import { haveViewKeys, viewKeyFor } from "./lib/viewkeys.js";
 
@@ -46,7 +46,7 @@ const FEE_FIELDS = new Set(["gas", "gas_price", "gas_burnt", "tokens_burnt"]);
 let feeFieldsSkipped = 0;
 
 async function transactionText(entry: RunEntry): Promise<string> {
-  const tx = await provider.viewTransactionStatusWithReceipts({ txHash: entry.hash, accountId: entry.signer, waitUntil: "FINAL" });
+  const tx = await archive.viewTransactionStatusWithReceipts({ txHash: entry.hash, accountId: entry.signer, waitUntil: "FINAL" });
   const withoutFees = JSON.stringify(tx, (key, value) => {
     if (!FEE_FIELDS.has(key)) return value;
     feeFieldsSkipped += 1;
