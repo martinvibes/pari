@@ -21,7 +21,7 @@ mod tests;
 
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::{json, Value};
-use near_sdk::store::LookupMap;
+use near_sdk::store::{LookupMap, Vector};
 use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError, PromiseOrValue};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -74,6 +74,22 @@ pub struct Envelope {
     pub sealed: String,
 }
 
+/// One line of the deal's public record: who did what, and what the chain
+/// learned from it.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Record {
+    /// The books' sequence number after the action. A refusal leaves it unchanged.
+    pub seq: u64,
+    /// Block time, in milliseconds.
+    pub at_ms: u64,
+    pub action: String,
+    pub caller: AccountId,
+    pub ok: bool,
+    /// What the action made public, as JSON, or why it was refused.
+    pub detail: String,
+}
+
 /// What a callback needs to remember about the action it finishes.
 #[near(serializers = [json])]
 #[derive(Clone, Debug, PartialEq)]
@@ -86,7 +102,7 @@ pub enum Action {
     FixRate,
     RequestInterest,
     /// `amount` is in USDC base units.
-    Deposit { amount: U128, request_id: Option<u64> },
+    Deposit { payer: AccountId, amount: U128, request_id: Option<u64> },
     Settle { request_id: u64 },
     SetDq,
     OfferTrade,
@@ -130,6 +146,8 @@ pub struct Ledger {
     view_keys: LookupMap<AccountId, String>,
     /// Payouts whose transfer failed, waiting for `claim`.
     owed: LookupMap<AccountId, u128>,
+    /// Every action and refusal, in order. Public facts only.
+    history: Vector<Record>,
 }
 
 #[near]
@@ -153,6 +171,7 @@ impl Ledger {
             envelopes: LookupMap::new(format!("{deal_id}/envelopes").into_bytes()),
             view_keys: LookupMap::new(format!("{deal_id}/view_keys").into_bytes()),
             owed: LookupMap::new(format!("{deal_id}/owed").into_bytes()),
+            history: Vector::new(format!("{deal_id}/history").into_bytes()),
             owner,
             deal_id,
             outlayer,
@@ -300,7 +319,7 @@ impl Ledger {
         let cents = amount.0 / UNITS_PER_CENT;
         require!(cents > 0, "less than one cent");
         let command = json!({ "cmd": "deposit", "party": sender_id, "amount": cents.to_string(), "purpose": purpose });
-        let action = Action::Deposit { amount, request_id };
+        let action = Action::Deposit { payer: sender_id, amount, request_id };
         let finish = Self::ext(env::current_account_id()).with_static_gas(GAS_CALLBACK).on_deposit_result(action.clone());
         self.call_enclave(&action, env::current_account_id(), command, None).then(finish).into()
     }
@@ -356,7 +375,13 @@ impl Ledger {
             "held": U128(self.held),
             "requests": self.requests,
             "parties": self.parties,
+            "history_len": self.history.len(),
         })
+    }
+
+    /// The deal's public record, oldest first.
+    pub fn history(&self, from_index: Option<u32>, limit: Option<u32>) -> Vec<&Record> {
+        self.history.iter().skip(from_index.unwrap_or(0) as usize).take(limit.unwrap_or(100) as usize).collect()
     }
 
     /// A party's latest envelope. Anyone can read it; only the party can open it.

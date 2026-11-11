@@ -1,7 +1,7 @@
 //! Talking to the enclave: sending a command to OutLayer and applying its
 //! answer, with the contract's own money checks.
 
-use crate::{events, ext_contract, Action, Envelope, Ledger, PublicRequest, EXECUTION_DEPOSIT, GAS_CALLBACK, GAS_OWN, UNITS_PER_CENT};
+use crate::{events, ext_contract, Action, Envelope, Ledger, PublicRequest, Record, EXECUTION_DEPOSIT, GAS_CALLBACK, GAS_OWN, UNITS_PER_CENT};
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::{json, Value};
 use near_sdk::{env, require, AccountId, Promise};
@@ -78,15 +78,22 @@ impl Ledger {
     pub(crate) fn finish(&mut self, action: &Action, caller: &AccountId, reply: Option<Value>) -> Value {
         self.in_flight = None;
         let name = action.name();
+        // A deposit reaches the enclave on the contract's word; the public record names the payer.
+        let caller = match action {
+            Action::Deposit { payer, .. } => payer,
+            _ => caller,
+        };
         let reply = reply.unwrap_or_else(|| json!({ "ok": false, "error": "the enclave did not answer; nothing changed" }));
         if reply["ok"] != true {
             let reason = reply["refused"].as_str().or(reply["error"].as_str()).unwrap_or("refused").to_string();
+            self.record(name, caller, false, reason.clone());
             events::emit("refused", json!({ "action": name, "caller": caller, "reason": reason }));
             return json!({ "ok": false, "refused": reason });
         }
         let public = reply["public"].clone();
         if *action == Action::EnclaveKey {
             self.enclave_key = public["pubkey"].as_str().map(String::from);
+            self.record(name, caller, true, public.to_string());
             return json!({ "ok": true, "public": public });
         }
 
@@ -104,8 +111,13 @@ impl Ledger {
             events::emit("frozen", json!({ "action": name, "reason": reason }));
             self.frozen = Some(reason);
         }
+        self.record(name, caller, true, public.to_string());
         events::emit("action", json!({ "action": name, "caller": caller, "seq": self.seq, "root": self.root, "public": public }));
         json!({ "ok": true, "seq": self.seq, "root": self.root, "public": public })
+    }
+
+    fn record(&mut self, action: &str, caller: &AccountId, ok: bool, detail: String) {
+        self.history.push(Record { seq: self.seq, at_ms: env::block_timestamp_ms(), action: action.into(), caller: caller.clone(), ok, detail });
     }
 
     /// The contract's own money rules, checked against what it has seen itself.
@@ -125,7 +137,7 @@ impl Ledger {
                 };
                 self.requests.insert(id, PublicRequest { total: U128(total), ..Default::default() });
             }
-            Action::Deposit { amount, request_id } => {
+            Action::Deposit { amount, request_id, .. } => {
                 let paid_in = amount.0 / UNITS_PER_CENT;
                 let (Some(funded), Some(cash)) = (cents(&public["funded"]), cents(&public["cash"])) else {
                     return Err("the deposit came back without amounts".into());

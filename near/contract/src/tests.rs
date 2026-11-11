@@ -72,7 +72,7 @@ fn borrower_pays(ledger: &mut Ledger, seq: u64, cents: u128) -> U128 {
     as_caller(USDC);
     let amount = U128(cents * UNITS_PER_CENT);
     let _ = ledger.ft_on_transfer(account(BORROWER), amount, r#"{"kind":"pay","request_id":1}"#.into());
-    let action = Action::Deposit { amount, request_id: Some(1) };
+    let action = Action::Deposit { payer: account(BORROWER), amount, request_id: Some(1) };
     as_caller(LEDGER);
     ledger.on_deposit_result(action, applied(seq, json!({ "funded": cents.to_string(), "cash": "0" }), json!([])))
 }
@@ -206,6 +206,33 @@ fn test_the_callback_applies_the_root_and_the_envelopes() {
     ledger.settle(1).detach();
     let (_, args) = calls().into_iter().find(|(m, _)| m == "request_execution").unwrap();
     assert!(args.contains(r#"\"prev_root\":\"root-1\""#));
+}
+
+#[test]
+fn test_the_public_record_lists_every_action_and_refusal() {
+    let mut ledger = ledger();
+    as_caller(AGENT);
+    ledger.request_interest(U128(90_000_000_000)).detach();
+    let refusal = "You entered 900,000,000.00; the register says 1,971,666.66.";
+    as_caller(LEDGER);
+    ledger.on_result(Action::RequestInterest, account(AGENT), Ok(Some(json!({ "ok": false, "refused": refusal, "root": null }))));
+    as_caller(AGENT);
+    ledger.request_interest(U128(TOTAL)).detach();
+    as_caller(LEDGER);
+    ledger.on_result(Action::RequestInterest, account(AGENT), applied(1, json!({ "request_id": 1, "total": TOTAL.to_string() }), json!([])));
+    borrower_pays(&mut ledger, 2, TOTAL);
+
+    let lines: Vec<_> = ledger.history(None, None).into_iter().map(|r| (r.seq, r.action.as_str(), r.caller.as_str(), r.ok, r.detail.as_str())).collect();
+    assert_eq!(
+        lines,
+        [
+            (0, "request_interest", AGENT, false, refusal),
+            (1, "request_interest", AGENT, true, r#"{"request_id":1,"total":"197166666"}"#),
+            (2, "deposit", BORROWER, true, r#"{"funded":"197166666","cash":"0"}"#),
+        ]
+    );
+    assert_eq!(ledger.state()["history_len"], 3);
+    assert_eq!(ledger.history(Some(2), Some(5)).len(), 1);
 }
 
 #[test]
@@ -363,7 +390,7 @@ fn test_a_deposit_keeps_whole_cents_and_a_failed_one_is_returned_in_full() {
     // 12.345678 USDC: 1,234 cents are kept, 5,678 base units go back.
     let amount = U128(12_345_678);
     let _ = ledger.ft_on_transfer(account(RIVAL), amount, r#"{"kind":"cash"}"#.into());
-    let action = Action::Deposit { amount, request_id: None };
+    let action = Action::Deposit { payer: account(RIVAL), amount, request_id: None };
     as_caller(LEDGER);
     let unused = ledger.on_deposit_result(action.clone(), applied(2, json!({ "funded": "0", "cash": "1234" }), json!([])));
     assert_eq!(unused, U128(5_678));
@@ -384,7 +411,7 @@ fn test_the_books_must_record_exactly_what_was_paid_in() {
     as_caller(USDC);
     let amount = U128(1_000 * UNITS_PER_CENT);
     let _ = ledger.ft_on_transfer(account(BORROWER), amount, r#"{"kind":"pay","request_id":1}"#.into());
-    let action = Action::Deposit { amount, request_id: Some(1) };
+    let action = Action::Deposit { payer: account(BORROWER), amount, request_id: Some(1) };
     as_caller(LEDGER);
     ledger.on_deposit_result(action, applied(2, json!({ "funded": "900000", "cash": "0" }), json!([])));
     assert_eq!(ledger.state()["frozen"], "the books recorded a different amount than was paid in");
