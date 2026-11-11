@@ -11,6 +11,12 @@
 //    lenders, and Alder withdraws part of its interest as USDC.
 // 2. Second period: Rival (on the borrower's DQ list) tries to buy and is not
 //    settled; Delta buys 10m from Alder at a sealed price, cash against loan.
+// 3. A short payment: the borrower pays half of the second period's interest,
+//    every lender gets half of what it is owed, and the rest is paid in full
+//    with the third period's.
+// 4. A proof: Alder cuts one fact from its envelope, what it holds of the
+//    loan, and anyone checks it against the chain with no keys. The proof is
+//    left in near/proofs for `npm run verify:proof`.
 
 import { isDeepStrictEqual } from "node:util";
 import {
@@ -25,14 +31,22 @@ import {
   MISTYPED_TOTAL as MISTYPED,
   money,
   OPERATORS,
+  SECOND_PERIOD_DUE,
   SECOND_PERIOD_END,
+  SECOND_PERIOD_TOTAL,
+  SHORT_PAYMENT,
+  THIRD_PERIOD_DUE,
+  THIRD_PERIOD_END,
+  THIRD_PERIOD_TOTAL,
   TRADE,
   UNITS_PER_CENT,
   USDC,
   WITHDRAWAL,
   type Persona,
 } from "./lib/deal.js";
-import { act, approve, openEnvelope, payIn, propose, sealForEnclave, state, view, type Outcome, type Sent } from "./lib/ledger.js";
+import { act, approve, checkProof, openEnvelope, payIn, propose, proveFact, sealForEnclave, state, view, type Outcome, type Sent } from "./lib/ledger.js";
+import { factHash, type Proof } from "./lib/proofs.js";
+import { saveProof } from "./lib/runlog.js";
 import { viewKeyFor } from "./lib/viewkeys.js";
 
 const [borrower, alder, birch, cedar, delta, rival, auditor] = (
@@ -45,7 +59,7 @@ const agent = deal.agent;
 interface View {
   cash: string;
   position?: { principal: string; carried: string } | null;
-  payments?: { due: string; paid: string | null }[];
+  payments?: { due: string; paid: string | null; status: string }[];
   trades?: { id: number; buyer: string; status: string; price_ppm?: number; screening?: string | null }[];
   requests?: { legs: Record<string, string>; paid: Record<string, string> }[];
   register?: Record<string, { principal: string }>;
@@ -83,6 +97,8 @@ async function settleInTwoApprovals(requestId: number): Promise<Sent<Outcome>> {
   check((await seen(alder)).cash === "0", "and no lender has been paid");
   const second = await approve(OPERATORS[1]!, proposed.result);
   if (!second.result) throw new Error(`the DAO's settlement did not reach the ledger (${second.url})`);
+  // The enclave gave no answer in time and nothing changed: the DAO proposes it again.
+  if (second.unanswered) return act(agent, "settle", { request_id: requestId });
   return { ...second, result: second.result };
 }
 
@@ -170,6 +186,61 @@ for (const party of [borrower, auditor]) {
   check(theirs.includes(delta) && !theirs.includes("price_ppm"), `${party} sees the trade but not the price`);
 }
 check(!JSON.stringify(await seen(auditor)).includes("dq_list"), "the auditor does not see the DQ list");
+
+console.log("\nA short payment: the borrower pays half, and the rest rolls into the next period");
+
+const second = await ok(`agent requests ${money(SECOND_PERIOD_TOTAL)} for the second period`, act(agent, "request_interest", { expected_total: SECOND_PERIOD_TOTAL.toString() }));
+const secondId = Number(second.public?.request_id);
+const short = await payIn(borrower, SHORT_PAYMENT, { kind: "pay", request_id: secondId });
+console.log(`  borrower pays half of it, ${money(SHORT_PAYMENT)}\n    ${short.url}`);
+const shared = await ok("agent settles the short payment", act(agent, "settle", { request_id: secondId }));
+check(shared.public?.credited === SHORT_PAYMENT.toString(), `the chain shows ${money(SHORT_PAYMENT)} credited, and no lender's share`);
+for (const [lender, due] of Object.entries(SECOND_PERIOD_DUE)) {
+  const mine = await seen(lender);
+  const half = (due / 2n).toString();
+  const payment = mine.payments?.at(-1);
+  check(payment?.due === due.toString() && payment.paid === half, `${lender} is paid half of its ${money(due)}`);
+  check(mine.position?.carried === half, "and is still owed the other half");
+}
+
+await ok("agent fixes the rate for the third period", act(agent, "fix_rate", { base_rate_bps: BASE_RATE_BPS, period_end: THIRD_PERIOD_END }));
+const third = await ok(`agent requests ${money(THIRD_PERIOD_TOTAL)}: the period's interest plus the unpaid half`, act(agent, "request_interest", { expected_total: THIRD_PERIOD_TOTAL.toString() }));
+const thirdId = Number(third.public?.request_id);
+const full = await payIn(borrower, THIRD_PERIOD_TOTAL, { kind: "pay", request_id: thirdId });
+console.log(`  borrower pays all of it\n    ${full.url}`);
+const caughtUp = await ok("agent settles", act(agent, "settle", { request_id: thirdId }));
+check(caughtUp.public?.credited === THIRD_PERIOD_TOTAL.toString(), `the chain shows ${money(THIRD_PERIOD_TOTAL)} credited`);
+for (const [lender, due] of Object.entries(THIRD_PERIOD_DUE)) {
+  const mine = await seen(lender);
+  const payment = mine.payments?.at(-1);
+  check(payment?.due === due.toString() && payment.paid === due.toString(), `${lender} is paid ${money(due)} in full`);
+  check(mine.position?.carried === "0", "and is owed nothing more");
+}
+
+console.log("\nA proof: Alder shows an outsider one fact from its envelope, and nothing else");
+
+/** What a proof's fact says, once the chain has confirmed it; `null` when the check fails. */
+async function proven(proof: Proof): Promise<Record<string, unknown> | null> {
+  const verdict = await checkProof(proof);
+  return verdict.holds ? (verdict.fact.value as Record<string, unknown>) : null;
+}
+
+const alderKey = await viewKeyFor(alder);
+const holding = await proveFact(alder, alderKey, "position");
+check((await proven(holding))?.principal === "4000000000", "anyone can check against the chain, with no keys, that Alder holds 40,000,000.00 of the loan");
+const others = [DUE[alder]!.toString(), (await seen(alder)).cash, TRADE.price_ppm.toString(), delta];
+check(!others.some((secret) => holding.fact.includes(secret)), "the fact it shows names no payment, no cash, no price and no other party");
+check(holding.hashes.length > 1, `its other ${holding.hashes.length - 1} facts are in the proof as salted hashes only`);
+
+const more = { ...holding, fact: holding.fact.replace("4000000000", "5000000000") };
+check((await proven(more)) === null, "the same proof saying 50,000,000.00 is rejected");
+const forged = { ...more, hashes: holding.hashes.map((hash, index) => (index === holding.index ? factHash(more.salt, more.fact) : hash)) };
+check((await proven(forged)) === null, "and with its hash forged into the list, the chain's commitment rejects it");
+
+const payment = await proveFact(alder, alderKey, "payments.0");
+check((await proven(payment))?.paid === DUE[alder]!.toString(), `a second proof shows one payment: ${money(DUE[alder]!)} for the first period`);
+saveProof(deal.deal_id, holding);
+console.log(`  kept in near/proofs/${deal.deal_id}.json: check it with \`npm run verify:proof\``);
 
 const record = await view<{ action: string; caller: string; ok: boolean; detail: string }[]>(LEDGER, "history", { limit: 200 });
 check(record.some((line) => !line.ok && line.caller === agent && line.detail.includes(money(MISTYPED))), "the chain's public record shows the refusal");

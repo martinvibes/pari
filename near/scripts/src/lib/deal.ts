@@ -74,6 +74,29 @@ export const TRADE = {
 /** What each buyer pays into the deal before trading. Deposits are public. */
 export const BUYER_CASH = 12_000_000_00n;
 
+/** Second-period interest at 7.80% for 90 days, after the trade. Alder is owed
+ *  what it kept to the trade date plus 60 days on 40m; Delta, 60 days on 10m. */
+export const SECOND_PERIOD_DUE: Record<string, bigint> = {
+  [accountOf("alder")]: 845_000_00n,
+  [accountOf("birch")]: 585_000_00n,
+  [accountOf("cedar")]: 390_000_00n,
+  [accountOf("delta")]: 130_000_00n,
+};
+export const SECOND_PERIOD_TOTAL = 1_950_000_00n;
+/** The borrower pays half of it. Every lender gets half of what it is owed,
+ *  and the other half stays owed. */
+export const SHORT_PAYMENT = 975_000_00n;
+
+export const THIRD_PERIOD_END = "2027-06-15";
+/** Third-period interest at 7.80% for 92 days, plus the half left unpaid. */
+export const THIRD_PERIOD_DUE: Record<string, bigint> = {
+  [accountOf("alder")]: 1_219_833_33n,
+  [accountOf("birch")]: 890_500_00n,
+  [accountOf("cedar")]: 593_666_66n,
+  [accountOf("delta")]: 264_333_33n,
+};
+export const THIRD_PERIOD_TOTAL = 2_968_333_32n;
+
 /** Test USDC has 6 decimals; the books keep cents. */
 export const UNITS_PER_CENT = 10_000n;
 
