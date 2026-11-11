@@ -20,7 +20,7 @@ Deadline: **2026-11-14T23:59:00Z** (Saturday 23:59 UTC, Sunday 00:59 in Lagos).
 | `nearAddress` | *(the builder's **mainnet** NEAR account, for the payout)* |
 | `projectUrl` | `https://github.com/martinvibes/pari` (see "Which branch judges see" below) |
 | `demoUrl` | *(the URL of the X post, once published)* |
-| `idea` | the text under "What did you build?" below (1,911 characters; the limit is 2,000) |
+| `idea` | the text under "What did you build?" below (1,989 characters; the limit is 2,000) |
 | `consent` | `true`, after the builder has read the contact notice |
 
 Leave `website` empty: it is a spam trap. One submission per repository; a
@@ -48,7 +48,8 @@ Working on testnet today:
 - a banned buyer refused without learning why;
 - a short payment shared pro rata, the rest paid with the next period;
 - the agent as a two-of-three Sputnik DAO: one approval moves nothing;
-- an auditor who sees every payment and no price.
+- an auditor who sees every payment and no price;
+- a lender proving one fact from its sealed view to anyone, and nothing else.
 
 Anyone can check the privacy claim with no keys: one command downloads every transaction of a recorded run and the contract's whole storage from NEAR, and finds none of the deal's secrets. There are 52 Rust tests; the deal's rules keep the names and numbers of the original test suite.
 
@@ -90,13 +91,15 @@ the waits.
 | 1:45 | A terminal: `npm run prove:privacy` | "Every transaction and the contract's whole storage, searched for the deal's secrets. Zero found." |
 | 1:55 | The repository | "Built at NEAR HACKATHON." |
 
-Optional, about 15 seconds, placed before the leak test: the agent as two of
-three. It needs a second recording on a deal made with
-`npm run setup -- --fresh --dao`.
+Two optional segments, about 15 seconds each, placed before the leak test.
 
 | On screen | Say |
 | --- | --- |
+| `/lender/alder`: press **Prove** beside the settled payment. `/verify` reads **It holds**. Change one digit in the box and check again: **It does not hold** | "Alder can hand an outsider one payment from its sealed view. Anyone checks it against NEAR with no key, and nothing else is shown." |
 | `/agent`: press **Settle all 3 lenders**; the receipt says nothing has moved. Then **Approve as operator 2** in the **Two of three** panel | "The agent can be two of three operators. One approval moves nothing. The second one pays every lender." |
+
+The second one needs its own recording, on a deal made with
+`npm run setup -- --fresh --dao`.
 
 The recorded runs in the README were played by `npm run e2e`. A fresh deal for
 the video replaces the live deal on the contract, which is fine: the leak test
@@ -121,7 +124,7 @@ Either way, tag the final commit `hackathon-submission`; the rules accept the
 - [ ] Branch `near` pushed (this makes the NEAR work public)
 - [ ] Default branch decided (above), final commit tagged `hackathon-submission`
 - [ ] Repository public, with its LICENSE (Apache-2.0 is there), through 2026-11-18
-- [ ] README section 1 run from a fresh clone: both `cargo test` runs and `npm run prove:privacy`
+- [ ] README section 1 run from a fresh clone: both `cargo test` runs, `npm run prove:privacy` and `npm run verify:proof`
 - [ ] Demo video recorded; its link added at the top of the README
 - [ ] Hosted demo (optional, "a plus"): `docker build -f near/Dockerfile`, with the variables from `npm run demo:env`; link added to the README; kept up through 2026-11-18
 - [ ] X post published with the video, saying "Built at NEAR HACKATHON", tagging @NEARProtocol and #NEARHackathon
