@@ -3,7 +3,7 @@
 //! In:  `{ deal, caller, prev_root, turn, command, sealed }`. `command` is
 //!      public; `sealed` is a box only the enclave can open, holding the
 //!      command's secret fields (a trade's price, the DQ list, the opening
-//!      positions).
+//!      positions) and the deal, the caller and the command they are for.
 //! Out: `{ ok: true, root, seq, public, payouts, envelopes, commitments }`, or
 //!      `{ ok: false, refused, root }` with the books untouched.
 //!
@@ -83,7 +83,7 @@ pub fn handle(stored: &Stored, input: Input, enclave: &SecretKey) -> Reply {
         Some(offer) if root == Some(offer.books.root()) => Some(&offer.books),
         _ => return Reply::refused("the contract names books the enclave does not hold", root),
     };
-    let command = match parse(input.command, input.sealed.as_deref(), enclave) {
+    let command = match parse(&input.deal, &input.caller, input.command, input.sealed.as_deref(), enclave) {
         Ok(command) => command,
         Err(reason) => return Reply::refused(reason, root),
     };
@@ -99,12 +99,19 @@ pub fn handle(stored: &Stored, input: Input, enclave: &SecretKey) -> Reply {
 }
 
 /// Opens the sealed fields and joins them to the public ones.
-fn parse(mut command: Map<String, Value>, sealed: Option<&str>, enclave: &SecretKey) -> Result<Command, String> {
+///
+/// A sealed box names no sender, and it sits on the public chain where anyone
+/// can copy it. So the fields inside say which deal, which caller and which
+/// command they were sealed for, and the enclave refuses a box that arrives
+/// any other way. Without that, a lender could send another lender's sealed
+/// offer as its own and read the price in its own envelope.
+fn parse(deal: &str, caller: &str, mut command: Map<String, Value>, sealed: Option<&str>, enclave: &SecretKey) -> Result<Command, String> {
     if let Some(sealed) = sealed {
-        let secret: Map<String, Value> =
+        let mut secret: Map<String, Value> =
             serde_json::from_slice(&seal::open(enclave, sealed)?).map_err(|_| "the sealed fields are not a JSON object")?;
-        if secret.contains_key("cmd") {
-            return Err("the command name is public".into());
+        let sealed_for = [("deal", Some(deal)), ("caller", Some(caller)), ("cmd", command.get("cmd").and_then(Value::as_str))];
+        if sealed_for.iter().any(|(field, expected)| expected.is_none() || secret.remove(*field).as_ref().and_then(Value::as_str) != *expected) {
+            return Err("these fields were sealed for another deal, caller or command".into());
         }
         command.extend(secret);
     }

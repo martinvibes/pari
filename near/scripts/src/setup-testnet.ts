@@ -202,7 +202,7 @@ if (!deal.enclave_key) {
 if (!deal.root) {
   step("The closed deal (positions sealed to the enclave)");
   const positions = Object.fromEntries(Object.entries(POSITIONS).map(([lender, cents]) => [lender, cents.toString()]));
-  const sealed = await sealForEnclave({ positions });
+  const sealed = await sealForEnclave(LEDGER, "init_deal", { positions });
   await expectOk("deal loaded", act(ROOT, "init_deal", { auditor: accountOf("auditor"), sealed }));
 }
 

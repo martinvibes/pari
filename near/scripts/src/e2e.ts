@@ -148,20 +148,21 @@ check((await seen(alder)).cash === alderCash.toString(), `Alder's cash in the bo
 console.log("\nSecond period: a trade, screened against the borrower's DQ list");
 
 await ok("agent fixes the rate for the second period", act(agent, "fix_rate", { base_rate_bps: BASE_RATE_BPS, period_end: SECOND_PERIOD_END }));
-await ok("borrower sets its DQ list (sealed)", act(borrower, "set_dq", { sealed: await sealForEnclave({ list: [rival] }) }));
+await ok("borrower sets its DQ list (sealed)", act(borrower, "set_dq", { sealed: await sealForEnclave(borrower, "set_dq", { list: [rival] }) }));
 
 for (const buyer of [rival, delta]) {
   const funded = await payIn(buyer, BUYER_CASH, { kind: "cash" });
   console.log(`  ${buyer} pays ${money(BUYER_CASH)} into the deal\n    ${funded.url}`);
 }
 
-async function trade(buyer: string): Promise<{ id: number; settled: boolean }> {
+async function trade(buyer: string): Promise<{ id: number; settled: boolean; sealed: string }> {
   const offer = { buyer, par: TRADE.par.toString(), price_ppm: TRADE.price_ppm, trade_date: TRADE.date };
-  const offered = await ok(`Alder offers ${money(TRADE.par)} to ${buyer} (sealed)`, act(alder, "offer_trade", { sealed: await sealForEnclave(offer) }));
+  const sealed = await sealForEnclave(alder, "offer_trade", offer);
+  const offered = await ok(`Alder offers ${money(TRADE.par)} to ${buyer} (sealed)`, act(alder, "offer_trade", { sealed }));
   const id = Number(offered.public?.trade_id);
   await ok(`${buyer} accepts`, act(buyer, "accept_trade", { trade_id: id }));
   const result = await ok("agent settles the trade", act(agent, "settle_trade", { trade_id: id }));
-  return { id, settled: result.public?.settled === true };
+  return { id, settled: result.public?.settled === true, sealed };
 }
 
 const refused = await trade(rival);
@@ -186,6 +187,13 @@ for (const party of [borrower, auditor]) {
   check(theirs.includes(delta) && !theirs.includes("price_ppm"), `${party} sees the trade but not the price`);
 }
 check(!JSON.stringify(await seen(auditor)).includes("dq_list"), "the auditor does not see the DQ list");
+
+// Alder's sealed offer is on the public chain, and Birch holds enough of the
+// loan to make the same offer. Sent by Birch, it would show Birch the terms.
+const copied = await act(birch, "offer_trade", { sealed: bought.sealed });
+console.log(`  Birch copies Alder's sealed offer from the chain and sends it as its own\n    ${copied.url}`);
+check(copied.result.ok === false, `refused: "${copied.result.refused}"`);
+check(!(await seen(birch)).trades?.length, "Birch's envelope shows no trade: it learns neither the size nor the price");
 
 console.log("\nA short payment: the borrower pays half, and the rest rolls into the next period");
 

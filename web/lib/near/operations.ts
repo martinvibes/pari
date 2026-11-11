@@ -5,7 +5,7 @@ import { teraToGas } from "near-api-js";
 import { noteTransaction } from "@/lib/near/activity";
 import { agentIsDao, proposalPrefix, publicRecord, publicState, type PublicState } from "@/lib/near/books";
 import { read, send } from "@/lib/near/chain";
-import { NEAR, OPERATORS, UNITS_PER_CENT } from "@/lib/near/config";
+import { accountOf, NEAR, OPERATORS, UNITS_PER_CENT } from "@/lib/near/config";
 import { seal } from "@/lib/near/seal";
 
 // The deal's writes. Each is one transaction signed by the persona entitled to
@@ -40,11 +40,14 @@ async function act(personaId: string, method: string, args: Record<string, unkno
   return { hash, public: result.public ?? {} };
 }
 
-/** Seals a command's secret fields to the enclave's key, so the transaction carries only ciphertext. */
-async function sealed(secret: Record<string, unknown>): Promise<string> {
-  const { enclave_key } = await publicState();
+/** Seals a command's secret fields to the enclave's key, so the transaction
+ *  carries only ciphertext. The box also names the deal, the persona's account
+ *  and the command: anyone can copy it from the chain, and the enclave refuses
+ *  it from anyone else. */
+async function sealed(personaId: string, cmd: string, secret: Record<string, unknown>): Promise<string> {
+  const { enclave_key, deal_id } = await publicState();
   if (!enclave_key) throw new Error("The contract has not published the enclave's key yet.");
-  return seal(JSON.stringify(secret), enclave_key);
+  return seal(JSON.stringify({ ...secret, deal: deal_id, caller: accountOf(personaId), cmd }), enclave_key);
 }
 
 /** Moves test USDC from the persona's own account into the deal. */
@@ -144,7 +147,7 @@ export function payRequest(requestId: number, amount: bigint): Promise<Done> {
 }
 
 export async function setDqList(accounts: string[]): Promise<Done> {
-  return act("northwind", "set_dq", { sealed: await sealed({ list: accounts }) });
+  return act("northwind", "set_dq", { sealed: await sealed("northwind", "set_dq", { list: accounts }) });
 }
 
 // Lenders and buyers --------------------------------------------------------------
@@ -154,7 +157,7 @@ export async function offerTrade(
   offer: { buyer: string; par: bigint; pricePpm: number; tradeDate: string },
 ): Promise<Done> {
   const secret = { buyer: offer.buyer, par: offer.par.toString(), price_ppm: offer.pricePpm, trade_date: offer.tradeDate };
-  return act(sellerId, "offer_trade", { sealed: await sealed(secret) });
+  return act(sellerId, "offer_trade", { sealed: await sealed(sellerId, "offer_trade", secret) });
 }
 
 export function acceptTrade(buyerId: string, tradeId: number): Promise<Done> {

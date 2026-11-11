@@ -27,11 +27,25 @@ impl Enclave {
         Enclave { key: SecretKey::from([7u8; 32]), stored: Stored::default(), root: None, turn: 0, public: String::new() }
     }
 
+    /// What a caller seals to the enclave: a command's secret fields, and the
+    /// deal, the caller and the command they are for.
+    fn seal(&self, caller: &str, command: &Value, mut secret: Value) -> String {
+        secret["deal"] = json!("test-deal");
+        secret["caller"] = json!(caller);
+        secret["cmd"] = command["cmd"].clone();
+        let enclave_key = seal::public_key(&seal::public_b64(&self.key)).unwrap();
+        seal::seal(&enclave_key, secret.to_string().as_bytes()).unwrap()
+    }
+
     /// What the rules contract sends for a command. `secret` is sealed to the
     /// enclave before it leaves the caller.
     fn request(&mut self, caller: &str, command: Value, secret: Option<Value>) -> Value {
-        let enclave_key = seal::public_key(&seal::public_b64(&self.key)).unwrap();
-        let sealed = secret.map(|s| seal::seal(&enclave_key, s.to_string().as_bytes()).unwrap());
+        let sealed = secret.map(|secret| self.seal(caller, &command, secret));
+        self.request_with(caller, command, sealed)
+    }
+
+    /// The same, with a box that is already sealed.
+    fn request_with(&mut self, caller: &str, command: Value, sealed: Option<String>) -> Value {
         self.turn += 1;
         json!({ "deal": "test-deal", "caller": caller, "prev_root": self.root, "turn": self.turn, "command": command, "sealed": sealed })
     }
@@ -256,6 +270,35 @@ fn test_books_the_enclave_does_not_hold_are_refused() {
     let reply = enclave.call(AGENT, json!({ "cmd": "request_interest", "expected_total": "197166666" }), None);
     assert_eq!(reply["ok"], false);
     assert_eq!(reply["refused"], "the contract names books the enclave does not hold");
+}
+
+#[test]
+fn test_a_sealed_offer_copied_from_the_chain_is_no_use_to_anyone_else() {
+    let (mut enclave, alder, birch) = open_deal();
+    let command = json!({ "cmd": "offer_trade" });
+    let offer = json!({ "buyer": DELTA, "par": "1000000000", "price_ppm": 995_000, "trade_date": "2026-10-15" });
+    let sealed = enclave.seal(ALDER, &command, offer);
+
+    // Birch holds 30m, enough to make the same offer. It copies Alder's box
+    // from the chain and sends it as its own, hoping to read the terms in its
+    // own envelope. The box says who sealed it, so the enclave refuses.
+    let refusal = "these fields were sealed for another deal, caller or command";
+    let copied = enclave.request_with(BIRCH, command.clone(), Some(sealed.clone()));
+    assert_eq!(enclave.run(copied)["refused"], refusal);
+
+    // Nor does Alder's own box pass under another command, or in another deal.
+    let as_dq = enclave.request_with(ALDER, json!({ "cmd": "set_dq" }), Some(sealed.clone()));
+    assert_eq!(enclave.run(as_dq)["refused"], refusal);
+    let mut elsewhere = enclave.request_with(ALDER, command.clone(), Some(sealed.clone()));
+    elsewhere["deal"] = json!("another-deal");
+    assert_eq!(enclave.run(elsewhere)["refused"], refusal);
+
+    // Sent by Alder, the same box is an offer, and only Alder reads its terms.
+    let sent = enclave.request_with(ALDER, command, Some(sealed));
+    let offered = enclave.run(sent);
+    assert_eq!(offered["ok"], true);
+    assert_eq!(open(&offered, ALDER, &alder)["trades"][0]["price_ppm"], 995_000);
+    assert_eq!(open(&offered, BIRCH, &birch)["trades"], json!([]));
 }
 
 // NEAR stops waiting for the enclave after about two minutes. An answer that

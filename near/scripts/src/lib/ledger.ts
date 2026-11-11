@@ -165,11 +165,15 @@ export async function approve(operator: string, id: number): Promise<Sent<Outcom
   return { hash, url: txUrl(hash), result: answer ?? null, unanswered: unanswered(tx) };
 }
 
-/** Seals a command's secret fields so only the enclave can read them. */
-export async function sealForEnclave(secret: Record<string, unknown>): Promise<string> {
-  const { enclave_key } = await state();
+/** Seals a command's secret fields so only the enclave can read them. The box
+ *  sits on the public chain, where anyone can copy it, so it also says which
+ *  deal, which caller and which command it is for. The enclave refuses it from
+ *  anyone else. `caller` is the account the contract vouches for: the sender,
+ *  or the contract itself for `init_deal`. */
+export async function sealForEnclave(caller: string, cmd: string, secret: Record<string, unknown>): Promise<string> {
+  const { enclave_key, deal_id } = await state();
   if (!enclave_key) throw new Error("the contract has not published the enclave's key yet");
-  return seal(JSON.stringify(secret), enclave_key);
+  return seal(JSON.stringify({ ...secret, deal: deal_id, caller, cmd }), enclave_key);
 }
 
 /**
