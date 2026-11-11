@@ -13,6 +13,8 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+# The home page is built ahead of time, so the build has to know it is the NEAR one.
+ENV PARI_BACKEND=near
 RUN npm run build
 
 FROM node:22-bookworm-slim

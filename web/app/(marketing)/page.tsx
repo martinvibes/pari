@@ -18,16 +18,26 @@ import { Spotlight } from "@/components/Spotlight";
 import { TickerBand } from "@/components/TickerBand";
 import { Term } from "@/components/Term";
 import { WordReveal } from "@/components/WordReveal";
+import { BACKEND } from "@/lib/backend";
 
-// Every claim on this page is a Daml Script test in daml/pari-tests.
+// Every claim on this page is a test: a Daml Script test in daml/pari-tests on
+// Canton, a Rust test in near/enclave and near/contract on NEAR. The page says
+// which ledger it runs on, and words the three places where the two differ.
+const NEAR = BACKEND === "near";
+
 // Contract and standard names carry the mono Term voice so they read as objects.
 const STEPS = [
   {
     n: "01",
-    title: "Syndicate and close",
+    title: NEAR ? "Seal the books" : "Syndicate and close",
     kicker: "Action / Commit",
     hue: "#3DDC97",
-    body: (
+    body: NEAR ? (
+      <>
+        The closed deal is loaded once, with every lender&rsquo;s position sealed to the enclave.
+        From then on the chain holds a fingerprint of the books, never the register.
+      </>
+    ) : (
       <>
         Each lender commits and funds its own <Term>CIP-56</Term> allocation. Closing pays the
         borrower from every lender in one transaction, or not at all.
@@ -40,7 +50,12 @@ const STEPS = [
     title: "Pay every lender",
     kicker: "Mechanism / Distribute",
     hue: "#5AC8FA",
-    body: (
+    body: NEAR ? (
+      <>
+        The agent fixes the rate and requests interest. The borrower pays once, and one settlement
+        credits every lender, to the cent. A mistyped total is refused.
+      </>
+    ) : (
       <>
         The agent fixes the rate and requests interest. The borrower funds one leg per lender, and
         every leg settles together, to the cent.
@@ -81,9 +96,14 @@ const HERO_EXIT: ExitSequence = {
 // Pari and is backed by a test; none is a market metric.
 const FACTS = [
   { value: "01", label: "Transaction per payment", note: "Every lender is paid, or none is", hue: "#3DDC97" },
-  { value: "00", label: "Funds held by the agent", note: "Payers fund their own allocations", hue: "#FFAC2E" },
+  {
+    value: "00",
+    label: "Funds held by the agent",
+    note: NEAR ? "The contract holds them and caps every payout" : "Payers fund their own allocations",
+    hue: "#FFAC2E",
+  },
   { value: "00", label: "Rival positions visible", note: "A lender sees only its own", hue: "#A78BFA" },
-  { value: "03", label: "Information walls", note: "Positions · DQ list · MNPI", hue: "#5AC8FA" },
+  { value: "03", label: "Information walls", note: NEAR ? "Positions · prices · DQ list" : "Positions · DQ list · MNPI", hue: "#5AC8FA" },
 ];
 
 export default function LandingPage() {
@@ -115,7 +135,7 @@ export default function LandingPage() {
               className="mb-8 inline-flex items-center gap-2.5 rounded-pill border border-mint/30 bg-mint/[0.08] px-3.5 py-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-mint"
             >
               <span className="h-1.5 w-1.5 animate-pulse rounded-pill bg-mint shadow-[0_0_8px_rgba(61,220,151,0.8)] motion-reduce:animate-none" />
-              Running on the Canton DevNet
+              {NEAR ? "Running on NEAR testnet" : "Running on the Canton DevNet"}
             </p>
             <h1
               data-exit="headline"
@@ -138,7 +158,15 @@ export default function LandingPage() {
                 Open App
               </Link>
               <span className="font-mono text-sm tracking-[0.2em] text-pewter">
-                Canton · <span className="text-amber">CIP-56</span> settlement
+                {NEAR ? (
+                  <>
+                    NEAR · books in a <span className="text-amber">TDX</span> enclave
+                  </>
+                ) : (
+                  <>
+                    Canton · <span className="text-amber">CIP-56</span> settlement
+                  </>
+                )}
               </span>
             </div>
           </Parallax>
@@ -190,8 +218,8 @@ export default function LandingPage() {
       </section>
 
       <TickerBand />
-      <AudienceCards />
-      <GuaranteesStrip />
+      <AudienceCards near={NEAR} />
+      <GuaranteesStrip near={NEAR} />
 
       {/* Overview: design facts as numerals in an enclosed panel, not invented
           market metrics. */}
@@ -203,7 +231,7 @@ export default function LandingPage() {
             <h2 className="text-4xl font-medium tracking-tight sm:text-5xl">
               <WordReveal brightWords={[0]}>Pari overview</WordReveal>
             </h2>
-            <span className="label-data">Canton Network</span>
+            <span className="label-data">{NEAR ? "NEAR testnet" : "Canton Network"}</span>
           </div>
           <div className="mt-12 grid grid-cols-2 border border-white/10 lg:grid-cols-4">
             {FACTS.map((fact, i) => (

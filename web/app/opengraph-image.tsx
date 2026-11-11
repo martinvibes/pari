@@ -2,6 +2,7 @@
 
 import { ImageResponse } from "next/og";
 import { MARK_PATH } from "@/lib/mark";
+import { BACKEND } from "@/lib/backend";
 
 export const alt = "Pari, the private ledger for syndicated loans";
 export const size = { width: 1200, height: 630 };
@@ -33,7 +34,7 @@ export default function OpenGraphImage() {
             The private ledger for syndicated loans.
           </span>
           <span style={{ fontSize: 24, letterSpacing: 6, color: "#6D6D6D", textTransform: "uppercase" }}>
-            Canton · CIP-56 settlement · DvP trades
+            {BACKEND === "near" ? "NEAR · books in a TDX enclave · DvP trades" : "Canton · CIP-56 settlement · DvP trades"}
           </span>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { Atmosphere } from "@/components/Atmosphere";
 import { Grain } from "@/components/Grain";
 import { DocsSidebar } from "@/components/DocsSidebar";
 import { SITE } from "@/lib/site";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = {
   title: {
@@ -57,7 +58,19 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-0 px-6 lg:flex-row lg:gap-12">
         <DocsSidebar />
-        <main className="min-w-0 max-w-3xl flex-1 py-10 lg:py-14">{children}</main>
+        <main className="min-w-0 max-w-3xl flex-1 py-10 lg:py-14">
+          {BACKEND === "near" && (
+            <p className="mb-10 border border-amber/30 bg-amber/[0.06] px-4 py-3 text-[14px] leading-relaxed text-smoke">
+              These pages describe Pari&rsquo;s Canton build. This app is running the NEAR build, which is
+              documented in{" "}
+              <a href={`${SITE.repo}/tree/near#readme`} className="text-paper underline underline-offset-4">
+                the README
+              </a>
+              .
+            </p>
+          )}
+          {children}
+        </main>
       </div>
 
       <footer className="relative z-10 border-t border-white/10 bg-ink/50 backdrop-blur-sm">

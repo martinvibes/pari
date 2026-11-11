@@ -115,7 +115,24 @@ const AUDIENCES: Array<{
   },
 ];
 
-export function AudienceCards() {
+// On NEAR two of the three read differently: there is no information wall for
+// documents, and the borrower pays with one token transfer.
+const NEAR_BODIES: Partial<Record<Role, React.ReactNode>> = {
+  lender: (
+    <>
+      Hold a position no other lender can read, and no one on the public chain. Get paid with
+      every other lender in one transaction, and sell <Term>DvP</Term>.
+    </>
+  ),
+  borrower: (
+    <>
+      Pay once per request and know every lender is paid pro rata, to the cent. Keep the DQ list
+      secret, even from the agent.
+    </>
+  ),
+};
+
+export function AudienceCards({ near = false }: { near?: boolean }) {
   const { ref, inView } = useInView<HTMLDivElement>(0.15);
   const [armed, setArmed] = useState(false);
 
@@ -181,7 +198,7 @@ export function AudienceCards() {
                 <h3 className="mt-8 text-3xl font-medium tracking-tight sm:text-4xl">
                   {audience.title}
                 </h3>
-                <p className="mt-5 max-w-sm text-lg leading-relaxed text-smoke">{audience.body}</p>
+                <p className="mt-5 max-w-sm text-lg leading-relaxed text-smoke">{(near && NEAR_BODIES[audience.role]) || audience.body}</p>
                 <RollingLink
                   href={audience.href}
                   className="mt-auto pt-10 font-mono text-[13px] font-semibold uppercase tracking-[0.15em]"

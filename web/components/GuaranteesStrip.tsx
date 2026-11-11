@@ -36,6 +36,19 @@ const GUARANTEES = [
   },
 ];
 
+// The same four guarantees as the NEAR build keeps them: the money sits in the
+// rules contract, and the tests are Rust.
+const NEAR_BODIES: Record<string, React.ReactNode> = {
+  "01": <>The rules contract holds the money. The agent can ask for a settlement; it cannot send a token anywhere.</>,
+  "02": (
+    <>
+      The enclave refuses a total that differs from the register, and the contract never credits
+      lenders more than the borrower paid in.
+    </>
+  ),
+  "04": <>Each guarantee is a Rust test in the open-source repo, published under Apache-2.0.</>,
+};
+
 // One guarantee, ticking on as it crosses the viewport: the numeral brightens,
 // the marker dot swells, the title lifts to full paper. Rows stay lit once
 // passed, so scrolling the strip reads as working down a checklist.
@@ -43,10 +56,12 @@ function GuaranteeRow({
   guarantee,
   index,
   stripHidden,
+  near,
 }: {
   guarantee: (typeof GUARANTEES)[number];
   index: number;
   stripHidden: boolean;
+  near: boolean;
 }) {
   const { ref, inView } = useInView<HTMLDivElement>(0.6);
   const lit = inView && !stripHidden;
@@ -90,13 +105,13 @@ function GuaranteeRow({
         >
           {guarantee.title}
         </h3>
-        <p className="mt-2 max-w-2xl text-lg leading-relaxed text-smoke">{guarantee.body}</p>
+        <p className="mt-2 max-w-2xl text-lg leading-relaxed text-smoke">{(near && NEAR_BODIES[guarantee.index]) || guarantee.body}</p>
       </div>
     </div>
   );
 }
 
-export function GuaranteesStrip() {
+export function GuaranteesStrip({ near = false }: { near?: boolean }) {
   const { ref, inView } = useInView<HTMLDivElement>(0.15);
   const [armed, setArmed] = useState(false);
 
@@ -127,6 +142,7 @@ export function GuaranteesStrip() {
               guarantee={guarantee}
               index={index}
               stripHidden={hidden}
+              near={near}
             />
           ))}
         </div>
