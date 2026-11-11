@@ -184,11 +184,12 @@ if (deal.deal_id !== run.deal_id) {
 }
 
 console.log("\nThe enclave");
-line("program on OutLayer", deal.project_id);
-line("the one build the contract will run (sha256)", deal.version_key ?? "not pinned");
+const pinned = await pinnedBy(run.transactions);
+line("program on OutLayer", pinned.project_id);
+line("the one build this deal's contract would run (sha256)", pinned.version_key ?? "not pinned");
 const attested = await attestations(run.transactions);
 line("runs with an Intel TDX attestation from OutLayer", `${attested.length} of ${run.transactions.length} transactions`);
-const others = attested.filter((a) => a.executed_wasm_sha256 !== deal.version_key || a.project_id !== deal.project_id);
+const others = attested.filter((a) => a.executed_wasm_sha256 !== pinned.version_key || a.project_id !== pinned.project_id);
 line("of those, runs of any other build or program", others.length === 0 ? "none" : `${others.length}`);
 const sample = attested.at(-1);
 if (sample) {
@@ -198,7 +199,7 @@ if (sample) {
 }
 
 if (leaked > 0) fail(`${leaked} secrets found in public data`);
-if (others.length > 0) fail("a run was attested for a build the contract does not pin");
+if (others.length > 0) fail("a run was attested for a build the deal's contract did not pin");
 console.log(`\nPASS: 0 secrets in ${bytes(everything.length)} of public data.`);
 
 // ----- helpers -----
@@ -216,6 +217,17 @@ function latestRun(): string {
   });
   const newest = played.sort((a, b) => a.localeCompare(b, "en", { numeric: true })).at(-1);
   return newest ?? fail(`no full run recorded for ${LEDGER} in near/runs; run \`npm run e2e\` first`);
+}
+
+/** The program and the build the deal was started with. Both are public
+ *  arguments of the transaction that started it, so they stay readable after
+ *  the contract has moved on to a later deal and a later build. */
+async function pinnedBy(entries: RunEntry[]): Promise<{ project_id: string; version_key: string | null }> {
+  const start = entries.find((entry) => entry.step === "new") ?? fail("the run does not record the transaction that started the deal");
+  const tx = await archive.viewTransactionStatusWithReceipts({ txHash: start.hash, accountId: start.signer, waitUntil: "FINAL" });
+  const calls = tx.transaction.actions as { FunctionCall?: { method_name: string; args: string } }[];
+  const call = calls.find((action) => action.FunctionCall?.method_name === "new")?.FunctionCall;
+  return call ? JSON.parse(Buffer.from(call.args, "base64").toString("utf8")) : fail(`${start.hash} did not start a deal`);
 }
 
 interface Attestation {
