@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import type { BooksView, DealView, PartyView, PublicRecord, PublicState } from "@/lib/near/books";
+import type { BooksView, DealView, Envelope, PartyView, PublicRecord, PublicState } from "@/lib/near/books";
+import { commitmentOf } from "@/lib/near/proofs";
 
 // The privacy and money claims, each evaluated on every load against what the
 // chain holds and what each party's key opens. Each is also a Rust test.
@@ -8,7 +9,7 @@ import type { BooksView, DealView, PartyView, PublicRecord, PublicState } from "
 export type Reading = {
   chain: PublicState;
   record: PublicRecord[];
-  seen: Array<{ account: string; view: BooksView }>;
+  seen: Array<{ account: string; envelope: Envelope; view: BooksView }>;
 };
 
 export type Check = { claim: string; test: string; holds: (reading: Reading) => boolean };
@@ -100,5 +101,10 @@ export const CHECKS: Check[] = [
     claim: "Every refusal is on the public record, and the books did not move",
     test: "enclave/tests/protocol.rs: test_the_wrong_total_is_refused_and_the_books_do_not_move",
     holds: ({ record }) => record.every((line, i) => line.ok || i === 0 || line.seq === record[i - 1]!.seq),
+  },
+  {
+    claim: "Each party's commitment on the chain is the hash of the facts in its envelope, so one fact can be proved and no other shown",
+    test: "enclave/tests/protocol.rs: test_a_party_proves_one_fact_and_shows_nothing_else",
+    holds: ({ chain, seen }) => seen.every(({ envelope, view }) => commitmentOf(chain.deal_id, view) === envelope.commitment),
   },
 ];

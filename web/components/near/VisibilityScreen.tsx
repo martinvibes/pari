@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import Link from "next/link";
 import { Party } from "@/components/app/party";
 import { PageHeader, Panel, TableScroll, Tag } from "@/components/app/ui";
 import { Explore, NearUnavailable, plural, registerRows, seatOf, short } from "@/components/near/parts";
@@ -299,6 +300,7 @@ function PublicChain({ chain, record, sealed, hashes }: { chain: PublicState; re
                   <th>For</th>
                   <th>What the chain holds</th>
                   <th className="text-right">Bytes</th>
+                  <th>Commitment</th>
                 </tr>
               </thead>
               <tbody>
@@ -307,13 +309,21 @@ function PublicChain({ chain, record, sealed, hashes }: { chain: PublicState; re
                     <td>
                       <Party name={persona.name} />
                     </td>
-                    <td className="font-mono text-[12px] text-pewter">{envelope.sealed.slice(0, 28)}…</td>
+                    <td className="font-mono text-[12px] text-pewter">{envelope.sealed.slice(0, 20)}…</td>
                     <td className="text-right text-smoke">{Buffer.from(envelope.sealed, "base64").length.toLocaleString("en-US")}</td>
+                    <td className="font-mono text-[12px] text-pewter">{short(envelope.commitment || null)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </TableScroll>
+          <p className="text-[13px] leading-relaxed text-ash">
+            A commitment is the enclave&apos;s hash over every fact in that party&apos;s envelope. It tells the public nothing, and it lets the
+            party show one fact to an outsider and no other.{" "}
+            <Link href="/verify" className="text-sky underline decoration-sky/40 underline-offset-4 transition hover:text-paper">
+              Check a proof
+            </Link>
+          </p>
         </div>
       </div>
 
