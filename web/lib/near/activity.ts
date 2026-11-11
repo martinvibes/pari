@@ -29,14 +29,17 @@ export function transactionsOf(dealId: string): Record<string, string> {
   return { ...scriptTransactions(dealId), ...load()[dealId] };
 }
 
-/** Steps that start a deal or tidy storage, and write no line of the record. */
-const UNRECORDED = new Set(["new", "sweep"]);
+/** Steps that start a deal, tidy storage or propose an action to the agent's
+ *  DAO, and write no line of the record. */
+const UNRECORDED = new Set(["new", "sweep", "add_proposal"]);
 
 /** The transactions `near/scripts` sent when it set the deal up: each of the
- *  others wrote one line of the record, in order. */
+ *  others wrote one line of the record, in order. An operator's approval wrote
+ *  one only when it was the approval that made the DAO act (`ran`). */
 function scriptTransactions(dealId: string): Record<string, string> {
   const file = join(process.cwd(), "..", "near", "runs", `${dealId}.json`);
   if (!existsSync(file)) return {};
-  const run = JSON.parse(readFileSync(file, "utf8")) as { transactions: Array<{ step: string; hash: string }> };
-  return Object.fromEntries(run.transactions.filter((t) => !UNRECORDED.has(t.step)).map((t, index) => [index, t.hash]));
+  const run = JSON.parse(readFileSync(file, "utf8")) as { transactions: Array<{ step: string; hash: string; ran?: string }> };
+  const wrote = run.transactions.filter((t) => !UNRECORDED.has(t.step) && (t.step !== "act_proposal" || t.ran));
+  return Object.fromEntries(wrote.map((t, index) => [index, t.hash]));
 }

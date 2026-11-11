@@ -5,9 +5,10 @@ import { ActionForm } from "@/components/app/ActionForm";
 import { Party } from "@/components/app/party";
 import { Empty, Field, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";
 import { DealFacts, NearUnavailable, PaymentsMade, Register, registerRows, Sealed, Sides, totalDue, TradeStatus } from "@/components/near/parts";
-import type { DealView, PublicState, Request } from "@/lib/near/books";
+import { agentIsDao, openProposals, type DealView, type Proposal, type PublicState, type Request } from "@/lib/near/books";
+import { accountOf, OPERATORS, personaIdOf } from "@/lib/near/config";
 import { cents, showCents, showPrice, showRate } from "@/lib/near/money";
-import { isDealView, isUnavailable, nameOf, viewAs } from "@/lib/near/session";
+import { isDealView, isUnavailable, nameOf, unavailable, viewAs } from "@/lib/near/session";
 import { addMonths, clampDate, formatDate } from "@/lib/pari/dates";
 import { formatCents } from "@/lib/pari/money";
 import { persona } from "@/lib/pari/personas";
@@ -18,6 +19,14 @@ export async function AgentScreen() {
   if (!isDealView(seen)) return <NearUnavailable problem={{ unavailable: "deal", detail: "The agent's envelope is not the agent's view." }} />;
   const { view, chain } = seen;
   const open = view.requests.find((r) => r.status === "open");
+  let waiting: Proposal[] | null = null;
+  if (agentIsDao(chain)) {
+    try {
+      waiting = await openProposals(chain);
+    } catch (error) {
+      return <NearUnavailable problem={unavailable(error)} />;
+    }
+  }
 
   return (
     <div className="space-y-12">
@@ -39,6 +48,8 @@ export async function AgentScreen() {
         ]}
       />
 
+      {waiting ? <TwoOfThree chain={chain} waiting={waiting} /> : null}
+
       <div className="grid gap-6 lg:grid-cols-12">
         <Register
           view={view}
@@ -56,6 +67,77 @@ export async function AgentScreen() {
       <Sealed seen={seen} />
     </div>
   );
+}
+
+/** The agent as a DAO: its actions that wait for a second operator. */
+function TwoOfThree({ chain, waiting }: { chain: PublicState; waiting: Proposal[] }) {
+  return (
+    <Panel
+      title="Two of three"
+      note={`The agent of this deal is a DAO on NEAR, ${chain.agent}, with three operators. Each of the agent's buttons proposes the action and gives the first operator's approval. Nothing moves until a second operator approves. This demo server holds all three operators' testnet keys; in production each operator signs with its own.`}
+      aside={<Tag tone={waiting.length > 0 ? "wait" : "ok"}>{waiting.length > 0 ? `${waiting.length} waiting` : "Nothing waiting"}</Tag>}
+    >
+      {waiting.length === 0 ? (
+        <Empty>No action is waiting for a second operator.</Empty>
+      ) : (
+        <TableScroll>
+          <table className="table-data">
+            <thead>
+              <tr>
+                <th>Proposal</th>
+                <th>Action</th>
+                <th>Approved by</th>
+                <th className="text-right">Second approval</th>
+              </tr>
+            </thead>
+            <tbody>
+              {waiting.map((proposal) => (
+                <tr key={proposal.id}>
+                  <td className="text-smoke">{proposal.id}</td>
+                  <td>{asked(proposal)}</td>
+                  <td>{proposal.approvedBy.map(operatorName).join(", ") || "Nobody yet"}</td>
+                  <td>
+                    <div className="flex justify-end gap-2">
+                      {OPERATORS.filter((id) => !proposal.approvedBy.includes(accountOf(id))).map((id) => (
+                        <ActionForm
+                          key={id}
+                          action={act.approveProposal}
+                          label={`Approve as ${operatorName(accountOf(id)).toLowerCase()}`}
+                          variant="ghost"
+                          hidden={{ proposal: String(proposal.id), operator: id }}
+                        />
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
+      )}
+    </Panel>
+  );
+}
+
+function operatorName(account: string): string {
+  const index = OPERATORS.indexOf(personaIdOf(account) ?? "");
+  return index < 0 ? account : `Operator ${index + 1}`;
+}
+
+/** A proposal's action in words. Its arguments are public: the DAO stores them. */
+function asked({ method, args }: Proposal): string {
+  switch (method) {
+    case "fix_rate":
+      return `Fix the base rate at ${showRate(Number(args.base_rate_bps))} to ${formatDate(String(args.period_end))}`;
+    case "request_interest":
+      return `Request interest of ${showCents(String(args.expected_total))}`;
+    case "settle":
+      return `Settle interest request ${String(args.request_id)}`;
+    case "settle_trade":
+      return `Settle trade ${String(args.trade_id)}`;
+    default:
+      return method;
+  }
 }
 
 function FixRate({ view }: { view: DealView }) {

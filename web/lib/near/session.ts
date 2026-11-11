@@ -2,11 +2,11 @@
 
 import "server-only";
 import {
-  envelopeOf, openEnvelope, publicRecord, publicState, walletCents,
+  accountIn, envelopeOf, openEnvelope, publicRecord, publicState, walletCents,
   type BooksView, type DealView, type Envelope, type PartyView, type PublicRecord, type PublicState,
 } from "@/lib/near/books";
 import { ChainError } from "@/lib/near/chain";
-import { accountOf, KeyMissingError, NEAR, personaIdOf } from "@/lib/near/config";
+import { KeyMissingError, NEAR, personaIdOf } from "@/lib/near/config";
 import { personaById, PERSONAS, type Persona } from "@/lib/pari/personas";
 
 // One screen's read of the deal: the public chain, the persona's envelope as
@@ -37,13 +37,14 @@ export function nameOf(account: string): string {
 }
 
 export async function viewAs(persona: Persona): Promise<Seen | Unavailable> {
-  const account = accountOf(persona.id);
   try {
-    const [chain, envelope, wallet] = await Promise.all([publicState(), envelopeOf(account), walletCents(persona.id)]);
+    const chain = await publicState();
+    const account = accountIn(chain, persona.id);
+    const [envelope, wallet] = await Promise.all([envelopeOf(account), walletCents(account)]);
     if (!envelope) {
       return { unavailable: "deal", detail: `${account} has no envelope in deal ${chain.deal_id} on ${NEAR.ledger}.` };
     }
-    return { persona, account, chain, envelope, view: await openEnvelope(persona.id, envelope), wallet };
+    return { persona, account, chain, envelope, view: await openEnvelope(persona.id, account, envelope), wallet };
   } catch (error) {
     return unavailable(error);
   }
@@ -64,7 +65,7 @@ export async function viewAll(): Promise<Everyone | Unavailable> {
     const [chain, record] = await Promise.all([publicState(), publicRecord()]);
     const sealed: Sealed[] = [];
     for (const persona of PERSONAS) {
-      const account = accountOf(persona.id);
+      const account = accountIn(chain, persona.id);
       const envelope = await envelopeOf(account);
       if (!envelope) {
         return { unavailable: "deal", detail: `${account} has no envelope in deal ${chain.deal_id} on ${NEAR.ledger}.` };
@@ -79,7 +80,7 @@ export async function viewAll(): Promise<Everyone | Unavailable> {
 
 async function openAll(sealed: Sealed[]): Promise<Opened[] | null> {
   try {
-    return await Promise.all(sealed.map(async (one) => ({ ...one, view: await openEnvelope(one.persona.id, one.envelope) })));
+    return await Promise.all(sealed.map(async (one) => ({ ...one, view: await openEnvelope(one.persona.id, one.account, one.envelope) })));
   } catch (error) {
     if (error instanceof KeyMissingError) return null;
     throw error;

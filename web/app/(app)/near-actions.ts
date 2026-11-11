@@ -4,7 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/app/(app)/actions";
-import { accountOf, txUrl } from "@/lib/near/config";
+import { accountOf, OPERATORS, txUrl } from "@/lib/near/config";
 import { parseBasisPoints, parseCents, showRate } from "@/lib/near/money";
 import * as ops from "@/lib/near/operations";
 import { formatDate } from "@/lib/pari/dates";
@@ -52,37 +52,48 @@ function personaField(form: FormData, name: string): string {
 
 // Agent -------------------------------------------------------------------------
 
+/** What the screen says once one of the agent's actions has run, from what was
+ *  asked and what the chain made public. */
+const SAYS: Record<string, (args: Record<string, unknown>, out: Record<string, unknown>) => string> = {
+  fix_rate: (args, out) =>
+    `Base rate fixed at ${showRate(Number(args.base_rate_bps))} to ${formatDate(String(args.period_end))}. All-in ${showRate(Number(out.rate_bps))}.`,
+  request_interest: (args) =>
+    `Interest requested: ${formatCents(BigInt(String(args.expected_total)))}. The chain shows the total; each lender's share stays sealed.`,
+  settle: (_, out) =>
+    `Settled. Every lender was credited in one step. The chain shows one total, ${formatCents(BigInt(String(out.credited)))}, and no lender's share.`,
+  settle_trade: (_, out) =>
+    out.settled
+      ? "Trade settled. Cash, register and both positions moved in one step."
+      : "Not settled. Nothing moved, and the buyer is told nothing more. The reason is in the agent's envelope alone.",
+};
+
+/** An agent's action as the screen reports it: done, or waiting in the agent's DAO. */
+function said(sent: ops.Ran | ops.Proposed): { hash: string; message: string } {
+  if ("proposal" in sent) {
+    const message = `Proposed, and approved by operator 1 of 3. Nothing has moved: proposal ${sent.proposal} runs when a second operator approves it.`;
+    return { hash: sent.hash, message };
+  }
+  return { hash: sent.hash, message: SAYS[sent.method]?.(sent.args, sent.public) ?? `The agent ran ${sent.method}.` };
+}
+
 export const fixRate: Action = async (_, form) =>
-  run(async () => {
-    const rate = parseBasisPoints(field(form, "rate"), "the base rate");
-    const end = field(form, "end");
-    const { hash, public: out } = await ops.fixRate(rate, end);
-    return { hash, message: `Base rate fixed at ${showRate(rate)} to ${formatDate(end)}. All-in ${showRate(Number(out.rate_bps))}.` };
-  });
+  run(async () => said(await ops.fixRate(parseBasisPoints(field(form, "rate"), "the base rate"), field(form, "end"))));
 
 export const requestInterest: Action = async (_, form) =>
-  run(async () => {
-    const total = parseCents(field(form, "total"), "the total");
-    const { hash } = await ops.requestInterest(total);
-    return { hash, message: `Interest requested: ${formatCents(total)}. The chain shows the total; each lender's share stays sealed.` };
-  });
+  run(async () => said(await ops.requestInterest(parseCents(field(form, "total"), "the total"))));
 
-export const settlePayment: Action = async (_, form) =>
-  run(async () => {
-    const { hash, public: out } = await ops.settle(whole(form, "request"));
-    const credited = formatCents(BigInt(String(out.credited)));
-    return { hash, message: `Settled. Every lender was credited in one step. The chain shows one total, ${credited}, and no lender's share.` };
-  });
+export const settlePayment: Action = async (_, form) => run(async () => said(await ops.settle(whole(form, "request"))));
 
-export const settleTrade: Action = async (_, form) =>
+export const settleTrade: Action = async (_, form) => run(async () => said(await ops.settleTrade(whole(form, "trade"))));
+
+/** A second operator of the agent's DAO approves a proposal, which runs it. */
+export const approveProposal: Action = async (_, form) =>
   run(async () => {
-    const { hash, public: out } = await ops.settleTrade(whole(form, "trade"));
-    return {
-      hash,
-      message: out.settled
-        ? "Trade settled. Cash, register and both positions moved in one step."
-        : "Not settled. Nothing moved, and the buyer is told nothing more. The reason is in the agent's envelope alone.",
-    };
+    const operator = field(form, "operator");
+    if (!OPERATORS.includes(operator)) throw new Error("Unknown operator.");
+    const sent = await ops.approve(operator, whole(form, "proposal"));
+    if ("proposal" in sent) return { hash: sent.hash, message: `Approved. Proposal ${sent.proposal} still needs another operator.` };
+    return { hash: sent.hash, message: `Two of three operators approved, so the agent acted. ${said(sent).message}` };
   });
 
 // Borrower ----------------------------------------------------------------------

@@ -31,6 +31,12 @@ export function accountOf(personaId: string): string {
   return `${personaId}.${NEAR.root}`;
 }
 
+/** Sputnik DAO's factory on testnet. A deal set up with `--dao` (near/scripts)
+ *  has a DAO made by it as its agent, with these three operators: each of the
+ *  agent's actions is a proposal, and it runs when two of them have approved. */
+export const DAO_FACTORY = "sputnikv2.testnet";
+export const OPERATORS = ["op1", "op2", "op3"];
+
 /** The persona id an account belongs to, if it is one of the cast's. */
 export function personaIdOf(account: string): string | null {
   const suffix = `.${NEAR.root}`;
@@ -62,14 +68,15 @@ export function signingKey(personaId: string): string {
 }
 
 /** The private half of a persona's view key (X25519, base64), which opens its
- *  envelope: `VIEW_KEY_<PERSONA>` in the environment, or the file setup writes. */
-export function viewKey(personaId: string): string {
+ *  envelope: `VIEW_KEY_<PERSONA>` in the environment, or the file setup writes,
+ *  which keeps one key per account. */
+export function viewKey(personaId: string, account: string = accountOf(personaId)): string {
   const key = fromEnv("VIEW_KEY", personaId);
   if (key) return key;
   const file = process.env.PARI_VIEW_KEYS ?? join(process.cwd(), "..", "near", ".keys", "view-keys.json");
   const keys = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Record<string, { privateKey: string }>) : {};
-  const found = keys[accountOf(personaId)];
-  if (!found) throw new KeyMissingError(`No view key for ${accountOf(personaId)} on this server.`);
+  const found = keys[account];
+  if (!found) throw new KeyMissingError(`No view key for ${account} on this server.`);
   return found.privateKey;
 }
 
