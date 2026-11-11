@@ -72,3 +72,16 @@ export function viewKey(personaId: string): string {
   if (!found) throw new KeyMissingError(`No view key for ${accountOf(personaId)} on this server.`);
   return found.privateKey;
 }
+
+/** Whether this server can sign and open envelopes as `personaId`. A server
+ *  without the demo's keys still shows what the public can read. */
+export function holdsKeysFor(personaId: string): boolean {
+  try {
+    signingKey(personaId);
+    viewKey(personaId);
+    return true;
+  } catch (error) {
+    if (error instanceof KeyMissingError) return false;
+    throw error;
+  }
+}

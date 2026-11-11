@@ -8,7 +8,8 @@ import { ActionFeed, type FeedWording } from "@/components/app/ActionFeed";
 import { CastNav, LensLink } from "@/components/app/CastNav";
 import { BACKEND } from "@/lib/backend";
 import { LEDGER } from "@/lib/ledger/config";
-import { NEAR } from "@/lib/near/config";
+import { holdsKeysFor, NEAR } from "@/lib/near/config";
+import { PERSONAS } from "@/lib/pari/personas";
 import { SITE } from "@/lib/site";
 
 // Every screen reads the ledger live as its own party. Next.js would
@@ -34,6 +35,7 @@ const NEAR_WORDING: FeedWording = {
 // the demo-mode disclosure, and a quiet footer.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const near = BACKEND === "near";
+  const readOnly = near && !PERSONAS.every((persona) => holdsKeysFor(persona.id));
   return (
     <ActionFeed wording={near ? NEAR_WORDING : undefined}>
       <div className="relative flex min-h-screen flex-col bg-ink text-paper">
@@ -58,10 +60,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </span>
               <span aria-hidden className="hidden h-3.5 w-px shrink-0 bg-white/15 sm:block" />
               <p className="min-w-0 flex-1 basis-full text-pewter sm:basis-auto">
-                <span className="font-semibold text-amber">Demo mode.</span>{" "}
-                {near
-                  ? "This server holds a testnet key for every party, so one browser walks the deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope."
-                  : "One server signs for every party, so one browser walks the deal; each screen still reads the ledger as its own party."}
+                <span className="font-semibold text-amber">{readOnly ? "Read only." : "Demo mode."}</span>{" "}
+                {readOnly
+                  ? "This server holds no party's key, so it shows the deal as the public reads it. Open Who sees what."
+                  : near
+                    ? "This server holds a testnet key for every party, so one browser walks the deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope."
+                    : "One server signs for every party, so one browser walks the deal; each screen still reads the ledger as its own party."}
               </p>
               <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-[12px] text-ash lg:inline-flex">
                 Keys <kbd className="kbd">1</kbd>
