@@ -23,8 +23,15 @@ async function run(work: () => Promise<{ message: string; hash: string }>): Prom
     return { ok: true, message, links: [{ label: "Transaction", href: txUrl(hash) }] };
   } catch (error) {
     if (error instanceof ops.Refused) {
+      const links = [{ label: "Transaction", href: txUrl(error.hash) }];
+      // NEAR waits about two minutes for the enclave. No answer in that time is
+      // no rule's refusal: nothing ran, and the same action can be sent again.
+      if (error.message.startsWith("the enclave did not answer")) {
+        const message = "The enclave did not answer within NEAR's two-minute wait. Press it again: an answer that comes late counts for nothing.";
+        return { ok: false, message, links };
+      }
       // The feed shows a `Pari: …` message as a rule that was not met.
-      return { ok: false, message: `Pari: ${error.message}`, links: [{ label: "Transaction", href: txUrl(error.hash) }] };
+      return { ok: false, message: `Pari: ${error.message}`, links };
     }
     return { ok: false, message: error instanceof Error ? error.message : String(error) };
   } finally {

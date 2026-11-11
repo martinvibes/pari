@@ -25,7 +25,7 @@ export const metadata = {
 // answers, so the receipt says what the wait is for.
 const NEAR_WORDING: FeedWording = {
   pending: "Sent to NEAR",
-  waiting: "The contract is running the books in the enclave and checking the answer. On testnet this takes about half a minute.",
+  waiting: "The contract is running the books in the enclave and checking the answer. On testnet this takes from ten seconds to two minutes.",
   refused: "Refused",
   unchanged: "Nothing changed: the books and the money are as they were.",
 };
