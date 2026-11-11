@@ -88,6 +88,15 @@ function again(what: string, hash: string): void {
   console.warn(`  (the enclave did not answer ${what} in time and nothing changed; sending it again)\n    ${txUrl(hash)}`);
 }
 
+/** Said when the last try went unanswered too, before the caller reports the refusal. */
+function gaveUp(what: string): void {
+  console.warn(
+    `\n  The enclave did not answer ${what} in ${ATTEMPTS} tries, about ${ATTEMPTS * 2} minutes. Nothing changed on the contract.` +
+      "\n  OutLayer's testnet is busy or down; your setup is not at fault. Try again later:" +
+      "\n  `npm run setup` carries on where it stopped, and `npm run e2e` needs a fresh deal (`npm run setup -- --fresh`).\n",
+  );
+}
+
 /** Sends one function call signed by `signerId` and decodes what it returned.
  *  An action the enclave did not answer in time is sent again. */
 export async function call<T>(
@@ -101,10 +110,12 @@ export async function call<T>(
     const tx = await transact(signerId, contractId, methodName, args, deposit);
     const hash = tx.transaction.hash;
     if (contractId === LEDGER || contractId === DAO || args.receiver_id === LEDGER) await log({ step: methodName, signer: signerId, hash });
-    if (attempt === ATTEMPTS || !unanswered(tx)) {
-      return { hash, url: txUrl(hash), result: decoded<T>((tx.status as { SuccessValue?: string }).SuccessValue) as T };
+    if (unanswered(tx) && attempt < ATTEMPTS) {
+      again(methodName, hash);
+      continue;
     }
-    again(methodName, hash);
+    if (unanswered(tx)) gaveUp(methodName);
+    return { hash, url: txUrl(hash), result: decoded<T>((tx.status as { SuccessValue?: string }).SuccessValue) as T };
   }
 }
 
@@ -118,8 +129,12 @@ export async function act(signerId: string, method: string, args: Record<string,
     await approve(OPERATORS[0]!, id);
     const ran = await approve(OPERATORS[1]!, id);
     if (!ran.result) throw new Error(`the DAO's call to ${method} did not reach the ledger (${ran.url})`);
-    if (attempt === ATTEMPTS || !ran.unanswered) return { ...ran, result: ran.result };
-    again(method, ran.hash);
+    if (ran.unanswered && attempt < ATTEMPTS) {
+      again(method, ran.hash);
+      continue;
+    }
+    if (ran.unanswered) gaveUp(method);
+    return { ...ran, result: ran.result };
   }
 }
 
