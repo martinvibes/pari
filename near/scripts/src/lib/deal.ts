@@ -9,6 +9,13 @@ export const PROJECT_ID = `${ROOT}/${PROJECT_NAME}`;
 export const LEDGER = `ledger.${ROOT}`;
 export const USDC = `usdc.${ROOT}`;
 
+/** Sputnik DAO's factory on testnet (docs.near.org/primitives/dao). */
+export const DAO_FACTORY = "sputnikv2.testnet";
+/** The agent as a DAO, for a deal set up with --dao: three operators, and two
+ *  of them must approve each of the agent's actions. */
+export const DAO = `${ROOT.replace(/\.testnet$/, "").replaceAll(".", "-")}-agent.${DAO_FACTORY}`;
+export const OPERATORS = ["op1", "op2", "op3"].map((name) => `${name}.${ROOT}`);
+
 export const PERSONAS = ["agent", "northwind", "alder", "birch", "cedar", "delta", "rival", "auditor"] as const;
 export type Persona = (typeof PERSONAS)[number];
 

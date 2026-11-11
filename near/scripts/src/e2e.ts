@@ -2,6 +2,9 @@
 // one account entitled to it, and checks what each party can read afterwards.
 //
 // Run it on a fresh deal: `npm run setup -- --fresh && npm run e2e`.
+// On a deal set up with --dao the agent is a DAO: each of its actions is
+// proposed and approved by two of three operators, and the settlement is
+// played one approval at a time to show that the first moves nothing.
 //
 // 1. First period: the agent fixes the rate, mistypes the total (refused),
 //    requests the right total, the borrower pays, one settlement pays three
@@ -14,12 +17,14 @@ import {
   accountOf,
   BASE_RATE_BPS,
   BUYER_CASH,
+  DAO,
   FIRST_PERIOD_DUE as DUE,
   FIRST_PERIOD_END,
   FIRST_PERIOD_TOTAL as TOTAL,
   LEDGER,
   MISTYPED_TOTAL as MISTYPED,
   money,
+  OPERATORS,
   SECOND_PERIOD_END,
   TRADE,
   UNITS_PER_CENT,
@@ -27,12 +32,14 @@ import {
   WITHDRAWAL,
   type Persona,
 } from "./lib/deal.js";
-import { act, openEnvelope, payIn, sealForEnclave, state, view, type Outcome, type Sent } from "./lib/ledger.js";
+import { act, approve, openEnvelope, payIn, propose, sealForEnclave, state, view, type Outcome, type Sent } from "./lib/ledger.js";
 import { viewKeyFor } from "./lib/viewkeys.js";
 
-const [agent, borrower, alder, birch, cedar, delta, rival, auditor] = (
-  ["agent", "northwind", "alder", "birch", "cedar", "delta", "rival", "auditor"] satisfies Persona[]
-).map(accountOf) as [string, string, string, string, string, string, string, string];
+const [borrower, alder, birch, cedar, delta, rival, auditor] = (
+  ["northwind", "alder", "birch", "cedar", "delta", "rival", "auditor"] satisfies Persona[]
+).map(accountOf) as [string, string, string, string, string, string, string];
+const deal = await state();
+const agent = deal.agent;
 
 /** A party's opened envelope. Amounts are cents in strings. */
 interface View {
@@ -63,11 +70,29 @@ async function seen(accountId: string): Promise<View> {
   return opened;
 }
 
+/** The DAO's settlement, one operator at a time: the first approval must leave
+ *  the books and every lender exactly where they were. */
+async function settleInTwoApprovals(requestId: number): Promise<Sent<Outcome>> {
+  const before = await state();
+  const proposed = await propose("settle", { request_id: requestId });
+  console.log(`  operator 1 proposes the settlement\n    ${proposed.url}`);
+  const first = await approve(OPERATORS[0]!, proposed.result);
+  console.log(`  operator 1 approves\n    ${first.url}`);
+  const after = await state();
+  check(after.seq === before.seq && after.root === before.root, "one approval of three: the books have not moved");
+  check((await seen(alder)).cash === "0", "and no lender has been paid");
+  const second = await approve(OPERATORS[1]!, proposed.result);
+  if (!second.result) throw new Error(`the DAO's settlement did not reach the ledger (${second.url})`);
+  return { ...second, result: second.result };
+}
+
 async function usdcOf(accountId: string): Promise<bigint> {
   return BigInt(await view<string>(USDC, "ft_balance_of", { account_id: accountId })) / UNITS_PER_CENT;
 }
 
-console.log(`Deal ${(await state()).deal_id} on ${LEDGER}\n\nFirst period: interest`);
+console.log(`Deal ${deal.deal_id} on ${LEDGER}`);
+if (agent === DAO) console.log(`The agent is the DAO ${DAO}: two of ${OPERATORS.join(", ")} approve each action`);
+console.log("\nFirst period: interest");
 
 await ok("agent fixes the rate at 4.30% + 3.50%", act(agent, "fix_rate", { base_rate_bps: BASE_RATE_BPS, period_end: FIRST_PERIOD_END }));
 
@@ -83,7 +108,10 @@ const paid = await payIn(borrower, TOTAL, { kind: "pay", request_id: requestId }
 console.log(`  borrower pays ${money(TOTAL)} in test USDC\n    ${paid.url}`);
 check(BigInt(paid.result) === TOTAL * UNITS_PER_CENT, "the contract kept the whole payment");
 
-const settled = await ok("agent settles: three lenders paid in one step", act(agent, "settle", { request_id: requestId }));
+const settled =
+  agent === DAO
+    ? await ok("operator 2 approves, and the agent settles: three lenders paid in one step", settleInTwoApprovals(requestId))
+    : await ok("agent settles: three lenders paid in one step", act(agent, "settle", { request_id: requestId }));
 check(settled.public?.credited === TOTAL.toString(), `the chain shows one total, ${money(TOTAL)}, and no lender's share`);
 
 for (const lender of [alder, birch, cedar]) {

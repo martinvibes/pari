@@ -16,7 +16,6 @@ import {
   FIRST_PERIOD_TOTAL,
   LEDGER,
   money,
-  PERSONAS,
   POSITIONS,
   TRADE,
   UNITS_PER_CENT,
@@ -169,11 +168,10 @@ for (const fact of PUBLIC) {
 const deal = await state();
 if (deal.deal_id !== run.deal_id) {
   console.log(`\nControl skipped: the contract has moved on to deal ${deal.deal_id}, so its envelopes are another deal's.`);
-} else if (haveViewKeys(PERSONAS.map(accountOf))) {
+} else if (haveViewKeys(deal.parties)) {
   console.log("\nControl: the same search over the envelopes, opened with each party's own key");
   const opened: string[] = [];
-  for (const persona of PERSONAS) {
-    const account = accountOf(persona);
+  for (const account of deal.parties) {
     opened.push(JSON.stringify(await openEnvelope<unknown>(account, await viewKeyFor(account))));
   }
   const current = SECRETS.filter((secret) => !secret.past);
@@ -214,7 +212,7 @@ function latestRun(): string {
   const deals = existsSync(RUNS_DIR) ? readdirSync(RUNS_DIR).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, "")) : [];
   const played = deals.filter((deal) => {
     const log = readRun(deal);
-    return log?.ledger === LEDGER && log.transactions.some((t) => t.step === "settle_trade");
+    return log?.ledger === LEDGER && log.transactions.some((t) => (t.ran ?? t.step) === "settle_trade");
   });
   const newest = played.sort((a, b) => a.localeCompare(b, "en", { numeric: true })).at(-1);
   return newest ?? fail(`no full run recorded for ${LEDGER} in near/runs; run \`npm run e2e\` first`);

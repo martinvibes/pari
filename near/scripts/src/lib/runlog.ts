@@ -10,6 +10,8 @@ export interface RunEntry {
   step: string;
   signer: string;
   hash: string;
+  /** On a DAO operator's approval that made the DAO act: the ledger method it ran. */
+  ran?: string;
 }
 
 export interface RunLog {

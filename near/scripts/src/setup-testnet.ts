@@ -3,6 +3,8 @@
 //
 //   npm run setup            bring the current deal up to date
 //   npm run setup -- --fresh start a new deal (new books in the enclave)
+//   npm run setup -- --fresh --dao
+//                            the same, with a two-of-three DAO as the agent
 //
 // Needs the root account's key in ~/.near-credentials/testnet and the builds
 // from near/build.sh.
@@ -13,7 +15,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KeyPair, nearToYocto } from "near-api-js";
 import {
-  accountOf, FUNDING, LEDGER, money, OUTLAYER, PERSONAS, POSITIONS, PROJECT_ID, PROJECT_NAME, ROOT, TERMS, UNITS_PER_CENT, USDC,
+  accountOf, DAO, DAO_FACTORY, FUNDING, LEDGER, money, OPERATORS, OUTLAYER, PERSONAS, POSITIONS, PROJECT_ID, PROJECT_NAME, ROOT, TERMS,
+  UNITS_PER_CENT, USDC,
 } from "./lib/deal.js";
 import { publish, sha256 } from "./lib/fastfs.js";
 import { act, call, sealForEnclave, state, view, type PublicState } from "./lib/ledger.js";
@@ -28,8 +31,15 @@ const BUILDS = {
 };
 
 /** Testnet NEAR each account is kept above. Contracts pay for their own storage;
- *  parties prepay about 0.3 NEAR of gas per action and get most of it back. */
-const MIN_NEAR: Record<string, number> = { [LEDGER]: 5, [USDC]: 2.5, [accountOf("agent")]: 1.5 };
+ *  parties prepay about 0.3 NEAR of gas per action and get most of it back. An
+ *  operator also puts up the DAO's bond (1 NEAR) with each proposal, and gets
+ *  it back when the proposal passes. */
+const MIN_NEAR: Record<string, number> = {
+  [LEDGER]: 5,
+  [USDC]: 2.5,
+  [accountOf("agent")]: 1.5,
+  ...Object.fromEntries(OPERATORS.map((operator) => [operator, 1.5])),
+};
 const DEFAULT_MIN_NEAR = 0.9;
 
 function step(text: string): void {
@@ -91,13 +101,27 @@ async function ensureEnclaveVersion(hash: string, url: string): Promise<void> {
   done(`version ${hash.slice(0, 12)}… added to ${PROJECT_ID}`);
 }
 
+/** Creates the agent's DAO through Sputnik's factory, with the three operators
+ *  as its council. Under Sputnik's default policy more than half must approve. */
+async function ensureDao(): Promise<void> {
+  if (await provider.viewAccount({ accountId: DAO }).catch(() => null)) return done(`${DAO} exists`);
+  const name = DAO.split(".")[0]!;
+  const config = { name, purpose: "Pari's administrative agent: two of three operators approve each action", metadata: "" };
+  const args = Buffer.from(JSON.stringify({ config, policy: OPERATORS })).toString("base64");
+  await call(ROOT, DAO_FACTORY, "create", { name, args }, nearToYocto(6));
+  done(`${DAO} created: three operators, and two must approve each action`);
+}
+
 /**
  * Starts the deal on the contract, pinned to this enclave build. `previous` is
  * the deal that was there before this run deployed anything: the enclave keeps
  * each deal's books by its id, so a new deal needs the next number.
  */
-async function ensureDeal(previous: PublicState | null, hash: string, fresh: boolean): Promise<PublicState> {
+async function ensureDeal(previous: PublicState | null, hash: string, fresh: boolean, agent: string): Promise<PublicState> {
   const current = await state().catch(() => null);
+  if (current && !fresh && agent === DAO && current.agent !== DAO) {
+    throw new Error(`deal ${current.deal_id} has ${current.agent} as its agent. Run with --fresh --dao to start a deal whose agent is the DAO.`);
+  }
   if (current && !fresh && current.version_key === hash) {
     done(`deal ${current.deal_id} is live on ${LEDGER}`);
     return current;
@@ -112,7 +136,7 @@ async function ensureDeal(previous: PublicState | null, hash: string, fresh: boo
   const deal_id = process.env.PARI_DEAL ?? `northwind-${number + 1}`;
   const args = {
     owner: ROOT, deal_id, outlayer: OUTLAYER, project_id: PROJECT_ID, version_key: hash, usdc: USDC, terms: TERMS,
-    agent: accountOf("agent"), borrower: accountOf("northwind"),
+    agent, borrower: accountOf("northwind"),
   };
   await call(LEDGER, LEDGER, "new", args);
   done(`deal ${deal_id} started, pinned to enclave build ${hash.slice(0, 12)}…`);
@@ -143,9 +167,15 @@ async function expectOk(what: string, sent: Promise<{ url: string; result: { ok:
 }
 
 const fresh = process.argv.includes("--fresh");
+// With --dao the deal's agent is a Sputnik DAO of three operators, not one account.
+const dao = process.argv.includes("--dao");
 
 step("Accounts");
 for (const accountId of [LEDGER, USDC, ...PERSONAS.map(accountOf)]) await ensureAccount(accountId);
+if (dao) {
+  for (const accountId of OPERATORS) await ensureAccount(accountId);
+  await ensureDao();
+}
 
 step("Test USDC");
 await ensureCode(USDC, build("usdc"));
@@ -162,7 +192,7 @@ await ensureEnclaveVersion(hash, await publish(enclave));
 step("Rules contract");
 const previous = await state().catch(() => null);
 await ensureCode(LEDGER, build("ledger"));
-let deal = await ensureDeal(previous, hash, fresh);
+let deal = await ensureDeal(previous, hash, fresh, dao ? DAO : accountOf("agent"));
 await sweepEndedDeals(deal.deal_id);
 
 if (!deal.enclave_key) {
@@ -178,7 +208,7 @@ if (!deal.root) {
 
 step("View keys");
 for (const persona of PERSONAS) {
-  const accountId = accountOf(persona);
+  const accountId = persona === "agent" ? deal.agent : accountOf(persona);
   const key = await viewKeyFor(accountId);
   if ((await view<string | null>(LEDGER, "view_key", { account_id: accountId })) === key.publicKey) {
     done(`${accountId} registered`);

@@ -2,9 +2,9 @@
 // opening a party's envelope.
 
 import { teraToGas } from "near-api-js";
-import { LEDGER, UNITS_PER_CENT, USDC } from "./deal.js";
+import { DAO, LEDGER, OPERATORS, UNITS_PER_CENT, USDC } from "./deal.js";
 import { accountFor, provider, txUrl } from "./network.js";
-import { record } from "./runlog.js";
+import { record, type RunEntry } from "./runlog.js";
 import { open, seal, type ViewKey } from "./seal.js";
 
 export interface PublicRequest {
@@ -55,6 +55,20 @@ export function state(): Promise<PublicState> {
   return view<PublicState>(LEDGER, "state");
 }
 
+function decoded<T>(value: string | undefined): T | null {
+  return value ? (JSON.parse(Buffer.from(value, "base64").toString()) as T) : null;
+}
+
+/** Sends one function call signed by `signerId` and waits for all of it to finish. */
+function transact(signerId: string, contractId: string, methodName: string, args: Record<string, unknown>, deposit: bigint) {
+  return accountFor(signerId).callFunctionRaw({ contractId, methodName, args, gas: teraToGas("300"), deposit, waitUntil: "FINAL" });
+}
+
+/** Everything that reaches the deal goes in the run log, for the leak test. */
+async function log(entry: RunEntry): Promise<void> {
+  record((await state()).deal_id, LEDGER, entry);
+}
+
 /** Sends one function call signed by `signerId` and decodes what it returned. */
 export async function call<T>(
   signerId: string,
@@ -63,27 +77,47 @@ export async function call<T>(
   args: Record<string, unknown>,
   deposit: bigint = 0n,
 ): Promise<Sent<T>> {
-  const tx = await accountFor(signerId).callFunctionRaw({
-    contractId,
-    methodName,
-    args,
-    gas: teraToGas("300"),
-    deposit,
-    waitUntil: "FINAL",
-  });
-  const value = (tx.status as { SuccessValue?: string }).SuccessValue;
-  const result = (value ? JSON.parse(Buffer.from(value, "base64").toString()) : null) as T;
+  const tx = await transact(signerId, contractId, methodName, args, deposit);
   const hash = tx.transaction.hash;
-  // Everything that reaches the deal goes in the run log, for the leak test.
-  if (contractId === LEDGER || args.receiver_id === LEDGER) {
-    record((await state()).deal_id, LEDGER, { step: methodName, signer: signerId, hash });
-  }
-  return { hash, url: txUrl(hash), result };
+  if (contractId === LEDGER || contractId === DAO || args.receiver_id === LEDGER) await log({ step: methodName, signer: signerId, hash });
+  return { hash, url: txUrl(hash), result: decoded<T>((tx.status as { SuccessValue?: string }).SuccessValue) as T };
 }
 
-/** One action on the deal, signed by the party entitled to it. */
-export function act(signerId: string, method: string, args: Record<string, unknown> = {}): Promise<Sent<Outcome>> {
-  return call<Outcome>(signerId, LEDGER, method, args);
+/** One action on the deal, signed by the party entitled to it. When the agent
+ *  is the DAO, its action is proposed and approved by two of the operators. */
+export async function act(signerId: string, method: string, args: Record<string, unknown> = {}): Promise<Sent<Outcome>> {
+  if (signerId !== DAO) return call<Outcome>(signerId, LEDGER, method, args);
+  const { result: id } = await propose(method, args);
+  await approve(OPERATORS[0]!, id);
+  const ran = await approve(OPERATORS[1]!, id);
+  if (!ran.result) throw new Error(`the DAO's call to ${method} did not reach the ledger (${ran.url})`);
+  return { ...ran, result: ran.result };
+}
+
+/** The first operator proposes one of the agent's actions to the DAO. Nothing
+ *  runs: a proposal needs the approval of two of the three operators. */
+export async function propose(method: string, args: Record<string, unknown> = {}): Promise<Sent<number>> {
+  const action = { method_name: method, args: Buffer.from(JSON.stringify(args)).toString("base64"), deposit: "0", gas: teraToGas("250").toString() };
+  // The DAO holds a bond for each proposal and returns it when the proposal passes.
+  const [{ deal_id }, { proposal_bond }] = await Promise.all([state(), view<{ proposal_bond: string }>(DAO, "get_policy")]);
+  const proposal = { description: `Pari ${deal_id}: ${method}`, kind: { FunctionCall: { receiver_id: LEDGER, actions: [action] } } };
+  return call<number>(OPERATORS[0]!, DAO, "add_proposal", { proposal }, BigInt(proposal_bond));
+}
+
+/** One operator approves a proposal. The second approval makes the DAO call
+ *  the ledger in the same transaction; `result` is then the ledger's answer. */
+export async function approve(operator: string, id: number): Promise<Sent<Outcome | null>> {
+  const { kind } = await view<{ kind: { FunctionCall: { actions: { method_name: string }[] } } }>(DAO, "get_proposal", { id });
+  const tx = await transact(operator, DAO, "act_proposal", { id, action: "VoteApprove", proposal: kind }, 0n);
+  const answer = tx.receipts_outcome
+    .filter((receipt) => receipt.outcome.executor_id === LEDGER)
+    .map((receipt) => decoded<Outcome>((receipt.outcome.status as { SuccessValue?: string }).SuccessValue))
+    .filter((answer) => typeof answer?.ok === "boolean")
+    .at(-1);
+  const hash = tx.transaction.hash;
+  const ran = answer ? { ran: kind.FunctionCall.actions[0]!.method_name } : {};
+  await log({ step: "act_proposal", signer: operator, hash, ...ran });
+  return { hash, url: txUrl(hash), result: answer ?? null };
 }
 
 /** Seals a command's secret fields so only the enclave can read them. */

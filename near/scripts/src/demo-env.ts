@@ -8,20 +8,28 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { accountOf, PERSONAS, ROOT } from "./lib/deal.js";
+import { accountOf, DAO, OPERATORS, PERSONAS, ROOT } from "./lib/deal.js";
+import { state } from "./lib/ledger.js";
 import { keyFor } from "./lib/network.js";
 import { haveViewKeys, viewKeyFor } from "./lib/viewkeys.js";
 
 const FILE = join(dirname(fileURLToPath(import.meta.url)), "../../.keys/demo.env");
 
-if (!haveViewKeys(PERSONAS.map(accountOf))) {
+const { agent, parties } = await state();
+if (!haveViewKeys(parties)) {
   throw new Error("this machine does not hold the parties' view keys: run `npm run setup` first");
 }
 
 const lines = ["PARI_BACKEND=near", `PARI_ROOT=${ROOT}`];
 for (const persona of PERSONAS) {
+  // The agent's envelope is sealed to the key of the account that is the deal's agent.
+  const viewer = persona === "agent" ? agent : accountOf(persona);
   lines.push(`NEAR_KEY_${persona.toUpperCase()}=${keyFor(accountOf(persona))}`);
-  lines.push(`VIEW_KEY_${persona.toUpperCase()}=${(await viewKeyFor(accountOf(persona))).privateKey}`);
+  lines.push(`VIEW_KEY_${persona.toUpperCase()}=${(await viewKeyFor(viewer)).privateKey}`);
+}
+// When the agent is the DAO, its operators sign the agent's actions.
+if (agent === DAO) {
+  for (const operator of OPERATORS) lines.push(`NEAR_KEY_${operator.split(".")[0]!.toUpperCase()}=${keyFor(operator)}`);
 }
 
 mkdirSync(dirname(FILE), { recursive: true });
