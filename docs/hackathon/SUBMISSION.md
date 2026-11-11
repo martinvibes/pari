@@ -1,0 +1,115 @@
+# Pari on NEAR: submission drafts
+
+Drafts only. Nothing here has been submitted or posted. The builder submits the
+form and publishes the X post.
+
+Rules re-read on 2026-11-11 from https://nearhackathon.com/HACKATHON.md.
+Deadline: **2026-11-14T23:59:00Z** (Saturday 23:59 UTC, Sunday 00:59 in Lagos).
+
+## The form
+
+`POST https://nearhackathon.com/api/applications`, exactly these fields.
+
+| Field | Value |
+| --- | --- |
+| `projectName` | Pari |
+| `leadName` | *(the builder's name, 2 to 80 characters)* |
+| `email` | *(the builder's email; at most 2 submissions per email)* |
+| `size` | `1` |
+| `tracks` | `["privacy", "realworld"]` |
+| `nearAddress` | *(the builder's **mainnet** NEAR account, for the payout)* |
+| `projectUrl` | `https://github.com/martinvibes/pari` (see "Which branch judges see" below) |
+| `demoUrl` | *(the URL of the X post, once published)* |
+| `idea` | the text under "What did you build?" below (1,757 characters; the limit is 2,000) |
+| `consent` | `true`, after the builder has read the contact notice |
+
+Leave `website` empty: it is a spam trap. One submission per repository; a
+second POST for the same repository is rejected, and corrections go through the
+request-changes page.
+
+### One-liner
+
+A syndicated loan's books on NEAR: the rules in a contract, the books in a TDX
+enclave, and each party sees only its own.
+
+### What did you build?
+
+```
+Pari is the administrative agent's books for a syndicated loan, on NEAR.
+
+In 2020 Citibank, as Revlon's loan agent, meant to pay $7.8M of interest and wired $900M instead. Loans still run on email and spreadsheets. They can't simply move to a public chain either, because the chain would publish every lender's position, every trade price and the borrower's list of banned buyers.
+
+Pari splits the job in two. A NEAR contract holds the rules: who may do what, one action at a time, and a cap on every payout. The books themselves (positions, cash, trade prices, the banned-buyer list) live in encrypted storage inside an Intel TDX enclave on OutLayer, which the contract calls and resumes from. After every action the enclave returns a fingerprint of the books and one sealed envelope per party. The public chain sees one total and a fingerprint. Each lender opens only its own envelope.
+
+Working on testnet today:
+- interest paid to three lenders in one step, to the cent;
+- a mistyped $900,000,000 total refused by the enclave, with a second, independent cap in the contract;
+- a loan trade settled cash against loan at a sealed price;
+- a banned buyer refused without learning why;
+- an auditor who sees every payment and no price.
+
+Anyone can check the privacy claim with no keys: one command downloads every transaction of a recorded run and the contract's whole storage from NEAR, and finds none of the deal's secrets. There are 46 Rust tests, with the same names and numbers as the original test suite.
+
+Pari was first built for Canton, where the ledger itself is private. The NEAR version is a new build made during the hackathon: a new contract, a new enclave program and a new data layer. The README discloses the earlier build and links the diff.
+```
+
+## The X post
+
+The builder posts it. It must say the project was built at NEAR HACKATHON, tag
+@NEARProtocol and #NEARHackathon, and carry the demo video. @NearLegion and
+@NearBuilders are optional. The draft is 278 characters with the link counted
+as X counts it (23), inside the 280 limit.
+
+```
+In 2020 Citi meant to pay $7.8M in interest. It wired $900M.
+
+Pari keeps a loan's books on NEAR: rules in a contract, books in a TDX enclave. Each lender sees only its own. The $900M typo is refused.
+
+Built at NEAR HACKATHON @NEARProtocol #NEARHackathon
+
+github.com/martinvibes/pari
+```
+
+## The demo video (about two minutes)
+
+Record against a fresh deal: `npm run setup -- --fresh` in `near/scripts`, then
+`PARI_BACKEND=near npm run dev` in `web`. Each action takes 10 to 30 seconds on
+testnet, so cut the waits.
+
+| Time | On screen | Say |
+| --- | --- | --- |
+| 0:00 | A title card, or the Revlon headline | "In 2020 Citibank meant to pay 7.8 million dollars of loan interest. It wired 900 million." |
+| 0:12 | The README diagram | "A loan can't live on a public chain. Every position, price and banned buyer would leak. On NEAR, Pari keeps the rules in a contract and the books in an enclave." |
+| 0:30 | `/agent`: Fix rate, then type `900,000,000.00` and press Request interest | "The agent types 900 million. Refused: the register says 1,971,666.66." Then request the right total. |
+| 0:50 | `/borrower`: Pay. `/agent`: Settle all 3 lenders | "The borrower pays once. One settlement pays three lenders." |
+| 1:05 | `/visibility`, then `/lender/alder` | "The public chain shows one total and a fingerprint. Alder sees 985,833.33 and nothing about Birch or Cedar." |
+| 1:25 | Rival's refused trade, Delta's settled one, `/borrower` | "Rival is on the borrower's banned list. Its trade doesn't settle, and it is never told why. Delta buys ten million at a sealed price. The borrower sees the trade, not the price." |
+| 1:45 | A terminal: `npm run prove:privacy` | "Every transaction and the contract's whole storage, searched for the deal's secrets. Zero found." |
+| 1:55 | The repository | "Built at NEAR HACKATHON." |
+
+## Which branch judges see
+
+The form takes the repository's URL, and a plain `git clone` gives the default
+branch. Today that is `main`, which is the Canton build with the Canton README.
+The NEAR work is on branch `near`. Before submitting, the builder picks one:
+
+1. **Make `near` the default branch on GitHub** (recommended). `main` and the
+   Canton demo that deploys from it stay exactly as they are, and it can be
+   switched back after judging.
+2. Merge `near` into `main`. One branch, but it redeploys the hosted Canton demo.
+
+Either way, tag the final commit `hackathon-submission`; the rules accept the
+`pre-hackathon` and `hackathon-submission` tags plus the README's diff link.
+
+## Checklist
+
+- [ ] Branch `near` pushed (this makes the NEAR work public)
+- [ ] Default branch decided (above), final commit tagged `hackathon-submission`
+- [ ] Repository public, with its LICENSE (Apache-2.0 is there), through 2026-11-18
+- [ ] README section 1 run from a fresh clone: both `cargo test` runs and `npm run prove:privacy`
+- [ ] Demo video recorded; its link added at the top of the README
+- [ ] Hosted demo (optional, "a plus"): `docker build -f near/Dockerfile`, with the variables from `npm run demo:env`; link added to the README; kept up through 2026-11-18
+- [ ] X post published with the video, saying "Built at NEAR HACKATHON", tagging @NEARProtocol and #NEARHackathon
+- [ ] Selkie's README names Pari (Pari's README already names Selkie)
+- [ ] Mainnet payout account ready for `nearAddress`
+- [ ] Form submitted before 2026-11-14T23:59:00Z, after Selkie's
