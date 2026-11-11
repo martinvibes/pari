@@ -11,8 +11,10 @@ import { LEDGER } from "@/lib/ledger/config";
 import { NEAR } from "@/lib/near/config";
 import { SITE } from "@/lib/site";
 
-// Every screen reads the ledger live as its own party.
+// Every screen reads the ledger live as its own party. Next.js would
+// otherwise keep the answer to a chain read and serve it again later.
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export const metadata = {
   title: { template: "%s · Pari", default: "Pari" },
