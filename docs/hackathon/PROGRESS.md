@@ -115,7 +115,7 @@ Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txn
 - **P1: the two-of-three agent (Sputnik DAO) and the second period.** Left out to finish P0 properly. The enclave does share a short payment pro rata and carry the unpaid part (tested in `near/enclave/tests/interest.rs`), but no testnet run shows a second period.
 - **The brief's cut list**, as planned: prepayment, MNPI documents and the information wall, the 100-lender scale test, Confidential Intents withdrawals, an AI agent, mainnet, Canton Coin.
 - **No hosted NEAR demo yet.** `near/Dockerfile` and `npm run demo:env` are ready. The same standalone server was run locally with that env file and no other keys; the Docker image build itself has not been run.
-- **The landing page and `/docs` still describe the Canton build.** Only the app screens switch with `PARI_BACKEND=near`.
+- **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
 
 ## Next (the builder's steps)
