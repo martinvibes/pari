@@ -10,8 +10,8 @@ Baseline: tag `pre-hackathon` = 3c11dbc (the Canton build, 2026-10-07).
 | Setup (branch, tag, folders) | done |
 | Spike 1: contract → OutLayer → callback, private storage | **pass** |
 | Spike 2: sealed envelopes | **pass** |
-| P0-a enclave logic | deal rules done: `cargo test` in `near/enclave`, 17 tests green with the golden numbers. Enclave entry point next |
-| P0-b rules contract | not started |
+| P0-a enclave logic | **done**: `cargo test` in `near/enclave`, 21 tests green with the golden numbers; wasm builds for wasm32-wasip2 |
+| P0-b rules contract | written: `cargo test` in `near/contract`, 20 tests green. Testnet deploy and e2e next |
 | P0-c web NEAR mode | not started |
 | P0-d leak test | not started |
 | P0-e trade with DQ screening | not started |
