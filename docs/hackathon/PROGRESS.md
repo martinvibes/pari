@@ -3,20 +3,24 @@
 Branch `near`, built for NEAR HACKATHON (window 2026-10-19 → 2026-11-14T23:59Z).
 Baseline: tag `pre-hackathon` = 3c11dbc (the Canton build, 2026-10-07).
 
-## Status (2026-11-11, evening UTC)
+## Status (2026-11-11, 22:00 UTC)
 
 | Part | State |
 | --- | --- |
 | Setup (branch, tag, folders) | done |
 | Spike 1: contract → OutLayer → callback, private storage | **pass** |
 | Spike 2: sealed envelopes | **pass** |
-| P0-a enclave logic | **done**: `cargo test` in `near/enclave`, 21 tests green with the golden numbers |
-| P0-b rules contract | **done**: `cargo test` in `near/contract`, 25 tests green; deployed at `ledger.paridesk.testnet`; `npm run e2e` all green on testnet |
+| P0-a enclave logic | **done**: `cargo test` in `near/enclave`, 26 tests green with the golden numbers |
+| P0-b rules contract | **done**: `cargo test` in `near/contract`, 26 tests green; deployed at `ledger.paridesk.testnet`; `npm run e2e` all green on testnet (on the earlier builds: see below) |
 | P0-c web NEAR mode | **done**: the whole acceptance flow played in a real browser against testnet |
 | P0-d leak test | **done**: `npm run prove:privacy` passes, 0 secrets in 1,476,899 bytes of public data |
 | P0-e trade with DQ screening | **done**: in the end-to-end script and in the browser |
 | README and submission drafts | **done**: `README.md`, `docs/hackathon/SUBMISSION.md` |
-| P1: two-of-three agent, second period | **cut** (see Cut) |
+| P1: two-of-three agent | **done**: the deal's agent can be a Sputnik DAO; played by `npm run e2e` and in the browser |
+| P1: second period | **done in the app**, played in the browser. In `npm run e2e` and the leak test it is written and **not yet run on testnet** |
+| Late answers | **done**: an enclave answer that misses NEAR's two-minute wait changes nothing, and the action can be sent again. Tested in Rust; the resend was seen working on testnet |
+| Proofs: one fact, and nothing else | **built, not yet played on testnet.** Enclave, contract, scripts and web are written and tested, and the rejection paths were run against testnet. No real proof has been cut yet, because OutLayer's testnet stopped answering (see below) |
+| The live deal on testnet | **empty.** `ledger.paridesk.testnet` runs the new contract and pins the new enclave build for deal `northwind-9`, which has no enclave key yet for the same reason |
 
 Nothing has been pushed, posted or submitted. Those steps are the builder's.
 
@@ -26,11 +30,39 @@ Nothing has been pushed, posted or submitted. Those steps are the builder's.
 - **The Revlon refusal.** The agent types 900,000,000.00. The enclave refuses: "You entered 900,000,000.00; the register says 1,971,666.66." The refusal is on the public record and the books do not move. The contract has its own caps as a second guard (credited ≤ paid in, payouts ≤ held).
 - **Withdrawal.** Alder withdraws 500,000.00; the contract pays exactly that in test USDC.
 - **A screened trade.** The borrower seals a DQ list naming Rival. Rival's trade is "not settled" and Rival is told no more; the agent's envelope alone holds the reason. Delta buys 10,000,000.00 at 99.50, cash against loan in one step. Alder keeps the interest it earned to the trade date (65,000.00 on the part sold).
-- **Who sees what.** Eight sealed envelopes, one per party, rewritten after every action. `/visibility` shows the public chain beside every party's opened envelope and re-checks seven claims on every load.
+- **A short payment, and the period that pays the rest.** The borrower pays 975,000.00 of the 1,950,000.00 requested for the second period. One settlement pays every lender the same half of what it is owed (Alder 422,500.00, Birch 292,500.00, Cedar 195,000.00, Delta 65,000.00) and the other half stays owed. The third period's request is 2,968,333.32: its own interest plus every unpaid half, paid in full.
+- **The agent as two of three.** `npm run setup -- --fresh --dao` names a Sputnik DAO (`paridesk-agent.sputnikv2.testnet`, council `op1`, `op2`, `op3`) as the deal's agent, with no change to the contract or the enclave. Each agent action is a proposal to call the rules contract. Operator 1 proposes and approves and nothing moves; a second operator's approval runs DAO → contract → enclave → callback in one transaction. Two operators approving 900,000,000.00 are still refused by the enclave.
+- **Who sees what.** Eight sealed envelopes, one per party, rewritten after every action. `/visibility` shows the public chain beside every party's opened envelope and re-checks eight claims on every load.
 - **A server with no keys.** The web app still renders `/visibility` as the public reads it, with every envelope sealed.
+- **An answer that comes late counts for nothing.** The contract sends the enclave the fingerprint it holds and the number of the request. The enclave builds only on the books with that fingerprint, and refuses a request with a lower number than one it has answered. So when the enclave misses NEAR's wait the contract records "the enclave did not answer; nothing changed", and a run that finishes later cannot change the books. Tests: `test_an_answer_the_contract_never_received_is_not_built_on`, `test_a_late_run_cannot_undo_an_answer_the_contract_received`.
+- **Proofs (built; the real thing not yet cut on testnet).** With every answer the enclave returns one commitment per party: the sha256 of the salted hashes of the facts in that party's view. The contract stores it beside the envelope. A party cuts a proof of one fact (what it holds, its cash, one payment, the register) and anyone checks it with no keys against `envelope(party)` at the proof's block: `/verify` in the app, `npm run verify:proof` in the scripts. Tests: `test_a_party_proves_one_fact_and_shows_nothing_else`, `test_a_commitment_is_new_with_every_answer_and_confirms_no_guess`, `test_the_enclave_and_the_proof_checker_agree_on_a_known_view`. Run against testnet so far: a made-up proof is rejected by the chain, and a changed fact and a non-hex hash are rejected by the arithmetic.
 - **The leak test.** Every transaction of the recorded run plus the contract's whole storage, searched for 16 secrets: none found. The same search finds what Pari publishes on purpose, and finds 13 of 13 secrets inside the opened envelopes.
 
-## The recorded run: deal `northwind-4`
+## OutLayer's testnet stopped answering (2026-11-11, from about 21:38 UTC)
+
+This blocks every step that needs the enclave. It is not a fault in Pari.
+
+- Through the day OutLayer answered in 6 to 16 seconds. In the evening it took 60 to 80 seconds, then 92 and 108. From 21:38 UTC it did not answer at all within NEAR's wait of about two minutes.
+- `npm run setup -- --fresh` started deal `northwind-9` on the new contract and the new enclave build, then stopped at its first enclave call. Four requests for the enclave's key went unanswered: [81gqvip7…](https://testnet.nearblocks.io/txns/81gqvip7KTLnMngWLPsaJXbQev9mLdGF24qc3eZH99LE), [9hPmbGmY…](https://testnet.nearblocks.io/txns/9hPmbGmYf72TXDAdatoyiEnrGeuvmq4xhveNQdYWdt1V), [3LqAWghd…](https://testnet.nearblocks.io/txns/3LqAWghdi2HVNxQQQn3hYMiFUFUnwARdFsgjP5G3LY4j), [Hc1XkrY7…](https://testnet.nearblocks.io/txns/Hc1XkrY7pBYkHkJr3gPXxroakQmMXt32trng2sDNNHTT).
+- The receipts of the second one show what happens. OutLayer logs `execution_requested` 1.1 seconds in. At 120.1 seconds it logs `Execution promise failed`, refunds the unused deposit and charges 0.001 NEAR. The ledger then records "the enclave did not answer; nothing changed" and releases its lock. OutLayer has no attestation for any of the four (`/attestations/by-tx/<hash>` answers 404), so no worker ran them.
+- **It is not the new build.** The day-one counter program (`npm run spike`, another OutLayer project, a build that answered all day) got no answer either, at 21:47 and 21:49 UTC: [CooGFm45…](https://testnet.nearblocks.io/txns/CooGFm45HQvfnXnrFtUeJNFcsHgRcHSapfxx48ryj12y), [gHacNYUi…](https://testnet.nearblocks.io/txns/gHacNYUiWvTDXMXiJZeo1h43HBBQ8vCtMqSg8rdjUCz).
+- The new build is where the workers fetch it: `https://test.fastfs.io/paridesk.testnet/outlayer.testnet/e3ea1f33d0258be343fb2cc40056fab020671f213045e8bd02aeebc3f4d7f115.wasm`, 439,311 bytes, and its sha256 matches.
+- OutLayer's contract is not paused (`is_paused` on `outlayer.testnet` returns `false`).
+- **It is not only Pari.** `get_stats` on `outlayer.testnet` counted 75 more executions between 21:53 and 22:04 UTC (26,285 to 26,360), and its total of fees rose by exactly 0.075 NEAR: 0.001 NEAR each, which is what a run that fails is charged. About five of the 75 were Pari's.
+- What the scripts do about it: an action whose transaction carries the ledger's "the enclave did not answer" is sent again, up to four times. That is safe because of the late-answer rule (see "What works").
+
+**Waiting on OutLayer:** the setup of `northwind-9`; the end-to-end run with the short payment, the third period and the proof checks; the leak test's new secrets; `npm run verify:proof` on a real proof; the proof buttons in the browser; the final recorded runs.
+
+## The recorded runs: deals `northwind-4` and `northwind-5`
+
+Both were played on the earlier builds (below), before the commitments and the
+late-answer rule. Their transactions stay on the chain, and `npm run
+prove:privacy` still passes on them from a fresh clone. It reads the build a
+deal pinned from that deal's own first transaction, so it does not matter that
+the contract has since moved on. `northwind-5` is the same deal played with the
+DAO as the agent (44 transactions, in [`near/runs/northwind-5.json`](../../near/runs/northwind-5.json)).
+
+### Deal `northwind-4`
 
 Played by `npm run e2e` on 2026-11-11. Books at seq 23, fingerprint
 `a36f61c021543fc351c9c3c4e1006b9b1c4b0eac0d4667444e5f28212c808eb1`. All 28
@@ -106,17 +138,31 @@ OutLayer project `paridesk.testnet/pari-spike`, build pinned by sha256
 - sealed round trip: [4G9Wz1Fv…](https://testnet.nearblocks.io/txns/4G9Wz1FvciyYiZNdGS5XN6tMwNUmF6fQS8BNvC3LNiQm). The script searched the whole transaction (args, logs, return values, base64-decoded) for the secret price and the DQ entry: none found.
 - Rust `crypto_box` 0.9.1 (`seal`) and TS `libsodium-wrappers` 0.8.4 interoperate.
 
+**Spike 3: pass.** A Sputnik DAO with three council members called a contract, and the call ran only after the second approval.
+
+- DAO `paridesk-agent.sputnikv2.testnet`, made by the factory `sputnikv2.testnet` (`create` with 6 NEAR attached): [9YwV12rD…](https://testnet.nearblocks.io/txns/9YwV12rDXnfTEFKSAJtFZWTfPVcKgg7CcppXB9QbtNgq). Council: `op1`, `op2`, `op3` under `paridesk.testnet`.
+- The proposal, a `FunctionCall` to `spike.paridesk.testnet` with 250 TGas: [GFxXaDfj…](https://testnet.nearblocks.io/txns/GFxXaDfjPtY6nexs4dEAxrPDTGMuNb2vdo3q6wpCzzu7).
+- First approval: [HmPjWc9R…](https://testnet.nearblocks.io/txns/HmPjWc9RGukFuSVUaS3RUfQsjPeHnXNMAji4zZvdyfi6). The proposal stayed `InProgress` with one vote of three, and the spike contract's count did not change.
+- Second approval: [5QGeAqjn…](https://testnet.nearblocks.io/txns/5QGeAqjn2RTAyHJsHqQitYqwkRxPAqHXY3RWh5uxTEVC). The proposal became `Approved` and the same transaction ran the contract, the enclave and the callback (count 7). The enclave saw `predecessor = spike.paridesk.testnet` and `signer = op2.paridesk.testnet`.
+- The DAO's default policy, as read from the chain: a 1 NEAR bond per proposal (returned when it passes), seven days to vote, and more than half of the council to pass, so two of three. `act_proposal` takes the proposal's kind as well as its id.
+
 **Gotcha: FastFS.** `outlayer upload` can report success while the gateway never serves the file (first upload [J7sYWyuM…](https://testnet.nearblocks.io/txns/J7sYWyuMSnBeTpHv5SX23xBmpdSgPXkYdNqLnq8xuhu3) stayed 404 for 30+ minutes). Uploading the same bytes again ([B2HHDPiA…](https://testnet.nearblocks.io/txns/B2HHDPiAKGFjpP7dXAgJhJZqp1L6kcqwKxY5QvDz94Pk)) served within seconds. Always check the URL's sha256 before deploying a version.
 
 Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txns/G1ZSCUNefRpokiTrv38xHcvSUuucGY3LuhcL4A59NjqD), create_project [Adeiu9uj…](https://testnet.nearblocks.io/txns/Adeiu9ujRRR91eaHuyrpGtJJ2JUadmTL8RqGmJjU9VvQ), spike account [4xQky8eW…](https://testnet.nearblocks.io/txns/4xQky8eWpuBw9CgqP3ceEJzcZXnvYKGEe4BcG6ocTPMo), spike deploy [Dw1tMpyo…](https://testnet.nearblocks.io/txns/Dw1tMpyow6SBXFD34QhRV4frPP6ujnabQJrZ2A3Ucjmf).
 
 ## Cut
 
-- **P1: the two-of-three agent (Sputnik DAO) and the second period.** Left out to finish P0 properly. The enclave does share a short payment pro rata and carry the unpaid part (tested in `near/enclave/tests/interest.rs`), but no testnet run shows a second period.
 - **The brief's cut list**, as planned: prepayment, MNPI documents and the information wall, the 100-lender scale test, Confidential Intents withdrawals, an AI agent, mainnet, Canton Coin.
 - **No hosted NEAR demo yet.** `near/Dockerfile` and `npm run demo:env` are ready. The same standalone server was run locally with that env file and no other keys; the Docker image build itself has not been run.
 - **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
+
+## Next, when OutLayer answers again
+
+1. `npm run setup` (it carries on with `northwind-9`), then `npm run e2e`, `npm run prove:privacy` and `npm run verify:proof`. Fix what the first real run of the short payment, the third period and the proof checks turns up.
+2. Play the proof buttons in the browser: `/lender/alder`, `/agent`, `/auditor`, `/borrower`, then `/verify`, and `/visibility` with eight claims holding.
+3. Record the two final runs on the final builds, one with the DAO as the agent and one plain, and keep their run logs and proofs in the repository in place of `northwind-4` and `northwind-5`.
+4. Put the new figures in the README: the leak test's output, the table of transactions, the pinned build, the DAO run, `npm run verify:proof` from a fresh clone. Add the proof line to `SUBMISSION.md`.
 
 ## Next (the builder's steps)
 
@@ -174,5 +220,12 @@ github.com/out-layer/outlayer (main @ 2d50bfa, 2026-11-11).
 - **Contract storage has to stay small to be read in one call.** A whole played deal measures 16,042 bytes in 43 keys. The limit on `view_state` is understood to be 50,000 bytes by default; that figure was not confirmed against a node's configuration. The contract's `sweep` removes ended deals, so storage holds one deal at a time.
 - **Next.js 14 keeps the answers to chain reads.** Its data cache stored near-api-js's RPC POST responses for a year, even on pages marked `force-dynamic`, so a screen could show an old deal. Fixed with `export const fetchCache = "force-no-store"` in `web/app/(app)/layout.tsx`.
 - **near-api-js 7.5.3 does not retry a dropped connection.** It retries HTTP 500, 503 and 408 only; Node's `TypeError: fetch failed` stops the script. The scripts wrap `fetch` with six attempts.
+- **The public RPC rate-limits, and near-api-js 7.5.3 does not retry that either.** `rpc.testnet.fastnear.com` answers HTTP 429, "Rate limits exceeded", after a long run of calls from one address. It first stopped the leak test, then an approval in the browser. The scripts' `fetch` wrapper and the web's provider now send the same request again after 2, 4, 8, 16 and 32 seconds. Re-sending is safe: a read changes nothing and a signed transaction has one hash.
+- **OutLayer's testnet latency varies a lot.** From the contract's request to the enclave's answer took 6 to 16 seconds in the afternoon of 2026-11-11 and 60 to 80 seconds that evening (measured on chain for [HngFH8DD…](https://testnet.nearblocks.io/txns/HngFH8DDRjEnUtnysZ55m8hpo7LtNLiHGJNK9JpyTJku), [5k4xjCJF…](https://testnet.nearblocks.io/txns/5k4xjCJFgqDnBVmEAkVgfH45k5QvKWTMCpyukWQ6zTaA) and [5WqP6fyj…](https://testnet.nearblocks.io/txns/5WqP6fyjXJ7zZWEwvpo1wGE7qu9SDbnMTryZNUh5eQGM)). Nothing in Pari changed between the two; record the video when it is fast.
+- **Sputnik DAO on testnet, read from the chain.** Factory `sputnikv2.testnet`. `get_last_proposal_id` returns the number of proposals, which is the next id. `get_proposals({from_index, limit})` returns each proposal's `status` (`InProgress`, `Approved`), `votes` by account and `kind`. The rules contract's methods take no deposit, so a proposal's action carries deposit 0 and 250 TGas, which was enough for every agent action.
+- **A DAO's proposals are public.** Their arguments are the rate, the total, and the number of a request or a trade: nothing sealed. The leak test reads the DAO's transactions like any others.
+- **Reading the chain as it was.** near-api-js 7.5.3: `provider.callFunctionRaw({ contractId, method, args, blockQuery: { blockId } })` on the archival node `https://archival-rpc.testnet.fastnear.com` returns a view call's answer at an old block, and `provider.viewBlock({ blockId })` its time (`header.timestamp_nanosec`). A block that had just become final was already there in three tries of three (0.4 to 2 seconds). A block the node does not know raises `UnknownBlockError`; the proof checkers try three times before saying the archive could not be asked.
+- **A recorded run outlives the contract's current deal.** The leak test compared each run's attested build with the build the contract pins now, so it failed on the recorded runs as soon as the contract moved to a new enclave build. It now reads the build from the public arguments of the deal's own first transaction (`new`).
+- **OutLayer, from its docs and source, read on 2026-11-11.** Limits per run: `max_instructions` 1 billion by default and 500 billion at most, `max_memory_mb` 128 and 4,096, `max_execution_seconds` 60 and 180. The docs name no priority option and no queue-status endpoint. Views on the contract (`contract/src/views.rs`): `is_paused()`, `get_stats()` (total executions, total fees), `get_request(request_id)`, `get_pending_request_ids(from_index, limit)`. On testnet at 21:53 UTC `is_paused` returned `false` and `get_pending_request_ids` ran out of gas as a view call, even with a limit of 3. Mainnet, not used by Pari: contract `outlayer.near`, API `https://api.outlayer.ai`.
 - **near-api-js 7.5.3 declares Node 22.22.2 or later** but ran correctly here on Node 20.20.2, 22.16.0 and 22.23.2 (a view call, key generation, libsodium).
 - **The submission form** (`POST https://nearhackathon.com/api/applications`): the exact fields are in `SUBMISSION.md`. The X post is the `demoUrl`.

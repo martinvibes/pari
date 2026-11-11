@@ -14,19 +14,21 @@
 The rules run in a NEAR contract. The books run inside an Intel TDX enclave.<br/>
 The public chain sees one total and a fingerprint, and a mistyped $900M payment is refused.
 
-[![tests](https://img.shields.io/badge/Rust%20tests-46%20passing-3DDC97.svg)](#tests)
+[![tests](https://img.shields.io/badge/Rust%20tests-52%20passing-3DDC97.svg)](#tests)
 [![NEAR](https://img.shields.io/badge/NEAR-testnet-00EC97.svg)](https://testnet.nearblocks.io/address/ledger.paridesk.testnet)
 [![enclave](https://img.shields.io/badge/OutLayer-Intel%20TDX-A78BFA.svg)](#how-it-works)
 [![hackathon](https://img.shields.io/badge/NEAR%20HACKATHON-privacy%20%C2%B7%20realworld-FFC857.svg)](#near-hackathon)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-[Check it in five minutes](#check-it-yourself) · [The leak test](#the-leak-test) · [Contract on testnet](https://testnet.nearblocks.io/address/ledger.paridesk.testnet) · [Trust model](#trust-model) · [The earlier Canton build](#pari-on-canton)
+[Check it in five minutes](#check-it-yourself) · [The leak test](#the-leak-test) · [Prove one fact](#prove-one-fact-and-nothing-else) · [Contract on testnet](https://testnet.nearblocks.io/address/ledger.paridesk.testnet) · [Trust model](#trust-model) · [The earlier Canton build](#pari-on-canton)
 
 </div>
 
 ---
 
 > This README has two parts. **Pari on NEAR** is the NEAR HACKATHON entry and comes first. **[Pari on Canton](#pari-on-canton)**, below the divider, is the earlier build it grew from; it is kept unchanged and disclosed in [NEAR HACKATHON](#near-hackathon).
+
+> **Status, 11 November 2026, 22:00 UTC.** OutLayer's testnet enclave workers stopped answering this evening, for every caller: [what was measured](docs/hackathon/PROGRESS.md#outlayers-testnet-stopped-answering-2026-11-11-from-about-2138-utc). Until they answer again the live deal on testnet is empty and no action can run. [Part 1 of Check it yourself](#1-with-no-account-and-no-keys-about-five-minutes) works now, on the two recorded runs. Two things are built and tested but not yet played on testnet: [proofs](#prove-one-fact-and-nothing-else), and the short payment inside `npm run e2e` (it has been played in the browser). This note goes when they have been.
 
 ## The problem
 
@@ -39,9 +41,11 @@ A public blockchain can't hold a loan's books either. It would publish every len
 Pari keeps the administrative agent's books for a syndicated loan:
 
 - every lender is paid in one step, to the cent;
+- a short payment is shared pro rata, and the unpaid part is paid with the next period;
 - a trade settles cash against loan in one step, or not at all;
 - each party sees only what it is entitled to;
-- the agent can't overpay anyone.
+- a party can [prove one fact](#prove-one-fact-and-nothing-else) from its own view to anyone, and show nothing else;
+- the agent can't overpay anyone, and the agent can be [two of three operators](#the-agent-as-two-of-three).
 
 On NEAR, those books are two programs that check each other.
 
@@ -50,7 +54,7 @@ On NEAR, those books are two programs that check each other.
 | **The rules contract** | [`ledger.paridesk.testnet`](https://testnet.nearblocks.io/address/ledger.paridesk.testnet), source in [`near/contract`](near/contract/src) | Checks who may do what, runs one action at a time, holds the test USDC and caps every payout. |
 | **The books** (`pari-core`) | An Intel TDX enclave on [OutLayer](https://outlayer.ai), source in [`near/enclave`](near/enclave/src) | Keeps positions, cash, trade prices and the DQ list in encrypted storage, and applies the deal's rules. |
 
-After every action the enclave hands back a **fingerprint** of the new books (a sha256) and one **sealed envelope per party**, encrypted so only that party can open it. The contract stores both. The public chain sees rules, totals and fingerprints. Each party opens its own envelope and sees its own slice.
+After every action the enclave hands back a **fingerprint** of the new books (a sha256) and, for each party, one **sealed envelope**, encrypted so only that party can open it, and one **commitment**: a salted hash of the facts inside that envelope. The contract stores all three. The public chain sees rules, totals, fingerprints and hashes. Each party opens its own envelope and sees its own slice, and can use the commitment to [prove one fact](#prove-one-fact-and-nothing-else) from it.
 
 ## How it works
 
@@ -69,11 +73,13 @@ After every action the enclave hands back a **fingerprint** of the new books (a 
       │                          │                                      │ 5. apply the deal's rules,
       │                          │                                      │    or refuse
       │                          │  new fingerprint, public totals,     │ 6. save the books; seal one
-      │                          │  one sealed envelope per party       │    envelope per party
+      │                          │  one sealed envelope and one         │    envelope per party and
+      │                          │  commitment per party                │    hash the facts in it
       │                          │◀─────────────────────────────────────┤
       │                          │ 7. check the money rules again,      │
       │                          │    without trusting the enclave      │
-      │                          │ 8. store fingerprint and envelopes   │
+      │                          │ 8. store fingerprint, envelopes      │
+      │                          │    and commitments                   │
       │   done, or refused       │ 9. pay out test USDC (withdrawals)   │
       │◀─────────────────────────┤                                      │
 ```
@@ -86,6 +92,8 @@ Steps 3 to 6 are one NEAR transaction: the contract calls OutLayer, waits (NEAR'
 2. *The contract enforces the money.* It never lets lenders be credited more than the borrower paid in for that request, and never pays out more test USDC than it holds for the deal. It checks this itself on every answer. If an answer ever broke a money rule, the contract would freeze the deal instead of paying.
 
 **Secrets never touch the chain in the clear.** Anything secret a party sends (a trade's buyer, size and price; the DQ list; the opening positions) is sealed to the enclave's public key before it goes into a transaction. Lender payments are credits inside the books, not token transfers, so no per-lender amount ever appears on chain.
+
+**An answer that comes late counts for nothing.** NEAR lets a contract wait about two minutes for the enclave. If no answer comes, the contract records "the enclave did not answer; nothing changed", releases the lock and gives back any tokens sent with the action. The contract numbers every request and names the fingerprint it holds. The enclave builds only on the books with that fingerprint, and refuses a request with an older number than one it has already answered. So an enclave run that finishes after the wait changes nothing, and the action can simply be sent again. The scripts do that by themselves, up to four times; the app says what happened and asks you to press the button again.
 
 ## Check it yourself
 
@@ -107,11 +115,13 @@ npm run prove:privacy               # reads NEAR testnet; needs no key
 
 You should see:
 
-- `cargo test` in `near/enclave`: 21 tests pass (five files: 3, 5, 4, 4 and 5).
-- `cargo test` in `near/contract`: `25 passed`.
+- `cargo test` in `near/enclave`: 26 tests pass (five files: 3, 5, 4, 9 and 5).
+- `cargo test` in `near/contract`: `26 passed`.
 - `npm run prove:privacy` ends with `PASS: 0 secrets in … bytes of public data.` Its full output is under [The leak test](#the-leak-test).
 
 The leak test downloads every transaction of a recorded run of the deal, plus the contract's whole storage, straight from NEAR testnet, and searches them for each lender's position, each payment, the trade's size and price, and the DQ list.
+
+The scripts and the app read NEAR through a free public RPC. When it answers `Rate limits exceeded` they wait and try again, so a step can pause, for up to four minutes after a long run of reads. To use another RPC, set `NEAR_RPC_URL` (and `NEAR_ARCHIVAL_RPC_URL`, which the leak test reads old transactions from) to one from [docs.near.org/api/rpc/providers](https://docs.near.org/api/rpc/providers).
 
 You can also read the live deal as the public does, in the app, with no keys:
 
@@ -120,11 +130,11 @@ cd web && npm install
 PARI_BACKEND=near npm run dev       # then open http://localhost:3000/visibility
 ```
 
-You should see the page titled **Who sees what** with a panel **You are reading as the public**: the contract's facts, one total per interest request, the record of every action, and eight sealed envelopes that this server cannot open.
+You should see the page titled **Who sees what** with a panel **You are reading as the public**: the contract's facts, one total per interest request, the record of every action, and eight sealed envelopes that this server cannot open, each beside its commitment.
 
 ### 2. Play the deal in the browser
 
-This needs the demo's keys, so it runs on [your own deployment](#3-your-own-deployment-on-testnet) (or on the builder's machine in the demo video). Each action takes 10 to 30 seconds on testnet, because the contract waits for the enclave.
+This needs the demo's keys, so it runs on [your own deployment](#3-your-own-deployment-on-testnet) (or on the builder's machine in the demo video). Each action usually takes 10 to 30 seconds on testnet, because the contract waits for the enclave. When OutLayer's testnet workers are busy it can take a minute or more (measured on 11 November 2026: 6 to 16 seconds in the afternoon, 60 to 80 in the evening). If the enclave misses NEAR's two-minute wait, the app says *The enclave did not answer within NEAR's two-minute wait. Press it again: an answer that comes late counts for nothing.* Nothing has changed when you see that, so press the button again.
 
 The numbers below are for a fresh deal. Every screen is one party's own view: pick the party in the top bar.
 
@@ -142,7 +152,7 @@ The numbers below are for a fresh deal. Every screen is one party's own view: pi
    You see: *Settled. Every lender was credited in one step. The chain shows one total, 1,971,666.66, and no lender's share.*
 6. Open `/lender/alder`. You see Alder was paid **985,833.33**, and nothing about Birch or Cedar.
    `/lender/birch` shows **591,500.00** and `/lender/cedar` shows **394,333.33**. `/auditor` shows all three.
-7. Open `/visibility`. The **Public chain** column has one payment total and no register line, payment leg, trade price or DQ list. Under **The public chain** you see the total 1,971,666.66, the books' fingerprint, eight sealed envelopes, and the refusal from step 2 on the public record. Under **Checked live**, seven claims read **Holds**.
+7. Open `/visibility`. The **Public chain** column has one payment total and no register line, payment leg, trade price or DQ list. Under **The public chain** you see the total 1,971,666.66, the books' fingerprint, eight sealed envelopes, and the refusal from step 2 on the public record. Under **Checked live**, eight claims read **Holds**.
 
 **A trade, screened against a list the buyer never sees**
 
@@ -154,6 +164,16 @@ The numbers below are for a fresh deal. Every screen is one party's own view: pi
     You see: *Not settled. Nothing moved, and the buyer is told nothing more.* Rival's screen says *not settled* and gives no reason. The agent's screen says *The buyer is on the DQ list.*
 12. Do the same with **Delta** as the buyer.
     You see: *Trade settled. Cash, register and both positions moved in one step.* Delta holds 10,000,000.00 and paid 9,950,000.00. Alder holds 40,000,000.00 with 845,000.00 of interest due at period end: 780,000.00 on what it kept, plus the 65,000.00 it earned on the part it sold, up to the trade date. `/borrower` shows the trade and no price.
+
+**A short payment, and the period that pays the rest**
+
+13. On `/agent`, press **Request interest**. The form is prefilled with `1,950,000.00`, the second period's interest for the four lenders.
+14. On `/borrower`, replace the amount with `975,000.00` and press **Pay**.
+    You see: *Paid 975,000.00 of test USDC into the deal.*
+15. On `/agent`, press **Settle the short payment pro rata**.
+    You see: *Settled. Every lender was credited in one step. The chain shows one total, 975,000.00, and no lender's share.* Every lender was paid the same half of what it was owed. `/lender/alder` shows 422,500.00 paid of 845,000.00 due, and the other half still owed. Birch got 292,500.00, Cedar 195,000.00 and Delta 65,000.00, each on its own screen only.
+16. On `/agent`, press **Fix rate** (the third period, to 15 Jun 2027). The request form now reads `2,968,333.32`: the third period's interest plus every unpaid half. Press **Request interest**, then **Pay** on `/borrower`, then **Settle all 4 lenders** on `/agent`.
+    `/lender/alder` shows **1,219,833.33** paid, and nothing left owed from the short period.
 
 ### 3. Your own deployment on testnet
 
@@ -176,7 +196,48 @@ PARI_BACKEND=near npm run dev         # http://localhost:3000/agent
 
 `npm run setup` is safe to run again: every step checks the chain first and does only what is missing. `npm run setup -- --fresh` starts a new deal with new books. The faucet starts a new account with 10 NEAR, so top it up before running setup: from [near-faucet.io](https://near-faucet.io), or make a second faucet account the same way and send its balance over (`near tokens OTHER.testnet send-near YOU.testnet '9.5 NEAR' network-config testnet sign-with-legacy-keychain send`).
 
-`npm run e2e` ends with `All green.` and the books' fingerprint. It plays the interest payment (with the mistyped total refused), a withdrawal, the DQ list, Rival's refused trade and Delta's settled one, and checks each party's envelope after every step.
+`npm run e2e` ends with `All green.` and the books' fingerprint. It plays the interest payment (with the mistyped total refused), a withdrawal, the DQ list, Rival's refused trade and Delta's settled one, then a short payment and the period that pays the rest, and checks each party's envelope after every step.
+
+## The agent as two of three
+
+A real agent desk does not act on one person's word, and on a chain it should not act on one key. On NEAR an account can be a contract, so the deal's agent can be a [Sputnik DAO](https://github.com/near-daos/sputnik-dao-contract) with three operators, of whom two must approve. Nothing in the rules contract or the enclave changes for this: the contract checks that the caller is the deal's agent, and the agent is the DAO.
+
+- Each of the agent's actions (fix the rate, request interest, settle a payment, settle a trade) is a DAO proposal to call the rules contract.
+- **Operator 1 proposes and approves. Nothing moves.** The books' fingerprint stays the same and no lender is paid.
+- **A second operator approves, and it settles.** That one transaction runs DAO → rules contract → enclave and back, and credits every lender.
+- **Approval does not replace the rule.** At Citibank three people approved the Revlon wire, under the bank's "six-eye" check, and it still went out. Here two operators can approve a request for 900,000,000.00 and the enclave still refuses it.
+
+The recorded run of deal `northwind-5` is the whole deal played this way, by [`paridesk-agent.sputnikv2.testnet`](https://testnet.nearblocks.io/address/paridesk-agent.sputnikv2.testnet) with operators `op1`, `op2` and `op3`:
+
+| Step of deal `northwind-5` | Transaction |
+|---|---|
+| Operator 1 proposes a request for 900,000,000.00, and approves it | [`G6S4VivM…`](https://testnet.nearblocks.io/txns/G6S4VivMYeDFZvjabsYSKYWZR6PBsfM5iwozhA6h6gRq), [`AkEYcCcq…`](https://testnet.nearblocks.io/txns/AkEYcCcqDYTxDDY5UZsQzuoipgvDZx9e7mNJWGx6WLon) |
+| Operator 2 approves it too: the enclave still refuses | [`3x5J4QQC…`](https://testnet.nearblocks.io/txns/3x5J4QQCxY93wFgz3CvYJ8wehyCyiVR1Jcc89ouAy8XT) |
+| Operator 1 proposes the settlement | [`47UuA8TB…`](https://testnet.nearblocks.io/txns/47UuA8TBF4zRzwvAi9i6Z6SGXUEWPmdASk4JvpeuAoGw) |
+| Operator 1 approves: nothing moves | [`DbocTMLU…`](https://testnet.nearblocks.io/txns/DbocTMLUWZazGy3yBtwjF2j76HP8nhHa8iDTHrbWTFNu) |
+| Operator 2 approves: that transaction pays three lenders | [`8huKuwps…`](https://testnet.nearblocks.io/txns/8huKuwpsA9cu9FgyDByTFxU4XUHQhmstgQzyVsvzhh8) |
+
+All 44 transactions are in [`near/runs/northwind-5.json`](near/runs/northwind-5.json).
+
+To play it yourself on [your own deployment](#3-your-own-deployment-on-testnet):
+
+```bash
+npm run setup -- --fresh --dao        # makes the DAO and a new deal whose agent is the DAO
+npm run e2e                           # the same deal; every agent action takes two operators
+```
+
+`--dao` needs about 11 NEAR more than the plain setup: 6 to create the DAO, and 1.5 for each operator, which covers the 1 NEAR bond the DAO holds while a proposal waits. In the browser, on a deal made with `--dao`:
+
+1. Open `/agent`. A panel **Two of three** names the DAO. Press **Fix rate**.
+   You see: *Proposed, and approved by operator 1 of 3. Nothing has moved: proposal 1 runs when a second operator approves it.* (The number counts the DAO's proposals, so yours may differ.) The panel lists the proposal, and the rate still reads *Not fixed*.
+2. In the panel, press **Approve as operator 2**.
+   You see: *Two of three operators approved, so the agent acted. Base rate fixed at 4.30% to 15 Dec 2026. All-in 7.80%.*
+3. Request `900,000,000.00`, then press **Approve as operator 3**.
+   You see: **Refused**. *You entered 900,000,000.00; the register says 1,971,666.66.*
+
+Every other step of [Play the deal in the browser](#2-play-the-deal-in-the-browser) works the same way, with one more press for each of the agent's actions.
+
+A proposal's arguments are public, as everything in a DAO is: the rate, the total, the number of a request or a trade. None of them is a secret, and the rules contract's own record shows the same figures. The leak test passes on the DAO run as well.
 
 ## What each party sees
 
@@ -193,17 +254,17 @@ The last row is the honest one. [Trust model](#trust-model) lists everything the
 
 ## The leak test
 
-`npm run prove:privacy` in `near/scripts`. It needs no keys. This is its output on the recorded run:
+`npm run prove:privacy` in `near/scripts`. It needs no keys. This is its output from a fresh clone, on the recorded run of deal `northwind-5` (the deal played with [the agent as two of three](#the-agent-as-two-of-three)). The storage figures change with the live deal.
 
 ```
 $ npm run prove:privacy
 
-Leak test: deal northwind-4 on ledger.paridesk.testnet
+Leak test: deal northwind-5 on ledger.paridesk.testnet
 
 Reading what anyone can read
-  28 transactions: arguments, logs, receipts, return values  1,429,790 bytes
-  the contract's whole storage: 43 keys                      47,081 bytes
-  left out: the network's own gas and fee figures            1034 fields
+  44 transactions: arguments, logs, receipts, return values  1,646,564 bytes
+  the contract's whole storage: 10 keys                      3,975 bytes
+  left out: the network's own gas and fee figures            1354 fields
 
 Secrets searched for, in every way they could be written
   Alder's position: 50,000,000.00                            not found
@@ -224,25 +285,23 @@ Secrets searched for, in every way they could be written
   Rival in the DQ transaction, beyond its envelope slot      not found (Rival 1, Delta 1)
 
 Public by design: the same search does find these
-  the interest request's total: 1,971,666.66                 found 39 times
-  each buyer's deposit: 12,000,000.00                        found 28 times
-  Alder's withdrawal: 500,000.00                             found 16 times
-  who takes part (accounts)                                  found 458 times
+  the interest request's total: 1,971,666.66                 found 35 times
+  each buyer's deposit: 12,000,000.00                        found 26 times
+  Alder's withdrawal: 500,000.00                             found 15 times
+  who takes part (accounts)                                  found 423 times
 
-Control: the same search over the envelopes, opened with each party's own key
-  secrets found inside the opened envelopes                  13 of 13
-  secrets from earlier in the deal, no longer in the books   2
+Control skipped: the contract has moved on to deal northwind-9, so its envelopes are another deal's.
 
 The enclave
   program on OutLayer                                        paridesk.testnet/pari-core
-  the one build the contract will run (sha256)               4fd3ba96a54d17244166e32c41b9eda73cf6ed1a5323e22b9f5fa0bc4aafff9a
-  runs with an Intel TDX attestation from OutLayer           26 of 28 transactions
+  the one build this deal's contract would run (sha256)      4fd3ba96a54d17244166e32c41b9eda73cf6ed1a5323e22b9f5fa0bc4aafff9a
+  runs with an Intel TDX attestation from OutLayer           26 of 44 transactions
   of those, runs of any other build or program               none
-  example                                                    https://testnet-api.outlayer.ai/attestations/by-tx/Bx72JcyT5XGLAM46YPRAreLnxbtKXxXBi5Ajr91szj86
-    TDX quote                                                5006 bytes, worker measurement d85416a5a567dd03…
-    transaction                                              https://testnet.nearblocks.io/txns/Bx72JcyT5XGLAM46YPRAreLnxbtKXxXBi5Ajr91szj86
+  example                                                    https://testnet-api.outlayer.ai/attestations/by-tx/HrSxUDmudo1xvkBwG1WLkcx8DiuhtHPBTvKWfdmvwLqT
+    TDX quote                                                5006 bytes, worker measurement 528235764e42c8ec…
+    transaction                                              https://testnet.nearblocks.io/txns/HrSxUDmudo1xvkBwG1WLkcx8DiuhtHPBTvKWfdmvwLqT
 
-PASS: 0 secrets in 1,476,899 bytes of public data.
+PASS: 0 secrets in 1,650,583 bytes of public data.
 ```
 
 How to read it:
@@ -250,8 +309,38 @@ How to read it:
 - **Reading what anyone can read.** Every transaction of the run (arguments, logs, receipts, return values) and the contract's whole storage, fetched from public NEAR nodes. Base64 is decoded before searching.
 - **Secrets searched for.** Each figure is searched for as a whole number in every way it could be written (cents, dollars with and without commas, token base units). The network's own gas and fee fields are left out, because on testnet the gas price happens to equal one of the deal's figures.
 - **Public by design.** The same search does find the things Pari publishes on purpose, which shows the search works.
-- **Control.** On a machine that holds the parties' keys, the test opens the envelopes and finds every secret inside them. So the secrets are in the data; they are just sealed. Without the keys this part prints `Control skipped`, and the rest runs the same.
-- **The enclave.** The contract pins one build of the enclave program by its sha256. Each run comes with an Intel TDX attestation from OutLayer, which you can fetch by transaction hash.
+- **Control.** On a machine that holds the parties' keys, and while the recorded deal is still the live one, the test opens the envelopes and finds every secret inside them. So the secrets are in the data; they are just sealed. On the builder's machine it found 13 of 13. Without the keys, or once the contract has moved on to a later deal, this part prints `Control skipped`, and the rest runs the same.
+- **The enclave.** A deal pins one build of the enclave program by its sha256, named in the public arguments of the transaction that starts the deal. The test reads it from there. Each run of the enclave comes with an Intel TDX attestation from OutLayer, which you can fetch by transaction hash, and the test fails if any of them names another build or program. The other transactions of this run never reach the enclave: they are setup calls, the DAO's proposals and its first approvals.
+
+## Prove one fact, and nothing else
+
+A lender sometimes has to show an outsider one thing from the books. A buyer wants to know the seller holds what it is selling. A fund's auditor wants to see one interest payment. A bank that lends against a position wants to see the position. Today that is a PDF from the agent. On a private ledger it usually means giving the outsider a seat on the ledger.
+
+In Pari the party cuts a **proof** from its own envelope and hands it over as a link or a small file. The outsider checks it against NEAR with no key and no account. The agent is not asked, and nothing else in the envelope is shown.
+
+**How it works**
+
+1. Inside the enclave, each party's view is a list of facts: what it holds, its cash, each payment, each trade. For the agent, the borrower and the auditor the list also has the register and the outstanding total.
+2. With every action the enclave draws 32 new random bytes for each party, the seed, and puts them inside that party's sealed envelope. Each fact gets its own salt, HMAC-SHA256 of the fact's name under the seed, and is hashed with it (sha256). The sha256 of all those hashes together is the party's **commitment**. The contract stores it beside the envelope, where anyone can read it.
+3. A proof is one fact in the clear, its salt, the list of fact hashes and the number of the block it was cut at.
+4. To check it, hash the fact with its salt and find the result at its place in the list. Then hash the list and ask a NEAR archival node what `envelope(party)` returned at that block. The two commitments must be equal.
+
+The check reads the chain as it was at the proof's block, so a proof stays checkable after the deal has moved on. The page says whether it is still the party's latest view.
+
+**Try it**, on [your own deployment](#3-your-own-deployment-on-testnet), after step 6 of [Play the deal in the browser](#2-play-the-deal-in-the-browser):
+
+1. Open `/lender/alder`. In the payments table, press **Prove** beside the settled payment.
+   You land on `/verify` and see **It holds**: *Alder was paid 985,833.33 of the 985,833.33 it was owed for interest to 15 Dec 2026.* Under **How it was checked** are the two steps above, with the block and the commitment. The page's address is the proof: anyone you send it to sees the same page, and the server uses no key to draw it.
+2. In the box **The proof**, change one digit of `"paid"` and press **Check against NEAR**.
+   You see **It does not hold**: *The fact, its salt and the list of hashes do not belong together.*
+3. Back on `/lender/alder`, under the sealed envelope, **Prove what you hold** and **Prove your cash** do the same for those two facts. `/agent`, `/borrower` and `/auditor` have **Prove the register** and **Prove the outstanding total**.
+4. In a terminal, `npm run e2e` leaves the proof of what Alder holds in `near/proofs`, and `npm run verify:proof` checks it with no keys. It then changes one digit and shows the proof rejected, and forges the changed fact's hash into the list and shows the chain's commitment reject that too.
+
+**What a proof shows besides its fact.** The party's account, the deal, the number of the action the view is from, and how many facts the party's view holds. The other facts are in the proof as salted hashes only. The salts are new with every action and come from a seed only the party can read, so a hash cannot be matched against a guess ("is Alder's cash 485,833.33?") or against an older proof. The proof Alder cuts of what it holds contains no payment, no cash balance, no price and no other party's name; `npm run e2e` checks exactly that.
+
+**What a proof is not.** It is not a signature and it is not zero-knowledge: the fact is shown in the clear to whoever holds the proof, and they can pass it on. Its weight comes from the chain: the rules contract stored that commitment from the answer of the one enclave build it pins. It says what the party's view held at one block, not what is true today.
+
+The enclave and the checker are written separately, in Rust and in TypeScript. One enclave test, `test_the_enclave_and_the_proof_checker_agree_on_a_known_view`, holds the enclave to the salt, the hash and the commitment the TypeScript checker computed for a known view. And on every load `/visibility` recomputes each party's commitment in TypeScript from its opened envelope and compares it with the chain's: the eighth claim under **Checked live**.
 
 ## Why this needs NEAR
 
@@ -260,7 +349,9 @@ How to read it:
 - **Named accounts for every role.** The agent is `agent.paridesk.testnet`, a lender is `alder.paridesk.testnet`. The contract's role checks and the enclave's views are keyed by names a person can read.
 - **One token transfer that also runs the books.** The borrower pays with `ft_transfer_call` (NEP-141); the contract records the public amount and the enclave credits the books in the same transaction. If the books refuse, the tokens go back.
 
-Next on NEAR: the agent as a Sputnik DAO, so two of three operators must approve each action, and withdrawals through NEAR's confidential intents so that even those amounts are hidden.
+- **An agent that is two of three, with no change to the contract.** A NEAR account can be a [Sputnik DAO](https://github.com/near-daos/sputnik-dao-contract). Name the DAO as the deal's agent and every agent action becomes a proposal that two of three operators must approve. See [The agent as two of three](#the-agent-as-two-of-three).
+
+Next on NEAR: withdrawals through NEAR's confidential intents, so that even those amounts are hidden.
 
 ## Trust model
 
@@ -269,9 +360,9 @@ Next on NEAR: the agent as a Sputnik DAO, so two of three operators must approve
 | | |
 |---|---|
 | Intel TDX, and OutLayer's attested workers and keystore | The books are private only if the enclave is. Each run has a TDX attestation you can fetch: `https://testnet-api.outlayer.ai/attestations/by-tx/<transaction hash>`. |
-| The one enclave build the contract pins | The contract calls the build with sha256 `4fd3ba96a54d17244166e32c41b9eda73cf6ed1a5323e22b9f5fa0bc4aafff9a` and no other. Build it yourself with `near/build.sh` and compare (the build is not yet bit-for-bit reproducible across machines). |
+| The one enclave build the contract pins | The contract calls one build, named by its sha256, and no other. A deal names its build in the public arguments of the transaction that starts it, and `state` on the contract returns it as `version_key`. The live deal pins `e3ea1f33d0258be343fb2cc40056fab020671f213045e8bd02aeebc3f4d7f115`; the recorded runs pinned the build before it, `4fd3ba96a54d17244166e32c41b9eda73cf6ed1a5323e22b9f5fa0bc4aafff9a`. Build it yourself with `near/build.sh` and compare (the build is not yet bit-for-bit reproducible across machines). |
 | Whoever holds the contract account's key | In this demo the contract account still has its full-access key, which setup uses to deploy. Its holder could replace the contract, or start a new deal pinned to another enclave build. The same person owns the OutLayer project. In production that key is deleted or handed to a DAO. |
-| The demo server | It holds a testnet key for every party, so one browser can play the whole deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope. In production each party holds its own keys. |
+| The demo server | It holds a testnet key for every party, so one browser can play the whole deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope. When the agent is a DAO, the server holds all three operators' keys as well. In production each party, and each operator, holds its own. |
 
 **What the public chain shows, on purpose or by inference**
 
@@ -280,30 +371,32 @@ Next on NEAR: the agent as a Sputnik DAO, so two of three operators must approve
 - **Who did what, and when.** Every action is a transaction signed by a named account. The chain shows that Alder offered a trade, that Delta accepted it and whether it settled. It does not show the size, the price or why a trade failed.
 - **Totals.** One total per interest request, how much the borrower paid in and how much was credited to lenders as a single figure. A refusal for a wrong total states the right total.
 - **Envelope sizes.** A party with more trades has a longer envelope.
+- **The agent's proposals, when the agent is a DAO.** Each proposal and each operator's vote is public, with the action's arguments: a rate, a total, the number of a request or a trade.
 
-**What the contract's owner can and cannot do.** The owner (`paridesk.testnet`) loads the deal once, and can re-read the fingerprint from the enclave or release the lock if a callback is lost. It cannot read the books, move money or act as the agent.
+**What the contract's owner can and cannot do.** The owner (`paridesk.testnet`) loads the deal once, and can release the lock if a callback is lost. It cannot read the books, move money, act as the agent or set the fingerprint: only the enclave's answer to the contract's own request does that.
 
-**Not built.** Prepayments, inside-information documents, a hundred-lender scale test and the two-of-three agent exist in the Canton build below and were left out of this one.
+**Not built.** Prepayments, inside-information documents and a hundred-lender scale test exist in the Canton build below and were left out of this one.
 
 ## Tests
 
 | What | Where | Run it |
 |---|---|---|
-| The deal's rules: 21 tests, ported from the Canton build's Daml tests with the same names and numbers | [`near/enclave/tests`](near/enclave/tests) | `cd near/enclave && cargo test` |
-| Roles, the lock, the money caps, the public record: 25 tests | [`near/contract/src/tests.rs`](near/contract/src/tests.rs) | `cd near/contract && cargo test` |
+| The deal's rules and the enclave's protocol: 26 tests. The deal's rules are ported from the Canton build's Daml tests with the same names and numbers | [`near/enclave/tests`](near/enclave/tests) | `cd near/enclave && cargo test` |
+| Roles, the lock, the money caps, the public record: 26 tests | [`near/contract/src/tests.rs`](near/contract/src/tests.rs) | `cd near/contract && cargo test` |
 | The whole deal on testnet, every figure and every envelope checked | [`near/scripts/src/e2e.ts`](near/scripts/src/e2e.ts) | `npm run e2e` |
 | The leak test | [`near/scripts/src/prove-privacy.ts`](near/scripts/src/prove-privacy.ts) | `npm run prove:privacy` |
-| Seven claims re-checked on every page load | `/visibility`, **Checked live** | open the page |
+| A proof checked against the chain, and the same proof with one digit changed rejected | [`near/scripts/src/verify-proof.ts`](near/scripts/src/verify-proof.ts) | `npm run verify:proof` |
+| Eight claims re-checked on every page load | `/visibility`, **Checked live** | open the page |
 
 ```
 enclave   interest     5   one-step payment to the cent, pro rata, no favourites, all or none
           trading      5   cash against loan, interest split on the trade date, DQ screening, trade privacy
           principal    4   the Revlon guard: no request, settlement or withdrawal above what is due
           authority    3   only the right party runs each command
-          protocol     4   one envelope per party, refusals move nothing, no secret in public output
-contract              25   roles, one action at a time, credited ≤ paid in, payouts ≤ held, freeze
+          protocol     9   one envelope per party, one-fact proofs, late answers, no secret in public output
+contract              26   roles, one action at a time, credited ≤ paid in, payouts ≤ held, freeze
 ───────────────────────────────────────────────────────────────────────────────────────────────────
-46 tests passing
+52 tests passing
 ```
 
 Money is whole cents in integers everywhere. Interest is ACT/360, rounded down to the cent. A short payment pays each lender the same fraction of what it is owed, rounded down to the cent, and a cent lost to rounding goes back to the borrower, never to a lender. The expected figures (985,833.33, 591,500.00, 394,333.33, total 1,971,666.66, and 65,000.00 kept by the seller) are the same ones the Canton tests use.
@@ -317,7 +410,7 @@ Money is whole cents in integers everywhere. Interest is ACT/360, rounded down t
 | Enclave program | OutLayer project `paridesk.testnet/pari-core` on [`outlayer.testnet`](https://testnet.nearblocks.io/address/outlayer.testnet) |
 | The parties | `agent`, `northwind` (borrower), `alder`, `birch`, `cedar` (lenders), `delta`, `rival` (buyers), `auditor`, each `.paridesk.testnet` |
 
-The recorded run the leak test reads:
+There are two recorded runs. `npm run prove:privacy` reads the newer one, `northwind-5`, played with the DAO as the agent; its transactions are under [The agent as two of three](#the-agent-as-two-of-three). `npm run prove:privacy -- northwind-4` reads the other, played with one agent key:
 
 | Step of deal `northwind-4` | Transaction |
 |---|---|
@@ -332,7 +425,7 @@ The recorded run the leak test reads:
 | Rival's trade is not settled | [`C5BqZGES…`](https://testnet.nearblocks.io/txns/C5BqZGESJo5PVc4QVuDXtwaJqXwmGGcvuybGu32z7XWe) |
 | Delta's trade settles, cash against loan | [`Bx72JcyT…`](https://testnet.nearblocks.io/txns/Bx72JcyT5XGLAM46YPRAreLnxbtKXxXBi5Ajr91szj86) |
 
-All 28 transactions of the run are listed in [`near/runs/northwind-4.json`](near/runs/northwind-4.json), and earlier runs are in [docs/hackathon/PROGRESS.md](docs/hackathon/PROGRESS.md).
+All 28 transactions of that run are listed in [`near/runs/northwind-4.json`](near/runs/northwind-4.json), and earlier runs are in [docs/hackathon/PROGRESS.md](docs/hackathon/PROGRESS.md). Both runs were played before the short payment and the proofs were added; the contract and the enclave build have been replaced since, and each run's transactions stay on the chain.
 
 ## Layout
 
@@ -342,7 +435,8 @@ near/
 ├── enclave/      the books: pure Rust deal logic, plus a thin OutLayer entry point
 ├── usdc/         a test USDC token (NEP-141) anyone can mint
 ├── scripts/      setup, the end-to-end run and the leak test (TypeScript)
-├── runs/         the transaction hashes of the recorded run
+├── runs/         the transaction hashes of the recorded runs
+├── proofs/       the proof each recorded run left: one fact from Alder's view
 └── build.sh      builds all three programs
 web/
 ├── lib/near/         reads the contract, opens envelopes, signs actions
@@ -356,7 +450,7 @@ The web app serves both builds. `PARI_BACKEND=near` switches every screen to NEA
 - **Tracks:** privacy (primary), realworld.
 - **Built during the hackathon:** everything under [`near/`](near), plus [`web/lib/near`](web/lib/near) and [`web/components/near`](web/components/near): the contract, the enclave program, the test token, the scripts and the app's NEAR data layer and screens. The full diff from the earlier build is [`pre-hackathon...near`](https://github.com/martinvibes/pari/compare/pre-hackathon...near).
 - **Existed before:** Pari was first designed for Canton at HackCanton Season 3. That build is tagged [`pre-hackathon`](https://github.com/martinvibes/pari/tree/pre-hackathon) (commit `3c11dbc`, 7 October 2026) and described below. The NEAR version reuses its idea, its demo deal, its test names and numbers, and the web app's visual layer. The `daml/` folder is untouched.
-- **Libraries:** near-sdk and near-contract-standards 5.30, cargo-near 0.23, the OutLayer SDK 0.2, crypto_box 0.9 (libsodium-compatible sealed boxes), sha2, serde, base64 and getrandom in Rust; near-api-js 7.5, libsodium-wrappers 0.8, Next.js 14 and React 18 in TypeScript.
+- **Libraries:** near-sdk and near-contract-standards 5.30, cargo-near 0.23, the OutLayer SDK 0.2, crypto_box 0.9 (libsodium-compatible sealed boxes), sha2, hmac, serde, base64 and getrandom in Rust; near-api-js 7.5, libsodium-wrappers 0.8, Next.js 14 and React 18 in TypeScript.
 - **AI tools:** the code was written with Claude Code (Anthropic) as a coding agent, directed and reviewed by the builder.
 - **The builder's other entry:** [Selkie](https://github.com/SelkieLabs/Selkie).
 - **Credit:** the web app's visual layer is derived from [sidereal-hedera](https://github.com/guha-rahul/sidereal-hedera) (Apache-2.0). See [NOTICE](NOTICE).
