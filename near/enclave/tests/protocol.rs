@@ -157,6 +157,40 @@ fn test_a_party_proves_one_fact_and_shows_nothing_else() {
     assert!(!proves(fact, &salt, &hashes, index, &reply["commitments"][BIRCH]));
 }
 
+/// The scripts and the web app check a proof in TypeScript
+/// (near/scripts/src/lib/proofs.ts). The figures below were computed there for
+/// the same view and seed, so the two cannot drift apart unnoticed.
+#[test]
+fn test_the_enclave_and_the_proof_checker_agree_on_a_known_view() {
+    let view = json!({
+        "role": "party",
+        "party": "alder.paridesk.testnet",
+        "seq": 7,
+        "facility": { "facility_id": "NORTHWIND-TLB-2026", "name": "Northwind Logistics Term Loan B", "margin_bps": 350, "closing": "2026-09-15", "maturity": "2031-09-15" },
+        "period": null,
+        "rate_bps": null,
+        "paid_through": "2026-12-15",
+        "cash": "48583333",
+        "position": { "principal": "5000000000", "accrual_start": "2026-12-15", "carried": "0" },
+        "interest_due": null,
+        "payments": [{ "request_id": 0, "period_end": "2026-12-15", "due": "98583333", "paid": "98583333", "status": "settled" }],
+        "trades": [],
+    });
+    let seed = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+    let facts = proofs::facts("northwind-1", &view);
+    let hashes = proofs::hashes("northwind-1", &view, seed);
+    assert_eq!(facts.len(), 8);
+    assert_eq!(facts[4].item, "payments.0");
+    assert_eq!(
+        facts[4].text,
+        r#"{"deal":"northwind-1","item":"payments.0","party":"alder.paridesk.testnet","seq":7,"value":{"due":"98583333","paid":"98583333","period_end":"2026-12-15","request_id":0,"status":"settled"}}"#
+    );
+    assert_eq!(proofs::hex(&proofs::salt(seed, "payments.0")), "20041193547c7c024aac3410a09237ca86cf5f6b09529ca11462b8c6e3d32dc0");
+    assert_eq!(proofs::hex(&hashes[4]), "438d563811c62f3f818b1564c5cda83debef101105e965255af04cd4ee260615");
+    assert_eq!(proofs::commitment(&hashes), "33ce1afa8fd3511c5432da492b535744bc13f7eefb402f75a56a2b32ca975b7b");
+}
+
 #[test]
 fn test_a_commitment_is_new_with_every_answer_and_confirms_no_guess() {
     let (mut enclave, alder, _) = open_deal();
