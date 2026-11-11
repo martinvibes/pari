@@ -5,3 +5,5 @@
 **/.pari
 .localnet
 web/.env*
+**/target
+near/.keys
