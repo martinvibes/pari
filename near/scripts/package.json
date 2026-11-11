@@ -1,0 +1,23 @@
+{
+  "name": "pari-near-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Testnet setup, deploy, end-to-end run and the leak test for Pari on NEAR",
+  "scripts": {
+    "spike": "tsx src/spike.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "0.8.4",
+    "near-api-js": "7.5.3"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers": "0.7.14",
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
