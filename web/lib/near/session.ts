@@ -49,27 +49,40 @@ export async function viewAs(persona: Persona): Promise<Seen | Unavailable> {
   }
 }
 
-/** One party's envelope, as the chain holds it and as its own key opens it. */
-export type Opened = { persona: Persona; account: string; envelope: Envelope; view: BooksView };
+/** One party's envelope as the chain holds it: sealed. */
+export type Sealed = { persona: Persona; account: string; envelope: Envelope };
 
-/** The public chain next to every party's own read of the deal. */
-export type Everyone = { chain: PublicState; record: PublicRecord[]; seen: Opened[] };
+/** The same envelope with what the party's own key opens. */
+export type Opened = Sealed & { view: BooksView };
+
+/** The public chain next to every party's own read of the deal. A server with
+ *  no keys reads what the public reads, and `seen` is null. */
+export type Everyone = { chain: PublicState; record: PublicRecord[]; sealed: Sealed[]; seen: Opened[] | null };
 
 export async function viewAll(): Promise<Everyone | Unavailable> {
   try {
     const [chain, record] = await Promise.all([publicState(), publicRecord()]);
-    const seen: Opened[] = [];
+    const sealed: Sealed[] = [];
     for (const persona of PERSONAS) {
       const account = accountOf(persona.id);
       const envelope = await envelopeOf(account);
       if (!envelope) {
         return { unavailable: "deal", detail: `${account} has no envelope in deal ${chain.deal_id} on ${NEAR.ledger}.` };
       }
-      seen.push({ persona, account, envelope, view: await openEnvelope(persona.id, envelope) });
+      sealed.push({ persona, account, envelope });
     }
-    return { chain, record, seen };
+    return { chain, record, sealed, seen: await openAll(sealed) };
   } catch (error) {
     return unavailable(error);
+  }
+}
+
+async function openAll(sealed: Sealed[]): Promise<Opened[] | null> {
+  try {
+    return await Promise.all(sealed.map(async (one) => ({ ...one, view: await openEnvelope(one.persona.id, one.envelope) })));
+  } catch (error) {
+    if (error instanceof KeyMissingError) return null;
+    throw error;
   }
 }
 

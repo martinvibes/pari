@@ -8,7 +8,7 @@ import type { BooksView, PublicRecord, PublicState } from "@/lib/near/books";
 import { CHECKS } from "@/lib/near/checks";
 import { accountUrl, NEAR, txUrl, UNITS_PER_CENT } from "@/lib/near/config";
 import { cents, showCents, showRate } from "@/lib/near/money";
-import { isUnavailable, nameOf, viewAll, type Opened } from "@/lib/near/session";
+import { isUnavailable, nameOf, viewAll, type Opened, type Sealed } from "@/lib/near/session";
 import { formatDate } from "@/lib/pari/dates";
 import { formatCents } from "@/lib/pari/money";
 import { PERSONAS, SEATS } from "@/lib/pari/personas";
@@ -110,8 +110,9 @@ function told(line: PublicRecord): string {
 export async function VisibilityScreen() {
   const all = await viewAll();
   if (isUnavailable(all)) return <NearUnavailable problem={all} />;
-  const { chain, record, seen } = all;
+  const { chain, record, sealed, seen } = all;
   const hashes = transactionsOf(chain.deal_id);
+  const viewOf = new Map(seen?.map((opened) => [opened.persona.id, opened.view]));
 
   return (
     <div className="space-y-12">
@@ -121,6 +122,19 @@ export async function VisibilityScreen() {
         accent={IRIS}
         lede="The first column is the public chain: what anyone can read from NEAR with no key. Every other column is one party's envelope, opened with that party's own key. The app filters nothing: a column shows what its key opens."
       />
+
+      {seen ? null : (
+        <Panel
+          title="You are reading as the public"
+          note="This server holds no party's key, so nothing on this page was opened. The chain's facts, one total per request, the record of actions and eight sealed envelopes are all that anyone without a key can read."
+          aside={<Tag tone="private">No keys</Tag>}
+        >
+          <p className="max-w-prose text-[15px] leading-relaxed text-pewter">
+            Each party&apos;s key stays with that party. The demo&apos;s keys are made by <span className="font-mono text-smoke">npm run setup</span> in{" "}
+            <span className="font-mono text-smoke">near/scripts</span>; with them on this machine, every column below opens.
+          </p>
+        </Panel>
+      )}
 
       <Panel
         title="What each reader has"
@@ -149,7 +163,7 @@ export async function VisibilityScreen() {
                 <th className="text-right">
                   <span className="text-iris">Public chain</span>
                 </th>
-                {seen.map(({ persona }) => (
+                {sealed.map(({ persona }) => (
                   <th key={persona.id} className="text-right">
                     <Party name={persona.name} className="text-paper" />
                   </th>
@@ -164,9 +178,16 @@ export async function VisibilityScreen() {
                     <span className="mt-0.5 block text-xs text-ash">{row.note}</span>
                   </td>
                   <Count n={row.onChain(chain, record)} className="bg-iris/[0.05]" />
-                  {seen.map(({ persona, view }) => (
-                    <Count key={persona.id} n={row.opened(view)} />
-                  ))}
+                  {sealed.map(({ persona }) => {
+                    const view = viewOf.get(persona.id);
+                    return view ? (
+                      <Count key={persona.id} n={row.opened(view)} />
+                    ) : (
+                      <td key={persona.id} className="text-right text-xs text-ash">
+                        sealed
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -174,17 +195,21 @@ export async function VisibilityScreen() {
         </TableScroll>
       </Panel>
 
-      <PublicChain chain={chain} record={record} seen={seen} hashes={hashes} />
+      <PublicChain chain={chain} record={record} sealed={sealed} hashes={hashes} />
 
       <Panel
         title="Opened with each party's own key"
         note="The same bytes as above, after each party opens its own. A lender's envelope has that lender's line; the register is in three envelopes only."
       >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {seen.map((opened) => (
-            <OpenedCard key={opened.persona.id} opened={opened} />
-          ))}
-        </div>
+        {seen ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {seen.map((opened) => (
+              <OpenedCard key={opened.persona.id} opened={opened} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-[15px] text-pewter">No key on this server opens an envelope, so there is nothing to show here.</p>
+        )}
       </Panel>
 
       <Panel
@@ -198,7 +223,7 @@ export async function VisibilityScreen() {
                 <span className="text-paper">{check.claim}</span>
                 <span className="mt-0.5 block font-mono text-xs text-ash">{check.test}</span>
               </span>
-              {check.holds({ chain, record, seen }) ? <Tag tone="ok">Holds</Tag> : <Tag tone="stop">Broken</Tag>}
+              {!seen ? <Tag tone="private">Needs the keys</Tag> : check.holds({ chain, record, seen }) ? <Tag tone="ok">Holds</Tag> : <Tag tone="stop">Broken</Tag>}
             </li>
           ))}
         </ul>
@@ -211,7 +236,7 @@ function Count({ n, className = "" }: { n: number; className?: string }) {
   return <td className={`text-right text-base ${n === 0 ? "text-ash" : "text-paper"} ${className}`}>{n === 0 ? "—" : n}</td>;
 }
 
-function PublicChain({ chain, record, seen, hashes }: { chain: PublicState; record: PublicRecord[]; seen: Opened[]; hashes: Record<string, string> }) {
+function PublicChain({ chain, record, sealed, hashes }: { chain: PublicState; record: PublicRecord[]; sealed: Sealed[]; hashes: Record<string, string> }) {
   const requests = Object.entries(chain.requests);
   return (
     <Panel
@@ -278,7 +303,7 @@ function PublicChain({ chain, record, seen, hashes }: { chain: PublicState; reco
                 </tr>
               </thead>
               <tbody>
-                {seen.map(({ persona, envelope }) => (
+                {sealed.map(({ persona, envelope }) => (
                   <tr key={persona.id}>
                     <td>
                       <Party name={persona.name} />

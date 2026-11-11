@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import Link from "next/link";
 import { Party } from "@/components/app/party";
 import { Facts, PageHeader, Panel, TableScroll, Tag, type Tone } from "@/components/app/ui";
 import type { DealView, Entry, PublicState, Request, Trade } from "@/lib/near/books";
@@ -23,6 +24,15 @@ export function NearUnavailable({ problem }: { problem: Unavailable }) {
         title={title}
         lede="The app reads the rules contract on NEAR testnet and opens each party's envelope with that party's key. Set the deal up once, then reload."
       />
+      {problem.unavailable === "keys" ? (
+        <p className="max-w-prose text-[15px] leading-relaxed text-pewter">
+          What the public can read needs no key:{" "}
+          <Link href="/visibility" className="text-paper underline underline-offset-4">
+            open Who sees what
+          </Link>
+          .
+        </p>
+      ) : null}
       <Panel title="Set the deal up on testnet" note={problem.detail}>
         <pre className="panel-subtle overflow-x-auto p-5 font-mono text-sm leading-7 text-smoke">
           {`cd near && ./build.sh                # the contracts and the enclave program
