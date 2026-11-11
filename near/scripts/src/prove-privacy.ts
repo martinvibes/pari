@@ -17,6 +17,9 @@ import {
   LEDGER,
   money,
   POSITIONS,
+  SECOND_PERIOD_DUE,
+  SHORT_PAYMENT,
+  THIRD_PERIOD_DUE,
   TRADE,
   UNITS_PER_CENT,
   WITHDRAWAL,
@@ -90,6 +93,8 @@ const name = (account: string) => account.split(".")[0]!.replace(/^./, (c) => c.
 const [alder, delta, rival] = [accountOf("alder"), accountOf("delta"), accountOf("rival")];
 
 const alderCash = FIRST_PERIOD_DUE[alder]! - WITHDRAWAL;
+/** What a lender was paid over the second and third periods together. */
+const laterInterest = (lender: string) => SECOND_PERIOD_DUE[lender]! / 2n + THIRD_PERIOD_DUE[lender]!;
 
 const SECRETS: Secret[] = [
   ...Object.entries(POSITIONS).map(([lender, cents]) => amount(`${name(lender)}'s position`, cents, lender === alder)),
@@ -98,16 +103,22 @@ const SECRETS: Secret[] = [
   amount("Alder's position after the trade", POSITIONS[alder]! - TRADE.par),
   amount("the cash Delta paid Alder", TRADE.cash),
   { what: "the trade price: 99.5", forms: [TRADE.price_ppm.toString(), "99.5", "0.995"] },
-  amount("the interest Alder kept on the trade date", TRADE.seller_carried),
+  amount("the interest Alder kept on the trade date", TRADE.seller_carried, true),
   amount("Alder's cash after its withdrawal", alderCash, true),
-  amount("Alder's cash after the trade", alderCash + TRADE.cash),
-  amount("Delta's cash after the trade", BUYER_CASH - TRADE.cash),
+  amount("Alder's cash after the trade", alderCash + TRADE.cash, true),
+  amount("Delta's cash after the trade", BUYER_CASH - TRADE.cash, true),
+  ...Object.entries(SECOND_PERIOD_DUE).map(([lender, cents]) => amount(`${name(lender)}'s second-period interest`, cents)),
+  ...Object.entries(SECOND_PERIOD_DUE).map(([lender, cents]) => amount(`the half of it ${name(lender)} was paid`, cents / 2n)),
+  ...Object.entries(THIRD_PERIOD_DUE).map(([lender, cents]) => amount(`${name(lender)}'s third-period payment`, cents)),
+  amount("Alder's cash at the end", alderCash + TRADE.cash + laterInterest(alder)),
+  amount("Delta's cash at the end", BUYER_CASH - TRADE.cash + laterInterest(delta)),
   { what: "the DQ list and screening results, by name", forms: ["dq_list", "screening", "on the DQ list"] },
 ];
 
 /** Facts the design makes public. The search must find these, or it is not looking. */
 const PUBLIC: Secret[] = [
   amount("the interest request's total", FIRST_PERIOD_TOTAL),
+  amount("the short payment", SHORT_PAYMENT),
   amount("each buyer's deposit", BUYER_CASH),
   amount("Alder's withdrawal", WITHDRAWAL),
   { what: "who takes part (accounts)", forms: [alder, delta, rival] },
@@ -175,10 +186,10 @@ if (deal.deal_id !== run.deal_id) {
     opened.push(JSON.stringify(await openEnvelope<unknown>(account, await viewKeyFor(account))));
   }
   const current = SECRETS.filter((secret) => !secret.past);
-  const inside = current.filter((secret) => hits(opened.join("\n"), secret) > 0).length;
-  line("secrets found inside the opened envelopes", `${inside} of ${current.length}`);
+  const missing = current.filter((secret) => hits(opened.join("\n"), secret) === 0);
+  line("secrets found inside the opened envelopes", `${current.length - missing.length} of ${current.length}`);
   line("secrets from earlier in the deal, no longer in the books", `${SECRETS.length - current.length}`);
-  if (inside !== current.length) fail("a secret was not in any envelope; the list of secrets is out of date");
+  if (missing.length > 0) fail(`not in any envelope, so the list of secrets is out of date: ${missing.map((secret) => secret.what).join("; ")}`);
 } else {
   console.log("\nControl skipped: the parties' view keys are not on this machine (they never leave the demo server).");
 }
