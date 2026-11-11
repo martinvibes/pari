@@ -16,6 +16,21 @@ export const RPC_URL = process.env.NEAR_RPC_URL ?? "https://rpc.testnet.fastnear
 export const ARCHIVAL_RPC_URL = process.env.NEAR_ARCHIVAL_RPC_URL ?? "https://archival-rpc.testnet.fastnear.com";
 export const EXPLORER_URL = process.env.NEAR_EXPLORER_URL ?? "https://testnet.nearblocks.io";
 
+// Node reports a dropped or timed-out connection as "fetch failed", which
+// near-api-js does not retry. Sending the same request again is safe: a read
+// changes nothing, and a signed transaction has one hash however often it is sent.
+const plainFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await plainFetch(input, init);
+    } catch (error) {
+      if (attempt === 6 || !(error instanceof TypeError)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    }
+  }
+};
+
 export const provider = new JsonRpcProvider({ url: RPC_URL });
 /** Reads transactions of any age. */
 export const archive = new JsonRpcProvider({ url: ARCHIVAL_RPC_URL });
