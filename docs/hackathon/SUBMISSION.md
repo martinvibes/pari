@@ -51,7 +51,7 @@ Working on testnet today:
 - an auditor who sees every payment and no price;
 - a lender proving one fact from its sealed view to anyone, and nothing else.
 
-Anyone can check the privacy claim with no keys: one command downloads every transaction of a recorded run and the contract's whole storage from NEAR, and finds none of the deal's secrets. There are 52 Rust tests; the deal's rules keep the names and numbers of the original test suite.
+Anyone can check the privacy claim with no keys: one command downloads every transaction of a recorded run and the contract's whole storage from NEAR, and finds none of the deal's secrets. There are 54 Rust tests; the deal's rules keep the names and numbers of the original test suite.
 
 Pari was first built for Canton, where the ledger itself is private. The NEAR version is a new build made during the hackathon: a new contract, a new enclave program and a new data layer. The README discloses the earlier build and links the diff.
 ```

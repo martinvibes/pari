@@ -3,26 +3,27 @@
 Branch `near`, built for NEAR HACKATHON (window 2026-10-19 → 2026-11-14T23:59Z).
 Baseline: tag `pre-hackathon` = 3c11dbc (the Canton build, 2026-10-07).
 
-## Status (2026-11-11, 22:00 UTC)
+## Status (2026-11-12, 11:00 UTC)
 
 | Part | State |
 | --- | --- |
 | Setup (branch, tag, folders) | done |
 | Spike 1: contract → OutLayer → callback, private storage | **pass** |
 | Spike 2: sealed envelopes | **pass** |
-| P0-a enclave logic | **done**: `cargo test` in `near/enclave`, 26 tests green with the golden numbers |
-| P0-b rules contract | **done**: `cargo test` in `near/contract`, 26 tests green; deployed at `ledger.paridesk.testnet`; `npm run e2e` all green on testnet (on the earlier builds: see below) |
+| P0-a enclave logic | **done**: `cargo test` in `near/enclave`, 28 tests green with the golden numbers |
+| P0-b rules contract | **done**: `cargo test` in `near/contract`, 26 tests green; deployed at `ledger.paridesk.testnet`; `npm run e2e` all green on testnet |
 | P0-c web NEAR mode | **done**: the whole acceptance flow played in a real browser against testnet |
-| P0-d leak test | **done**: `npm run prove:privacy` passes, 0 secrets in 1,476,899 bytes of public data |
+| P0-d leak test | **done**: `npm run prove:privacy` passes on both recorded runs (figures below) |
 | P0-e trade with DQ screening | **done**: in the end-to-end script and in the browser |
 | README and submission drafts | **done**: `README.md`, `docs/hackathon/SUBMISSION.md` |
 | P1: two-of-three agent | **done**: the deal's agent can be a Sputnik DAO; played by `npm run e2e` and in the browser |
-| P1: second period | **done in the app**, played in the browser. In `npm run e2e` and the leak test it is written and **not yet run on testnet** |
-| Late answers | **done**: an enclave answer that misses NEAR's two-minute wait changes nothing, and the action can be sent again. Tested in Rust; the resend was seen working on testnet |
-| Proofs: one fact, and nothing else | **built, not yet played on testnet.** Enclave, contract, scripts and web are written and tested, and the rejection paths were run against testnet. No real proof has been cut yet, because OutLayer's testnet stopped answering (see below) |
-| The live deal on testnet | **empty.** `ledger.paridesk.testnet` runs the new contract and pins the new enclave build for deal `northwind-9`, which has no enclave key yet for the same reason |
+| P1: second period | **done**: a short payment and the period that pays the rest, played by `npm run e2e` on testnet and in the browser |
+| Late answers | **done**: an enclave answer that misses NEAR's two-minute wait changes nothing, and the action can be sent again. Tested in Rust; the resend ran on testnet during the outage's recovery |
+| Proofs: one fact, and nothing else | **done**: a real proof cut and checked on testnet by `npm run e2e` and `npm run verify:proof`, and in the browser on `/verify` |
+| Two privacy gaps found by review | **fixed**, tested and played on testnet (below) |
+| The live deal on testnet | `northwind-14` on `ledger.paridesk.testnet`, played to the end of the third period (seq 30), pinned to enclave build `edef73c7…` |
 
-Nothing has been pushed, posted or submitted. Those steps are the builder's.
+Everything in the README has been run on testnet with real transactions, on the final builds. Nothing has been pushed, posted or submitted. Those steps are the builder's.
 
 ## What works
 
@@ -35,72 +36,116 @@ Nothing has been pushed, posted or submitted. Those steps are the builder's.
 - **Who sees what.** Eight sealed envelopes, one per party, rewritten after every action. `/visibility` shows the public chain beside every party's opened envelope and re-checks eight claims on every load.
 - **A server with no keys.** The web app still renders `/visibility` as the public reads it, with every envelope sealed.
 - **An answer that comes late counts for nothing.** The contract sends the enclave the fingerprint it holds and the number of the request. The enclave builds only on the books with that fingerprint, and refuses a request with a lower number than one it has answered. So when the enclave misses NEAR's wait the contract records "the enclave did not answer; nothing changed", and a run that finishes later cannot change the books. Tests: `test_an_answer_the_contract_never_received_is_not_built_on`, `test_a_late_run_cannot_undo_an_answer_the_contract_received`.
-- **Proofs (built; the real thing not yet cut on testnet).** With every answer the enclave returns one commitment per party: the sha256 of the salted hashes of the facts in that party's view. The contract stores it beside the envelope. A party cuts a proof of one fact (what it holds, its cash, one payment, the register) and anyone checks it with no keys against `envelope(party)` at the proof's block: `/verify` in the app, `npm run verify:proof` in the scripts. Tests: `test_a_party_proves_one_fact_and_shows_nothing_else`, `test_a_commitment_is_new_with_every_answer_and_confirms_no_guess`, `test_the_enclave_and_the_proof_checker_agree_on_a_known_view`. Run against testnet so far: a made-up proof is rejected by the chain, and a changed fact and a non-hex hash are rejected by the arithmetic.
-- **The leak test.** Every transaction of the recorded run plus the contract's whole storage, searched for 16 secrets: none found. The same search finds what Pari publishes on purpose, and finds 13 of 13 secrets inside the opened envelopes.
+- **Proofs.** With every answer the enclave returns one commitment per party: the sha256 of the salted hashes of the facts in that party's view. The contract stores it beside the envelope. A party cuts a proof of one fact (what it holds, its cash, one payment, the register) and anyone checks it with no keys against `envelope(party)` at the proof's block: `/verify` in the app, `npm run verify:proof` in the scripts. Tests: `test_a_party_proves_one_fact_and_shows_nothing_else`, `test_a_commitment_is_new_with_every_answer_and_confirms_no_guess`, `test_the_enclave_and_the_proof_checker_agree_on_a_known_view`. On testnet: each recorded run leaves Alder's proof of what it holds in `near/proofs`; the check passes, a proof with one digit changed is rejected by the arithmetic, and one with the changed hash forged into the list is rejected by the chain's commitment.
+- **A fingerprint that confirms no guess, and sealed boxes that work for their sender only.** See "Two privacy gaps found by review".
+- **The leak test.** Every transaction of a recorded run plus the contract's whole storage, searched for 29 secrets: none found. The same search finds what Pari publishes on purpose. With the parties' keys it finds 24 of 24 secrets inside the opened envelopes; the other five are from earlier in the deal and no longer in the books.
 
-## OutLayer's testnet stopped answering (2026-11-11, from about 21:38 UTC)
+## The OutLayer outage of 11 November
 
-This blocks every step that needs the enclave. It is not a fault in Pari.
+OutLayer's testnet gave no answer for about an hour, from about 21:38 to 22:41 UTC on 2026-11-11. It was not a fault in Pari, and it has recovered. Since then each action has taken about 15 seconds.
 
 - Through the day OutLayer answered in 6 to 16 seconds. In the evening it took 60 to 80 seconds, then 92 and 108. From 21:38 UTC it did not answer at all within NEAR's wait of about two minutes.
-- `npm run setup -- --fresh` started deal `northwind-9` on the new contract and the new enclave build, then stopped at its first enclave call. Four requests for the enclave's key went unanswered: [81gqvip7…](https://testnet.nearblocks.io/txns/81gqvip7KTLnMngWLPsaJXbQev9mLdGF24qc3eZH99LE), [9hPmbGmY…](https://testnet.nearblocks.io/txns/9hPmbGmYf72TXDAdatoyiEnrGeuvmq4xhveNQdYWdt1V), [3LqAWghd…](https://testnet.nearblocks.io/txns/3LqAWghdi2HVNxQQQn3hYMiFUFUnwARdFsgjP5G3LY4j), [Hc1XkrY7…](https://testnet.nearblocks.io/txns/Hc1XkrY7pBYkHkJr3gPXxroakQmMXt32trng2sDNNHTT).
+- `npm run setup -- --fresh` started deal `northwind-9`, then stopped at its first enclave call. Four requests for the enclave's key went unanswered: [81gqvip7…](https://testnet.nearblocks.io/txns/81gqvip7KTLnMngWLPsaJXbQev9mLdGF24qc3eZH99LE), [9hPmbGmY…](https://testnet.nearblocks.io/txns/9hPmbGmYf72TXDAdatoyiEnrGeuvmq4xhveNQdYWdt1V), [3LqAWghd…](https://testnet.nearblocks.io/txns/3LqAWghdi2HVNxQQQn3hYMiFUFUnwARdFsgjP5G3LY4j), [Hc1XkrY7…](https://testnet.nearblocks.io/txns/Hc1XkrY7pBYkHkJr3gPXxroakQmMXt32trng2sDNNHTT).
 - The receipts of the second one show what happens. OutLayer logs `execution_requested` 1.1 seconds in. At 120.1 seconds it logs `Execution promise failed`, refunds the unused deposit and charges 0.001 NEAR. The ledger then records "the enclave did not answer; nothing changed" and releases its lock. OutLayer has no attestation for any of the four (`/attestations/by-tx/<hash>` answers 404), so no worker ran them.
-- **It is not the new build.** The day-one counter program (`npm run spike`, another OutLayer project, a build that answered all day) got no answer either, at 21:47 and 21:49 UTC: [CooGFm45…](https://testnet.nearblocks.io/txns/CooGFm45HQvfnXnrFtUeJNFcsHgRcHSapfxx48ryj12y), [gHacNYUi…](https://testnet.nearblocks.io/txns/gHacNYUiWvTDXMXiJZeo1h43HBBQ8vCtMqSg8rdjUCz).
-- The new build is where the workers fetch it: `https://test.fastfs.io/paridesk.testnet/outlayer.testnet/e3ea1f33d0258be343fb2cc40056fab020671f213045e8bd02aeebc3f4d7f115.wasm`, 439,311 bytes, and its sha256 matches.
-- OutLayer's contract is not paused (`is_paused` on `outlayer.testnet` returns `false`).
-- **It is not only Pari.** `get_stats` on `outlayer.testnet` counted 75 more executions between 21:53 and 22:04 UTC (26,285 to 26,360), and its total of fees rose by exactly 0.075 NEAR: 0.001 NEAR each, which is what a run that fails is charged. About five of the 75 were Pari's.
-- What the scripts do about it: an action whose transaction carries the ledger's "the enclave did not answer" is sent again, up to four times. That is safe because of the late-answer rule (see "What works").
+- **It was not the build.** The day-one counter program (`npm run spike`, another OutLayer project, a build that answered all day) got no answer either, at 21:47 and 21:49 UTC: [CooGFm45…](https://testnet.nearblocks.io/txns/CooGFm45HQvfnXnrFtUeJNFcsHgRcHSapfxx48ryj12y), [gHacNYUi…](https://testnet.nearblocks.io/txns/gHacNYUiWvTDXMXiJZeo1h43HBBQ8vCtMqSg8rdjUCz).
+- OutLayer's contract was not paused (`is_paused` on `outlayer.testnet` returned `false`).
+- **It was not only Pari.** `get_stats` on `outlayer.testnet` counted 75 more executions between 21:53 and 22:04 UTC (26,285 to 26,360), and its total of fees rose by exactly 0.075 NEAR: 0.001 NEAR each, which is what a run that fails is charged. About five of the 75 were Pari's.
+- **When it came back.** The last request that got no answer was sent at 22:38:42 UTC ([5tQcRqET…](https://testnet.nearblocks.io/txns/5tQcRqETDVZzB6pFL9rRuw5dLVyFymG5VBPsuY8JRC2P)); the first one answered was sent at 22:40:46 ([7Nzr7uGw…](https://testnet.nearblocks.io/txns/7Nzr7uGwrJbLvThvfmDguZxJ2v8DaQLR2gGrSmE2ubx3)). The setup of `northwind-9` finished at 22:46.
+- What the scripts do about it: an action whose transaction carries the ledger's "the enclave did not answer" is sent again, up to four times. That is safe because of the late-answer rule (see "What works"). The run of `northwind-9` carries those resends.
 
-**Waiting on OutLayer:** the setup of `northwind-9`; the end-to-end run with the short payment, the third period and the proof checks; the leak test's new secrets; `npm run verify:proof` on a real proof; the proof buttons in the browser; the final recorded runs.
+## Two privacy gaps found by review, and fixed (11 November)
 
-## The recorded runs: deals `northwind-4` and `northwind-5`
+After the first full runs passed, the enclave was read again the way an attacker would read it. Two gaps turned up. The leak test could see neither, because it searches for plaintext.
 
-Both were played on the earlier builds (below), before the commitments and the
-late-answer rule. Their transactions stay on the chain, and `npm run
-prove:privacy` still passes on them from a fresh clone. It reads the build a
-deal pinned from that deal's own first transaction, so it does not matter that
-the contract has since moved on. `northwind-5` is the same deal played with the
-DAO as the agent (44 transactions, in [`near/runs/northwind-5.json`](../../near/runs/northwind-5.json)).
+1. **The fingerprint could confirm a guess.** It was a plain sha256 of the books. The chain shows what that means: deals `northwind-9` and `northwind-11`, played the same way on that build, have the same fingerprint at seq 8 (`74b862fccb48380c61ac938369625127b0def77a35df5472b09b91b40ca708dd`) and at seq 30 (`9e88aeec82f52cb0291d88aad7ac2639abbc9f550d8c82e1a9b3ba30f2c0248b`). Loan positions are round numbers, so anyone could hash a guess at the books and compare.
+   - **Fix:** the books carry 32 random bytes, which the enclave draws again with every answer. They are in the fingerprint and in no view.
+   - **Test:** `test_a_fingerprint_confirms_no_guess_at_the_books`.
+   - **On testnet:** `northwind-14` is the same deal played the same way on the final build. Its fingerprints are `4f84034fd40ec33df5578c347558697cba0727912a2c2f333c8afb2ac922e169` at seq 8 and `edc0f805ae47adb269a4f008a0a6b843ca1339ff2490c0772e731751ccf72fd5` at seq 30.
+2. **A sealed box was not tied to its sender.** A sealed offer sits on the public chain. Birch holds more than the trade's size, so it could have sent Alder's sealed offer as its own, and read the buyer, the size and the price in its own envelope.
+   - **Fix:** the sealed fields name the deal, the caller and the command they are for, and the enclave refuses a box that arrives any other way: "these fields were sealed for another deal, caller or command".
+   - **Test:** `test_a_sealed_offer_copied_from_the_chain_is_no_use_to_anyone_else`.
+   - **On testnet:** `npm run e2e` plays it. Birch's copy of Alder's sealed offer was refused on both recorded runs, and Birch's envelope showed no trade: [C2rKHgyb…](https://testnet.nearblocks.io/txns/C2rKHgybrk4Ep3oFfyvW7gW3wSe8ENbFR1UdhXvqwqyJ) on `northwind-14`, [6X64VPdh…](https://testnet.nearblocks.io/txns/6X64VPdhw8nsahFxyKehnHHoYTmE85CBVCAqTqetD4XN) on `northwind-13`.
 
-### Deal `northwind-4`
+Read in the same pass and found clean: every command's public output, every refusal's wording (none carries a private figure; the Revlon refusal states the total, which is public by design), and the trade settlement, which checks the seller's position again when it settles.
 
-Played by `npm run e2e` on 2026-11-11. Books at seq 23, fingerprint
-`a36f61c021543fc351c9c3c4e1006b9b1c4b0eac0d4667444e5f28212c808eb1`. All 28
-transactions are in [`near/runs/northwind-4.json`](../../near/runs/northwind-4.json).
+Known and not fixed: any account can register a view key, offer or accept a trade, pay test USDC in or ask for a withdrawal, because a buyer has to register before it holds anything. An outsider can't read the books or move anyone's money, but it can hold the one-at-a-time lock, make the contract pay OutLayer for a run, and add an envelope slot. Envelopes are not padded, so their sizes show roughly how much a view holds. Both are in the README's trust model.
 
-- Rules contract build: sha256 `8caf224b95fd100ae6f563d1bced969101c6528718958f148621914f02ee2ce0` (292,552 bytes).
-- Enclave build pinned by the contract: sha256 `4fd3ba96a54d17244166e32c41b9eda73cf6ed1a5323e22b9f5fa0bc4aafff9a`, OutLayer project `paridesk.testnet/pari-core`.
-- 26 of the 28 transactions ran the enclave, each with an Intel TDX attestation from OutLayer (`https://testnet-api.outlayer.ai/attestations/by-tx/<hash>`). The other two are the contract's own setup calls.
+## The recorded runs: deals `northwind-13` and `northwind-14`
+
+Both were played by `npm run e2e` on the final builds. Their run logs and the proofs they left are in the repository ([`near/runs`](../../near/runs), [`near/proofs`](../../near/proofs)), and the README's tables come from them.
+
+- Rules contract build: sha256 `efa1fa65155ce9c6f6ce81111b3e3a7b6cd00ba05620f63355d94bf50d92d224` (292,255 bytes).
+- Enclave build pinned by both deals: sha256 `edef73c7a53ee924982553f96886efab8bc2cb1d000d51e74f9026118d0c705d`, OutLayer project `paridesk.testnet/pari-core`.
+
+| | `northwind-13` | `northwind-14` |
+| --- | --- | --- |
+| The agent | the DAO, two of three operators | one key |
+| Played (UTC) | 11 Nov 23:33 to 12 Nov 05:25 | 12 Nov 05:25 to 05:35 |
+| Transactions | 62 | 36 |
+| Of those, runs of the enclave, each with an Intel TDX attestation | 34 | 34 |
+| Books at the end | seq 30, fingerprint `63ac48db69ae523222f6cdcf6a619f844698d00310ad4ef234c69fd0fbd7f06b` | seq 30, fingerprint `edc0f805ae47adb269a4f008a0a6b843ca1339ff2490c0772e731751ccf72fd5` |
+| `npm run e2e` | All green | All green |
+| `npm run prove:privacy` | PASS: 0 secrets in 2,585,777 bytes | PASS: 0 secrets in 2,216,417 bytes |
+| Its control, with the parties' keys | 24 of 24 found inside the opened envelopes | 24 of 24 |
+| `npm run verify:proof` | PASS, at block 277318993 | PASS, at block 277320067 |
+
+- `northwind-13` took six hours on the clock because the builder's machine was asleep for most of them, in the middle of the run. When it woke the script carried on from the step it was at and finished all green: the deal's state is on the chain and in the enclave, not in the script.
+- From a fresh clone with no keys (2026-11-12): `cargo test` passes in `near/enclave` (28) and `near/contract` (26), and `npm run prove:privacy` and `npm run verify:proof` pass on `northwind-14`. The README's two output blocks are from that run.
+- `northwind-14` is the live deal. The proof `northwind-13` left still checks against the chain now that the contract has moved on: `npm run verify:proof -- ../proofs/northwind-13.json` passes and says "The deal has moved on since; the proof is of that block."
+
+### Deal `northwind-14`, every transaction
 
 | Step | Transaction |
 | --- | --- |
-| New deal started on the contract | [4rwti7GC…](https://testnet.nearblocks.io/txns/4rwti7GCTWHXxaocqyVr2WsCQz6e9ddy9SGHUeyp5j96) |
-| Ended deals swept out of storage | [4NR9UjQv…](https://testnet.nearblocks.io/txns/4NR9UjQvU8syoWVyz3YGigkHzLz46n1ibrxRHqqVNt5F) |
-| Enclave's public key published | [DWs7hvhD…](https://testnet.nearblocks.io/txns/DWs7hvhDAUQe8Wd2GakzEqkb3oNHz1TmYk6jiej1yYfh) |
-| Deal loaded, opening positions sealed | [BbY4HPwA…](https://testnet.nearblocks.io/txns/BbY4HPwAdjpMzVNTZdjb2qhD7WAyJPVRgyZcqoAJ5AUG) |
-| View keys: agent, borrower | [GCab9YTp…](https://testnet.nearblocks.io/txns/GCab9YTpTuiXhZ6cTgd1FeKhLjuMXAUcwuaKeVnhBDfT), [FwmYeJSu…](https://testnet.nearblocks.io/txns/FwmYeJSuG2Zkqg6qcBdo1RGimgbVYnb5MakuVTLM1X6z) |
-| View keys: Alder, Birch, Cedar | [BqQgyJYU…](https://testnet.nearblocks.io/txns/BqQgyJYUKr51a1XbMxtV7VkvQEWkjPHRDqJmU9AR1LEx), [4LYvRQz4…](https://testnet.nearblocks.io/txns/4LYvRQz4UPedFHSmQR6vXcNh6xQHbaCvGyPKe6aEBT1V), [BhNmDVZg…](https://testnet.nearblocks.io/txns/BhNmDVZgbi4hSEUnKS3YwE5YEbWPhQ69zQwDcDyzzkfc) |
-| View keys: Delta, Rival, auditor | [EzQ7pXee…](https://testnet.nearblocks.io/txns/EzQ7pXeeBUmw4FwKPRQ5uXuatK3m7eEHAiVu85t6aa5c), [ywMWw1TF…](https://testnet.nearblocks.io/txns/ywMWw1TFoPtQkHxbeEVfEc3owipbDC4FnmWHuhofbBc), [84UFbzG4…](https://testnet.nearblocks.io/txns/84UFbzG4G6x5cWU5FhafnF61weKnUyNDJBczWrBhFGNq) |
-| Agent fixes the rate, 4.30% + 3.50% | [52rjbLek…](https://testnet.nearblocks.io/txns/52rjbLekNeGTSfJYWNdv1yrYmsaG7nK2V2fzZk1dTxWM) |
-| Agent types 900,000,000.00: **refused** | [3pQAtvaT…](https://testnet.nearblocks.io/txns/3pQAtvaTdwKrjuP8HHRyBomTtNfXWDN5ai3RXPRcnarD) |
-| Agent requests 1,971,666.66 | [CPvYf4kn…](https://testnet.nearblocks.io/txns/CPvYf4kn1ZhrrwBpMGxViSiuufX7ijEVUb2VHdVK2HM4) |
-| Borrower pays 1,971,666.66 | [CScqsy5h…](https://testnet.nearblocks.io/txns/CScqsy5hbSVE4B9snuodBfBBFsxx3P4d9EJm4mFWmM5B) |
-| Agent settles: three lenders in one step | [7UtB85n4…](https://testnet.nearblocks.io/txns/7UtB85n4ZDW98VRmw9X1i9vKaD1Vwvr3MJeCKexDvigQ) |
-| Alder withdraws 500,000.00 | [8KxtwT3P…](https://testnet.nearblocks.io/txns/8KxtwT3PWZQXW685iELqNwdTFMRqUBxxgHBmtFvd3gn3) |
-| Agent fixes the rate for the second period | [EMJ9aAaf…](https://testnet.nearblocks.io/txns/EMJ9aAafbAmXSwfjZhxLEfYSKmvMybNJMH9tdBUzsSZx) |
-| Borrower sets its DQ list, sealed | [GxcBaNvD…](https://testnet.nearblocks.io/txns/GxcBaNvD1iw1fuR3FMFLPLqXrfCLcbao21V5DHFUsbUF) |
-| Rival pays 12,000,000.00 in | [9Ar8NnCv…](https://testnet.nearblocks.io/txns/9Ar8NnCvgLjUXssyf5CnkFT3JufnusxMXvy4TEjvyjbo) |
-| Delta pays 12,000,000.00 in | [B1pR7wrN…](https://testnet.nearblocks.io/txns/B1pR7wrNKC6ubcg9yAnD6kNRBondeJp7sbhsUKUQTYDY) |
-| Alder offers 10,000,000.00 to Rival, sealed | [DQRTCkzd…](https://testnet.nearblocks.io/txns/DQRTCkzdCx4C8nE1XsYLxQgcJjzuKKqhMUdmZsRWAwhJ) |
-| Rival accepts | [AanuTRbx…](https://testnet.nearblocks.io/txns/AanuTRbxKgXZdzqJu6GTb5VDkqVLgpKcExky2KijXMtK) |
-| Agent settles: **not settled**, Rival learns nothing | [C5BqZGES…](https://testnet.nearblocks.io/txns/C5BqZGESJo5PVc4QVuDXtwaJqXwmGGcvuybGu32z7XWe) |
-| Alder offers 10,000,000.00 to Delta, sealed | [4FwjC1ht…](https://testnet.nearblocks.io/txns/4FwjC1htNKBDYC9ag86v14BVCEhPQCfRNEBfUBdejNYT) |
-| Delta accepts | [EqB7S9VW…](https://testnet.nearblocks.io/txns/EqB7S9VWdGR26VCN4ToxwjoihkSmn6teB2rrgeHa6xjv) |
-| Agent settles: cash against loan in one step | [Bx72JcyT…](https://testnet.nearblocks.io/txns/Bx72JcyT5XGLAM46YPRAreLnxbtKXxXBi5Ajr91szj86) |
+| New deal started on the contract, pinning the enclave build | [APPwXRPT…](https://testnet.nearblocks.io/txns/APPwXRPTx8RpKBPaCXT2jn9NxGgbfoHYv2ecgQdA2Jgs) |
+| Ended deals swept out of storage | [EjVksBzg…](https://testnet.nearblocks.io/txns/EjVksBzg71gitdejWcEVUdDWPswRP7wK6r8msBDwdMQx) |
+| Enclave's public key published | [Rs8QhVru…](https://testnet.nearblocks.io/txns/Rs8QhVruw6pGEbe117VDvdVZALRrB5MnB3VHqVLdNnD) |
+| Deal loaded, every opening position sealed | [DXbQjGs4…](https://testnet.nearblocks.io/txns/DXbQjGs4qfPVSQZC89PHqJgFinAXHsNVYVPVZDHtEeP5) |
+| View key: agent | [6GmvwekM…](https://testnet.nearblocks.io/txns/6GmvwekM6gvps8Fj9MUitFDSDSHjamdNyP1U2icZ2PKu) |
+| View key: borrower | [9N2eGgNs…](https://testnet.nearblocks.io/txns/9N2eGgNsYqZp41rjFcRBgXSp8GfpxpLpjkf84qa3M5eG) |
+| View key: Alder | [8ieEfYqQ…](https://testnet.nearblocks.io/txns/8ieEfYqQyqCvbRZEvr1f4rLjQM4dkwEA6aFTw6ns7UsX) |
+| View key: Birch | [bumd63k6…](https://testnet.nearblocks.io/txns/bumd63k6gNbi6W4pgH3TboQoo8jZJ9CRimfBXYGUnex) |
+| View key: Cedar | [9B8MZ4iu…](https://testnet.nearblocks.io/txns/9B8MZ4iuDvzTSCmJVHmPeN3iygqKjMbEARgo7iAev8qZ) |
+| View key: Delta | [84JCwjQ4…](https://testnet.nearblocks.io/txns/84JCwjQ4dpCpz18sjJUk1UM8nmTq9kTRNoEbWrk7ZKEq) |
+| View key: Rival | [9f5xSP5n…](https://testnet.nearblocks.io/txns/9f5xSP5nm1dFJWc8JbYsWKVH34szydyeifSyjaykvYk4) |
+| View key: auditor | [Bz6xwVkU…](https://testnet.nearblocks.io/txns/Bz6xwVkUuUGo2zTTpfAxnYZNrnvtTbmrHfdJ26LUoTtp) |
+| Agent fixes the rate, 4.30% + 3.50% | [8eFsakrW…](https://testnet.nearblocks.io/txns/8eFsakrWzbLhYAdrSyWpHcuZpT3Javk37c7QDhy3W58g) |
+| Agent types 900,000,000.00: **refused** | [o36Pf9jk…](https://testnet.nearblocks.io/txns/o36Pf9jk2zAAGQ8sf8xLa4Edo7DHGAA2qgGT3Bb5P58) |
+| Agent requests 1,971,666.66 | [3AVZW7vF…](https://testnet.nearblocks.io/txns/3AVZW7vFPf791Ro9vmaD1xdzv19wHQ2eEmjsJaXDg1ge) |
+| Borrower pays 1,971,666.66, in one transfer | [MZM57dBE…](https://testnet.nearblocks.io/txns/MZM57dBEUMQ8NwzSzQ9HGCyahkDNXSzuAF6yyPARgU6) |
+| Agent settles: three lenders paid in one step | [Dndv3Zvq…](https://testnet.nearblocks.io/txns/Dndv3ZvqtTQh8JktXri4mieVPf8fyq59woE9aguFzQ4U) |
+| Alder withdraws 500,000.00 | [DBeuzbsp…](https://testnet.nearblocks.io/txns/DBeuzbspmtNBBQJzvWd6sU7aShpeCEZmGbSXELkD6TsP) |
+| Agent fixes the rate for the second period | [F79WcoP4…](https://testnet.nearblocks.io/txns/F79WcoP4BR7brWT3KrJKn5qtrXKsvzZSbnDeKfPEVTL2) |
+| Borrower sets its DQ list, sealed | [FD3fH8P4…](https://testnet.nearblocks.io/txns/FD3fH8P4kBwEFaR5rEhGHABo5f1suAvc1tQSHDir3pMz) |
+| Rival pays 12,000,000.00 in | [94jmgeNd…](https://testnet.nearblocks.io/txns/94jmgeNdcjCUmQW2rtLCahNp78BfGHSApaqSmc6LYvJU) |
+| Delta pays 12,000,000.00 in | [4fP1ujLA…](https://testnet.nearblocks.io/txns/4fP1ujLAvYyYUypyxceftk5rQL5rdc94DhLqrBLmdU8j) |
+| Alder offers 10,000,000.00 to Rival, sealed | [AvRnAici…](https://testnet.nearblocks.io/txns/AvRnAicioifGTyfBwgGFT66vn8uscVspSiLXPuXpBUnh) |
+| Rival accepts | [8goqZBoq…](https://testnet.nearblocks.io/txns/8goqZBoqALuvx7rFRTGAK43gPcFHAoLQDZjnRL1ZCywS) |
+| Agent settles: **not settled**, Rival learns nothing | [D85FiUHa…](https://testnet.nearblocks.io/txns/D85FiUHaum7vGh1BCVzZ9TUqrPhC7mAw4U6SaF8ApCEi) |
+| Alder offers 10,000,000.00 to Delta, sealed | [3DSb3h1M…](https://testnet.nearblocks.io/txns/3DSb3h1Mn6EDUiVhhmHsSTpgK3y99z5xF4WxfQzzeCCs) |
+| Delta accepts | [ANZfHvFZ…](https://testnet.nearblocks.io/txns/ANZfHvFZF3CcWuLGBP988nq4F9EdurzdkthgDGXPPF8u) |
+| Agent settles: cash against loan in one step | [CM8FBYGP…](https://testnet.nearblocks.io/txns/CM8FBYGPz3yjzo7A29zY3LpR9gbVJtVjC5gKz8rdnYKo) |
+| Birch sends Alder's sealed offer as its own: **refused** | [C2rKHgyb…](https://testnet.nearblocks.io/txns/C2rKHgybrk4Ep3oFfyvW7gW3wSe8ENbFR1UdhXvqwqyJ) |
+| Agent requests 1,950,000.00 for the second period | [7ZBPdr3u…](https://testnet.nearblocks.io/txns/7ZBPdr3u9Y47hM2ytvSQRnzwqdExzjCUFPVGBofB3J1i) |
+| Borrower pays half of it, 975,000.00 | [FkfBEtXV…](https://testnet.nearblocks.io/txns/FkfBEtXVGRk9vPEMX81nEmMuXkSvQayGbPNUGQ7MSsVh) |
+| Agent settles the short payment: four lenders each paid half | [DzXpdJXg…](https://testnet.nearblocks.io/txns/DzXpdJXgG1smPvSh2v8yift82bdLLhgADJPXdNSazRpm) |
+| Agent fixes the rate for the third period | [6PL4aWvj…](https://testnet.nearblocks.io/txns/6PL4aWvjf4zYLVdkQFYaZFGo2CVGkXZVd49xw2kq9mqW) |
+| Agent requests 2,968,333.32: the period's interest plus every unpaid half | [3K2fn7F5…](https://testnet.nearblocks.io/txns/3K2fn7F5WNtTDVd7pQ2YG9dDNY42KiCWJraAFwSAWJkJ) |
+| Borrower pays all of it | [AEpeZmzf…](https://testnet.nearblocks.io/txns/AEpeZmzfygkKcgxuiihk6jieR4wACc2r9vCvayggjk4A) |
+| Agent settles: every lender paid in full | [3CG5ocEE…](https://testnet.nearblocks.io/txns/3CG5ocEEnJTbp2c8FyNKA7YLHC5uefow85y9vQgSVzSz) |
 
-Earlier deals (`northwind-1` to `northwind-3`) were played on earlier builds of
-the contract; their storage has been swept and their transactions remain on the
-chain.
+The 62 transactions of `northwind-13` are in [`near/runs/northwind-13.json`](../../near/runs/northwind-13.json). Each of the agent's actions there is three transactions: operator 1 proposes, operator 1 approves, operator 2 approves and the action runs. The README's section "The agent as two of three" links the ones that matter.
+
+### Earlier deals
+
+Their transactions stay on the chain; their storage has been swept from the contract.
+
+- `northwind-1` to `northwind-3`: earlier builds of the contract. The first browser acceptance was played on `northwind-3`.
+- `northwind-4` (one agent key, 28 transactions) and `northwind-5` (the DAO, 44 transactions): the first recorded runs, on enclave build `4fd3ba96a54d17244166e32c41b9eda73cf6ed1a5323e22b9f5fa0bc4aafff9a`, before the short payment, the late-answer rule and the proofs. Their run logs were in the repository until the final runs replaced them.
+- `northwind-6` to `northwind-8`: set up while the later features were being built (`northwind-6` was the deal for the two-of-three browser check). The scripts recorded their setup only.
+- `northwind-9`: the first run of the short payment, the third period and the proofs, on enclave build `e3ea1f33d0258be343fb2cc40056fab020671f213045e8bd02aeebc3f4d7f115`. All green; 56 transactions, some of them resends from the end of the outage.
+- `northwind-10` (the DAO, 61 transactions) and `northwind-11` (one agent key, 35 transactions): full green runs on that same build, replaced when the review found the two gaps above.
+- `northwind-12`: started on build `7bb5f16c7ac6affea66bfde207ee7226a3220c2452adbd2509416b96fedb21fe`, which had the first fix only, and stopped during setup when the second gap was found.
 
 ## Browser acceptance (P0-c)
 
@@ -115,6 +160,13 @@ DevTools protocol, against testnet. Every step passed:
 6. Borrower saves a sealed DQ list. Rival's trade is not settled and Rival's screen gives no reason. Delta's trade settles; Delta holds 10,000,000.00; the borrower's envelope has no price.
 
 Each action took 11 to 22 seconds, because the contract waits for the enclave.
+
+Played in the same way afterwards:
+
+- **The agent as two of three**, on deal `northwind-6`: operator 1 proposes and approves and nothing moves; **Approve as operator 2** runs the action; two operators approving 900,000,000.00 are refused.
+- **The short payment and the period that pays the rest**, in the app, before the scripts played it.
+- **Proofs, on the final build** (deal `northwind-14`, 2026-11-12, no transactions sent): on `/lender/alder` each of the three settled payments has a **Prove** button, and `/verify` reads **It holds** with the sentence for that payment (985,833.33 of 985,833.33 to 15 Dec 2026; 422,500.00 of 845,000.00 to 15 Mar 2027; 1,219,833.33 of 1,219,833.33 to 15 Jun 2027). One digit of `"paid"` changed in the box reads **It does not hold**: "The fact, its salt and the list of hashes do not belong together." **Prove what you hold** reads "Alder holds 40,000,000.00 of the loan" and the page shows no cash balance and no price; **Prove your cash** reads 12,078,166.66. `/agent`, `/auditor` and `/borrower` each prove the register and the outstanding total, 100,000,000.00. `/visibility` shows eight claims and all eight read **Holds**.
+- **Every screen at 1440 pixels wide**, full page: no table is wider than its panel. One was: a lender's trades table cut its status off, and was fixed (the trade date now sits under the names, the action under the status).
 
 ## Spike results (2026-11-11, testnet)
 
@@ -157,17 +209,12 @@ Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txn
 - **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
 
-## Next, when OutLayer answers again
-
-1. `npm run setup` (it carries on with `northwind-9`), then `npm run e2e`, `npm run prove:privacy` and `npm run verify:proof`. Fix what the first real run of the short payment, the third period and the proof checks turns up.
-2. Play the proof buttons in the browser: `/lender/alder`, `/agent`, `/auditor`, `/borrower`, then `/verify`, and `/visibility` with eight claims holding.
-3. Record the two final runs on the final builds, one with the DAO as the agent and one plain, and keep their run logs and proofs in the repository in place of `northwind-4` and `northwind-5`.
-4. Put the new figures in the README: the leak test's output, the table of transactions, the pinned build, the DAO run, `npm run verify:proof` from a fresh clone. Add the proof line to `SUBMISSION.md`.
-
 ## Next (the builder's steps)
 
+Nothing is left to build. These need the builder, in this order:
+
 1. Push branch `near` (this publishes the NEAR work), and decide which branch judges see: see `SUBMISSION.md`.
-2. Record the demo video against a fresh deal (`npm run setup -- --fresh`), and add its link at the top of the README.
+2. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected.
 3. Optional: host the NEAR demo, and keep it up through 2026-11-18.
 4. Add a line naming Pari to Selkie's README.
 5. Post on X, then submit the form, before 2026-11-14T23:59:00Z.
@@ -217,7 +264,7 @@ github.com/out-layer/outlayer (main @ 2d50bfa, 2026-11-11).
 - **The faucet starts a new account with 10 NEAR** (the root account's creation: [G1ZSCUNe…](https://testnet.nearblocks.io/txns/G1ZSCUNefRpokiTrv38xHcvSUuucGY3LuhcL4A59NjqD)). Setup needs about 18 NEAR in the root account: 5 for the ledger, 2.5 for the token, 1.5 for the agent, 0.9 for each other party.
 - **near CLI 0.30.1** (`--help`): `near account create-account sponsor-by-faucet-service YOU.testnet autogenerate-new-keypair save-to-legacy-keychain network-config testnet create`, and `near tokens A send-near B '9.5 NEAR' network-config testnet sign-with-legacy-keychain send`.
 - **Ordinary RPC nodes drop old transactions.** The leak test reads transactions from an archival node, `https://archival-rpc.testnet.fastnear.com`.
-- **Contract storage has to stay small to be read in one call.** A whole played deal measures 16,042 bytes in 43 keys. The limit on `view_state` is understood to be 50,000 bytes by default; that figure was not confirmed against a node's configuration. The contract's `sweep` removes ended deals, so storage holds one deal at a time.
+- **Contract storage has to stay small to be read in one call.** A deal played through one period measured 16,042 bytes in 43 keys. Played through all three periods, with a commitment beside every envelope, it measures about 65,000 bytes in 51 keys, and the public RPC still returns it in one `view_state` call. The contract's `sweep` removes ended deals, so storage holds one deal at a time.
 - **Next.js 14 keeps the answers to chain reads.** Its data cache stored near-api-js's RPC POST responses for a year, even on pages marked `force-dynamic`, so a screen could show an old deal. Fixed with `export const fetchCache = "force-no-store"` in `web/app/(app)/layout.tsx`.
 - **near-api-js 7.5.3 does not retry a dropped connection.** It retries HTTP 500, 503 and 408 only; Node's `TypeError: fetch failed` stops the script. The scripts wrap `fetch` with six attempts.
 - **The public RPC rate-limits, and near-api-js 7.5.3 does not retry that either.** `rpc.testnet.fastnear.com` answers HTTP 429, "Rate limits exceeded", after a long run of calls from one address. It first stopped the leak test, then an approval in the browser. The scripts' `fetch` wrapper and the web's provider now send the same request again after 2, 4, 8, 16 and 32 seconds. Re-sending is safe: a read changes nothing and a signed transaction has one hash.
