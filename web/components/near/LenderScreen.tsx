@@ -202,9 +202,7 @@ function Trades({ seen, account }: { seen: Seen<PartyView>; account: string }) {
                 <th className="text-right">Par</th>
                 <th className="text-right">Price</th>
                 <th className="text-right">Cash</th>
-                <th>Trade date</th>
                 <th>Status</th>
-                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -212,16 +210,14 @@ function Trades({ seen, account }: { seen: Seen<PartyView>; account: string }) {
                 <tr key={trade.id}>
                   <td>
                     <Sides trade={trade} />
+                    <div className="mt-1 text-xs font-normal text-ash">Trade date {formatDate(trade.trade_date)}</div>
                   </td>
                   <td className="text-right">{showCents(trade.par)}</td>
                   <td className="text-right">{trade.price_ppm === undefined ? "" : showPrice(trade.price_ppm)}</td>
                   <td className="text-right">{showCents(trade.cash)}</td>
-                  <td className="text-smoke">{formatDate(trade.trade_date)}</td>
                   <td>
-                    <TradeStatus trade={trade} />
-                  </td>
-                  <td>
-                    <div className="flex justify-end">
+                    <div className="flex flex-col items-start gap-2">
+                      <TradeStatus trade={trade} />
                       {trade.status === "offered" && trade.buyer === account ? (
                         <ActionForm action={act.acceptTrade} label="Accept" variant="ghost" hidden={{ persona: persona.id, trade: String(trade.id) }} />
                       ) : trade.status === "offered" ? (
