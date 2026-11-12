@@ -3,7 +3,7 @@
 Branch `main`, built for NEAR HACKATHON (window 2026-10-19 → 2026-11-14T23:59Z).
 Baseline: tag `pre-hackathon` = 392e45c (the Canton build as of 2026-10-07, its earlier commits folded into that one commit).
 
-## Status (2026-11-12, 11:00 UTC)
+## Status (2026-11-12, 21:30 UTC)
 
 | Part | State |
 | --- | --- |
@@ -21,6 +21,7 @@ Baseline: tag `pre-hackathon` = 392e45c (the Canton build as of 2026-10-07, its 
 | Late answers | **done**: an enclave answer that misses NEAR's two-minute wait changes nothing, and the action can be sent again. Tested in Rust; the resend ran on testnet during the outage's recovery |
 | Proofs: one fact, and nothing else | **done**: a real proof cut and checked on testnet by `npm run e2e` and `npm run verify:proof`, and in the browser on `/verify` |
 | Two privacy gaps found by review | **fixed**, tested and played on testnet (below) |
+| The app's screens, rebuilt | **done**: one next step per desk, the public chain in a column beside it; checked in a browser against testnet (below) |
 | The live deal on testnet | `northwind-14` on `ledger.paridesk.testnet`, played to the end of the third period (seq 30), pinned to enclave build `edef73c7…` |
 
 Everything in the README has been run on testnet with real transactions, on the final builds. Nothing has been pushed, posted or submitted. Those steps are the builder's.
@@ -238,6 +239,20 @@ Not run yet: the Privy path past its login dialog. Pressing **Sign in with Privy
 
 Found on the way: a call to the deal prepays 300 TGas, which is about 0.3 NEAR at testnet's gas price, so the faucet gives 0.5 NEAR (0.1 was refused: "Not enough balance"). The unused part comes back; the account held 0.594 NEAR after its three transactions. The live deal now has a ninth party and Alder holds 250,000.00 less, so the leak test's storage figures have moved again.
 
+## The app's screens, rebuilt (12 November)
+
+The inner app was laid out again so each screen has one thing to do and the public side of the deal has one place. The contract, the enclave, the data layer and the home page are unchanged.
+
+- **A sidebar instead of a row of tabs.** It shows whose seat you are in, **Switch seat** (also keys 1 to 9, or ⌘K), and four places: the desk, **Who sees what**, **Check a proof** and **Your own account**.
+- **One lit card per desk**, holding the next step and a tracker of where the period stands (Fix rate, Request interest, Borrower pays, Settle). The rest of the desk is flat ruled sections: the register, trades, payments.
+- **What the chain saw**, a column beside every desk: the last action, the books' fingerprint, the amount held, the party's envelope as ciphertext with its **Prove** buttons, and the last lines of the record. Everything public about a desk is in that column, and everything on the desk itself was opened with the party's key.
+- **The refusal stays on the card.** A refused interest request turns the card red: **Nothing moved.**, the figure typed struck through beside the register's, and the transaction.
+- **Who sees what** is one table of what each reader has, then the public chain beside one reader's opened envelope; press a reader's name to open theirs.
+
+Checked in headless Chrome against the live deal `northwind-14` on testnet: the agent's, Alder's, Rival's, the borrower's and the auditor's desks, Who sees what, Check a proof and Your own account at 1440 pixels wide, and the agent's desk at 390 pixels wide with no sideways scroll. One action was sent: the agent typed 900,000,000.00 and was refused, "You entered 900,000,000.00; the register says 1,993,333.32." ([7ddCcw4P…](https://testnet.nearblocks.io/txns/7ddCcw4PoyAPxmLgMFyQu3PteiDLbMaC4JVqa1b7gHkd), line 44 of the record). `npm run build` and the linter pass, and with no `PARI_BACKEND` the Canton screens render inside the same frame.
+
+Not run on the new screens: Pay, Settle, Accept and the other action buttons (their server actions are unchanged), and the DAO card **Waiting for a second operator**, because the live deal's agent is a plain account. Some labels changed, so the older notes above quote the old ones: **It holds** now reads **Holds**, **It does not hold** reads **Does not hold**, and **Prove what you hold** and **Prove your cash** are **What it holds** and **Its cash** in the chain's column.
+
 ## The repository's history (12 November)
 
 At the builder's request the history was rebuilt on 12 November 2026, and `main` on GitHub was replaced with it the same day. `main` now holds one commit with the Canton build as it stood on 7 October 2026 (`392e45c`, tag `pre-hackathon`), then the commits made during the hackathon, each with its original message, author and date. The files are the same as before the rebuild. The `near` branch is gone, and the README's Canton half moved to `docs/canton.md`, so the README is the NEAR build alone with its disclosure and diff link.
@@ -246,7 +261,7 @@ At the builder's request the history was rebuilt on 12 November 2026, and `main`
 
 Nothing is left to build, and `main` is public. These need the builder, in this order:
 
-0. On the hosted demo, sign in on `/you` with Privy and press the six buttons, to play the Privy path once by hand. If Privy refuses the sign-in there, add the hosted address to the Privy app's allowed origins.
+0. On the hosted demo, sign in on `/you` with Privy and press each of the six steps as the card offers it, to play the Privy path once by hand. If Privy refuses the sign-in there, add the hosted address to the Privy app's allowed origins.
 1. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected. Then upload the hosted demo again (see above).
 2. Keep the hosted demo up through 2026-11-18.
 3. Add a line naming Pari to Selkie's README.
