@@ -205,7 +205,7 @@ Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txn
 ## Cut
 
 - **The brief's cut list**, as planned: prepayment, MNPI documents and the information wall, the 100-lender scale test, Confidential Intents withdrawals, an AI agent, mainnet, Canton Coin.
-- **No hosted NEAR demo yet.** `near/Dockerfile` and `npm run demo:env` are ready. The same standalone server was run locally with that env file and no other keys; the Docker image build itself has not been run.
+- **No hosted NEAR demo yet.** `near/Dockerfile` and `npm run demo:env` are ready. The same standalone server was run locally with that env file and no other keys. On 12 November `next start` was run with only that env file (no key files on disk, an empty home folder), and the agent, borrower, lender, auditor, visibility and `/you` pages each came back the same length as from the server that reads the key files. The env file now also carries the faucet's key, which `/you` needs. The Docker image build itself has not been run.
 - **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
 
@@ -240,7 +240,7 @@ Nothing is left to build, and `main` is public. These need the builder, in this 
 
 0. Sign in on `/you` with Privy and press the six buttons, to play the Privy path once by hand. Set `NEXT_PUBLIC_PRIVY_APP_ID` wherever the demo is hosted, and add that host to the Privy app's allowed origins.
 1. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected.
-2. Optional: host the NEAR demo, and keep it up through 2026-11-18.
+2. Optional: host the NEAR demo, and keep it up through 2026-11-18. Without Docker, a Node 22 host is enough: build with `cd web && npm ci && npm run build`, start with `cd web && npm start`, and give it the variables in `near/.keys/demo.env` plus `NEXT_PUBLIC_PRIVY_APP_ID`.
 3. Add a line naming Pari to Selkie's README.
 4. Tag the final commit `hackathon-submission`, post on X, then submit the form, before 2026-11-14T23:59:00Z.
 
