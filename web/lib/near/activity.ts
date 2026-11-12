@@ -2,13 +2,17 @@
 
 import "server-only";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 // Which transaction wrote each line of the contract's public record. The
 // chain stores the record but not transaction hashes, so the server notes the
 // hash of each transaction it sends. Hashes are public; nothing here is secret.
 
 const FILE = join(process.cwd(), ".pari", "near-activity.json");
+
+/** Where `near/scripts` records each deal it set up: the repo's own folder, or
+ *  `PARI_RUNS` on a host that carries the web app alone. */
+const RUNS = resolve(process.cwd(), process.env.PARI_RUNS ?? "../near/runs");
 
 type Activity = Record<string, Record<string, string>>;
 
@@ -37,7 +41,7 @@ const UNRECORDED = new Set(["new", "sweep", "add_proposal"]);
  *  others wrote one line of the record, in order. An operator's approval wrote
  *  one only when it was the approval that made the DAO act (`ran`). */
 function scriptTransactions(dealId: string): Record<string, string> {
-  const file = join(process.cwd(), "..", "near", "runs", `${dealId}.json`);
+  const file = join(RUNS, `${dealId}.json`);
   if (!existsSync(file)) return {};
   const run = JSON.parse(readFileSync(file, "utf8")) as { transactions: Array<{ step: string; hash: string; ran?: string }> };
   const wrote = run.transactions.filter((t) => !UNRECORDED.has(t.step) && (t.step !== "act_proposal" || t.ran));
