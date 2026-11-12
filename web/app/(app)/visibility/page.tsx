@@ -30,8 +30,8 @@ const ROWS: Array<{ label: string; note: string; count: (s: Snapshot) => number 
   { label: "Cash allocations", note: "Funded legs awaiting settlement", count: (s) => s.allocations.length },
 ];
 
-export default async function VisibilityPage() {
-  if (BACKEND === "near") return <VisibilityScreen />;
+export default async function VisibilityPage({ searchParams }: { searchParams: { as?: string | string[] } }) {
+  if (BACKEND === "near") return <VisibilityScreen as={typeof searchParams.as === "string" ? searchParams.as : undefined} />;
   const views = await Promise.all(PERSONAS.map((persona) => viewAs(persona)));
   const problem = views.find(isUnavailable);
   if (problem) return <LedgerUnavailable problem={problem} />;
