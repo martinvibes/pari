@@ -15,15 +15,16 @@ import { haveViewKeys, viewKeyFor } from "./lib/viewkeys.js";
 
 const FILE = join(dirname(fileURLToPath(import.meta.url)), "../../.keys/demo.env");
 
-const { agent, parties } = await state();
-if (!haveViewKeys(parties)) {
-  throw new Error("this machine does not hold the parties' view keys: run `npm run setup` first");
+const { agent } = await state();
+// The agent's envelope is sealed to the key of the account that is the deal's agent.
+const cast = PERSONAS.map((persona) => ({ persona, viewer: persona === "agent" ? agent : accountOf(persona) }));
+// A visitor's own account (/you) is a party too, but its view key stays in the visitor's browser.
+if (!haveViewKeys(cast.map(({ viewer }) => viewer))) {
+  throw new Error("this machine does not hold the cast's view keys: run `npm run setup` first");
 }
 
 const lines = ["PARI_BACKEND=near", `PARI_ROOT=${ROOT}`];
-for (const persona of PERSONAS) {
-  // The agent's envelope is sealed to the key of the account that is the deal's agent.
-  const viewer = persona === "agent" ? agent : accountOf(persona);
+for (const { persona, viewer } of cast) {
   lines.push(`NEAR_KEY_${persona.toUpperCase()}=${keyFor(accountOf(persona))}`);
   lines.push(`VIEW_KEY_${persona.toUpperCase()}=${(await viewKeyFor(viewer)).privateKey}`);
 }
@@ -31,6 +32,8 @@ for (const persona of PERSONAS) {
 if (agent === DAO) {
   for (const operator of OPERATORS) lines.push(`NEAR_KEY_${operator.split(".")[0]!.toUpperCase()}=${keyFor(operator)}`);
 }
+// The root gives a visitor's own account (/you) its first test NEAR.
+lines.push(`NEAR_KEY_FAUCET=${keyFor(ROOT)}`);
 
 mkdirSync(dirname(FILE), { recursive: true });
 const existed = existsSync(FILE);
