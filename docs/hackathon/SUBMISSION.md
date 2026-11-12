@@ -18,7 +18,7 @@ Deadline: **2026-11-14T23:59:00Z** (Saturday 23:59 UTC, Sunday 00:59 in Lagos).
 | `size` | `1` |
 | `tracks` | `["privacy", "realworld"]` |
 | `nearAddress` | *(the builder's **mainnet** NEAR account, for the payout)* |
-| `projectUrl` | `https://github.com/martinvibes/pari` (see "Which branch judges see" below) |
+| `projectUrl` | `https://github.com/martinvibes/pari` |
 | `demoUrl` | *(the URL of the X post, once published)* |
 | `idea` | the text under "What did you build?" below (1,989 characters; the limit is 2,000) |
 | `consent` | `true`, after the builder has read the contact notice |
@@ -105,24 +105,20 @@ The recorded runs in the README were played by `npm run e2e`. A fresh deal for
 the video replaces the live deal on the contract, which is fine: the leak test
 still reads the recorded run's transactions, and says the contract has moved on.
 
-## Which branch judges see
+## What judges clone
 
 The form takes the repository's URL, and a plain `git clone` gives the default
-branch. Today that is `main`, which is the Canton build with the Canton README.
-The NEAR work is on branch `near`. Before submitting, the builder picks one:
+branch, `main`. The NEAR build is on `main`: one commit holds the Canton build
+as it stood on 7 October 2026 (tag `pre-hackathon`), and every commit after it
+was made during the hackathon.
 
-1. **Make `near` the default branch on GitHub** (recommended). `main` and the
-   Canton demo that deploys from it stay exactly as they are, and it can be
-   switched back after judging.
-2. Merge `near` into `main`. One branch, but it redeploys the hosted Canton demo.
-
-Either way, tag the final commit `hackathon-submission`; the rules accept the
+Tag the final commit `hackathon-submission`; the rules accept the
 `pre-hackathon` and `hackathon-submission` tags plus the README's diff link.
 
 ## Checklist
 
-- [ ] Branch `near` pushed (this makes the NEAR work public)
-- [ ] Default branch decided (above), final commit tagged `hackathon-submission`
+- [x] `main` pushed with the `pre-hackathon` tag (12 November; the NEAR work is public)
+- [ ] Final commit tagged `hackathon-submission`
 - [ ] Repository public, with its LICENSE (Apache-2.0 is there), through 2026-11-18
 - [ ] README section 1 run from a fresh clone: both `cargo test` runs, `npm run prove:privacy` and `npm run verify:proof`
 - [ ] Demo video recorded; its link added at the top of the README

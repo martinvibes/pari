@@ -63,7 +63,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
             <p className="mb-10 border border-amber/30 bg-amber/[0.06] px-4 py-3 text-[14px] leading-relaxed text-smoke">
               These pages describe Pari&rsquo;s Canton build. This app is running the NEAR build, which is
               documented in{" "}
-              <a href={`${SITE.repo}/tree/near#readme`} className="text-paper underline underline-offset-4">
+              <a href={`${SITE.repo}#readme`} className="text-paper underline underline-offset-4">
                 the README
               </a>
               .

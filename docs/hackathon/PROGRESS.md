@@ -1,7 +1,7 @@
 # Pari on NEAR: progress
 
-Branch `near`, built for NEAR HACKATHON (window 2026-10-19 → 2026-11-14T23:59Z).
-Baseline: tag `pre-hackathon` = 3c11dbc (the Canton build, 2026-10-07).
+Branch `main`, built for NEAR HACKATHON (window 2026-10-19 → 2026-11-14T23:59Z).
+Baseline: tag `pre-hackathon` = 392e45c (the Canton build as of 2026-10-07, its earlier commits folded into that one commit).
 
 ## Status (2026-11-12, 11:00 UTC)
 
@@ -209,15 +209,18 @@ Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txn
 - **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
 
+## The repository's history (12 November)
+
+At the builder's request the history was rebuilt on 12 November 2026, and `main` on GitHub was replaced with it the same day. `main` now holds one commit with the Canton build as it stood on 7 October 2026 (`392e45c`, tag `pre-hackathon`), then the commits made during the hackathon, each with its original message, author and date. The files are the same as before the rebuild. The `near` branch is gone, and the README's Canton half moved to `docs/canton.md`, so the README is the NEAR build alone with its disclosure and diff link.
+
 ## Next (the builder's steps)
 
-Nothing is left to build. These need the builder, in this order:
+Nothing is left to build, and `main` is public. These need the builder, in this order:
 
-1. Push branch `near` (this publishes the NEAR work), and decide which branch judges see: see `SUBMISSION.md`.
-2. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected.
-3. Optional: host the NEAR demo, and keep it up through 2026-11-18.
-4. Add a line naming Pari to Selkie's README.
-5. Post on X, then submit the form, before 2026-11-14T23:59:00Z.
+1. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected.
+2. Optional: host the NEAR demo, and keep it up through 2026-11-18.
+3. Add a line naming Pari to Selkie's README.
+4. Tag the final commit `hackathon-submission`, post on X, then submit the form, before 2026-11-14T23:59:00Z.
 
 ## Verified facts (section 10 of the brief)
 
