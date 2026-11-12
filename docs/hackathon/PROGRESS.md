@@ -202,10 +202,18 @@ OutLayer project `paridesk.testnet/pari-spike`, build pinned by sha256
 
 Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txns/G1ZSCUNefRpokiTrv38xHcvSUuucGY3LuhcL4A59NjqD), create_project [Adeiu9uj…](https://testnet.nearblocks.io/txns/Adeiu9ujRRR91eaHuyrpGtJJ2JUadmTL8RqGmJjU9VvQ), spike account [4xQky8eW…](https://testnet.nearblocks.io/txns/4xQky8eWpuBw9CgqP3ceEJzcZXnvYKGEe4BcG6ocTPMo), spike deploy [Dw1tMpyo…](https://testnet.nearblocks.io/txns/Dw1tMpyow6SBXFD34QhRV4frPP6ujnabQJrZ2A3Ucjmf).
 
+## The hosted demo (12 November)
+
+https://pari-web-production-5ff7e57a.up.railway.app runs the web app alone on Railway. Railpack builds `web/` on Node 22 and starts it with `next start`, with the variables `npm run demo:env` writes plus `NEXT_PUBLIC_PRIVY_APP_ID`. It plays the live deal on `ledger.paridesk.testnet`.
+
+- **Checked:** the agent, borrower, lender, auditor, visibility, verify and `/you` pages each came back the same length as from the local server, and the visibility page carries the same 38 transaction links. On `/you`, **Sign in with Privy** opens Privy's dialog.
+- **Not run yet:** no action button has been pressed on the hosted copy, and nobody has completed a Privy sign-in on it.
+- **What the host carries:** only the web app, so the upload also holds a copy of `near/runs` (`PARI_RUNS=runs`) and of the server's own transaction notes (`web/.pari/near-activity.json`). After a fresh deal, upload again so the new deal's setup transactions are linked.
+- `near/Dockerfile` has still not been built.
+
 ## Cut
 
 - **The brief's cut list**, as planned: prepayment, MNPI documents and the information wall, the 100-lender scale test, Confidential Intents withdrawals, an AI agent, mainnet, Canton Coin.
-- **No hosted NEAR demo yet.** `near/Dockerfile` and `npm run demo:env` are ready. The same standalone server was run locally with that env file and no other keys. On 12 November `next start` was run with only that env file (no key files on disk, an empty home folder), and the agent, borrower, lender, auditor, visibility and `/you` pages each came back the same length as from the server that reads the key files. The env file now also carries the faucet's key, which `/you` needs. The Docker image build itself has not been run.
 - **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
 
@@ -238,9 +246,9 @@ At the builder's request the history was rebuilt on 12 November 2026, and `main`
 
 Nothing is left to build, and `main` is public. These need the builder, in this order:
 
-0. Sign in on `/you` with Privy and press the six buttons, to play the Privy path once by hand. Set `NEXT_PUBLIC_PRIVY_APP_ID` wherever the demo is hosted, and add that host to the Privy app's allowed origins.
-1. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected.
-2. Optional: host the NEAR demo, and keep it up through 2026-11-18. Without Docker, a Node 22 host is enough: build with `cd web && npm ci && npm run build`, start with `cd web && npm start`, and give it the variables in `near/.keys/demo.env` plus `NEXT_PUBLIC_PRIVY_APP_ID`.
+0. On the hosted demo, sign in on `/you` with Privy and press the six buttons, to play the Privy path once by hand. If Privy refuses the sign-in there, add the hosted address to the Privy app's allowed origins.
+1. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected. Then upload the hosted demo again (see above).
+2. Keep the hosted demo up through 2026-11-18.
 3. Add a line naming Pari to Selkie's README.
 4. Tag the final commit `hackathon-submission`, post on X, then submit the form, before 2026-11-14T23:59:00Z.
 

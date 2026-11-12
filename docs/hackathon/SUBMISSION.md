@@ -122,7 +122,7 @@ Tag the final commit `hackathon-submission`; the rules accept the
 - [ ] Repository public, with its LICENSE (Apache-2.0 is there), through 2026-11-18
 - [ ] README section 1 run from a fresh clone: both `cargo test` runs, `npm run prove:privacy` and `npm run verify:proof`
 - [ ] Demo video recorded; its link added at the top of the README
-- [ ] Hosted demo (optional, "a plus"): `docker build -f near/Dockerfile`, or on a Node 22 host `cd web && npm ci && npm run build` then `cd web && npm start`, with the variables from `npm run demo:env`; link added to the README; kept up through 2026-11-18
+- [x] Hosted demo: https://pari-web-production-5ff7e57a.up.railway.app (Railway; linked at the top of the README). Keep it up through 2026-11-18.
 - [ ] X post published with the video, saying "Built at NEAR HACKATHON", tagging @NEARProtocol and #NEARHackathon
 - [ ] Selkie's README names Pari (Pari's README already names Selkie)
 - [ ] Mainnet payout account ready for `nearAddress`
