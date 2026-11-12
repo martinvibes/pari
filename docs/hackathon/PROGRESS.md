@@ -209,6 +209,27 @@ Setup transactions: root account [G1ZSCUNe…](https://testnet.nearblocks.io/txn
 - **The `/docs` pages still describe the Canton build.** In NEAR mode they carry a notice that says so and points to the README. The home page and the app screens switch with `PARI_BACKEND=near`.
 - **The enclave build is not bit-for-bit reproducible across machines.** The contract pins the sha256 of the build that was uploaded.
 
+## A visitor's own account: `/you` (12 November)
+
+A page the demo server does not sign for. A visitor signs in with Privy or with a key made in the browser, gets a NEAR account named by that key, and buys 250,000.00 of the loan from Alder. The visitor's three transactions (view key, pay in, accept) are signed in the browser and sent to NEAR from there; the faucet, Alder and the agent sign on the server. The browser opens the visitor's envelope with a view key it made and kept.
+
+Played end to end on testnet on the live deal `northwind-14`, in headless Chrome, with a browser-made key. Account `fe0b035ea61fec88b72497987e69bf3dcc907fb6b7bf86814da91b1c248d2de2`. Result on screen: principal 250,000.00, cash in the books 1,250.00, trade settled at 99.50 for 248,750.00.
+
+| Step | Signed by | Transaction |
+|---|---|---|
+| Test NEAR | faucet (`paridesk.testnet`) | `26Rgd5LVfH2CgfBQXJJWZEPSU39mnWLHwafbpTPqV1nQ` |
+| Test USDC | faucet | `6MTWe6GD8aBaVrHCc7VY9f97zQFog932WeYjqpw31wMW` |
+| Register view key | the visitor, in the browser | `AuYuGU1d598epE7bSpJ4TYJg26Am1Ks28zzm7hniUfy1` |
+| Pay in 250,000.00 | the visitor, in the browser | `4VQbxF5tvaNeadhKSSGvxSztDZBL7Shik9qASKSHNMEx` |
+| Alder's offer | `alder.paridesk.testnet` | `FHdm9CNjCvmG4iztdHW7qHb2aXVzvd4N8G3hTugUScyd` |
+| Accept | the visitor, in the browser | `3v5ewPmZWfohmHNqR5DKG8r8hzfnoWsFq7nDG8S2vtY7` |
+| Fix rate (no period was open) | `agent.paridesk.testnet` | `6qqxA436GqQ8ddXQ3oYBE8CZSPbk356aXkygptZiDi1i` |
+| Settle the trade | `agent.paridesk.testnet` | `HNSPhV4XRmVaVjb57TscRbV6gdLsFqkC7V7b4aosVD7L` |
+
+Not run yet: the Privy path past its login dialog. Pressing **Sign in with Privy** opens Privy's dialog for the builder's app (email, or a wallet). Completing a login needs a person, so signing a transaction with a Privy wallet has not been played. The signer follows NEAR's Privy tutorial (https://docs.near.org/web3-apps/tutorials/privy.md).
+
+Found on the way: a call to the deal prepays 300 TGas, which is about 0.3 NEAR at testnet's gas price, so the faucet gives 0.5 NEAR (0.1 was refused: "Not enough balance"). The unused part comes back; the account held 0.594 NEAR after its three transactions. The live deal now has a ninth party and Alder holds 250,000.00 less, so the leak test's storage figures have moved again.
+
 ## The repository's history (12 November)
 
 At the builder's request the history was rebuilt on 12 November 2026, and `main` on GitHub was replaced with it the same day. `main` now holds one commit with the Canton build as it stood on 7 October 2026 (`392e45c`, tag `pre-hackathon`), then the commits made during the hackathon, each with its original message, author and date. The files are the same as before the rebuild. The `near` branch is gone, and the README's Canton half moved to `docs/canton.md`, so the README is the NEAR build alone with its disclosure and diff link.
@@ -217,6 +238,7 @@ At the builder's request the history was rebuilt on 12 November 2026, and `main`
 
 Nothing is left to build, and `main` is public. These need the builder, in this order:
 
+0. Sign in on `/you` with Privy and press the six buttons, to play the Privy path once by hand. Set `NEXT_PUBLIC_PRIVY_APP_ID` wherever the demo is hosted, and add that host to the Privy app's allowed origins.
 1. Record the demo video against a fresh deal (`npm run setup -- --fresh`, about three minutes), while OutLayer is answering in seconds, and add its link at the top of the README. A fresh deal replaces `northwind-14` as the live one; the two recorded runs and their checks are not affected.
 2. Optional: host the NEAR demo, and keep it up through 2026-11-18.
 3. Add a line naming Pari to Selkie's README.

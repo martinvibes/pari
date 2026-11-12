@@ -177,6 +177,15 @@ The numbers below are for a fresh deal. Every screen is one party's own view: pi
 16. On `/agent`, press **Fix rate** (the third period, to 15 Jun 2027). The request form now reads `2,968,333.32`: the third period's interest plus every unpaid half. Press **Request interest**, then **Pay** on `/borrower`, then **Settle all 4 lenders** on `/agent`.
     `/lender/alder` shows **1,219,833.33** paid, and nothing left owed from the short period.
 
+**With an account only you control**
+
+17. Open `/you` (**Use your own account**, in the status line). Sign in with Privy, or press **Use a key made in this browser**.
+    You see: a NEAR testnet account named by a key. The demo server never holds that key.
+18. Press the six buttons in order: **Get test funds**, **Register view key**, **Pay in**, **Ask Alder for an offer**, **Accept**, **Ask the agent to settle**. Each step says whose account signs it. The faucet, Alder and the agent sign on the demo server. Your three are signed in your browser and sent to NEAR from there.
+    You see: *Trade settled. Your cash went to Alder and the loan came to you in one step.* You hold 250,000.00 of the loan, bought at 99.50 for 248,750.00, with 1,250.00 of cash left in the books. **What the chain holds about you** shows your envelope as ciphertext. **What you alone can open** shows the same envelope, opened in your browser with a view key that never leaves it.
+
+If no interest period is open, the agent fixes one (4.30%, three months) before it settles your trade. Privy sign-in appears when the deployment has a Privy app id (`NEXT_PUBLIC_PRIVY_APP_ID` in `web/.env.local`); without one the page offers the browser key alone.
+
 ### 3. Your own deployment on testnet
 
 About ten minutes. You need Rust, [cargo-near](https://github.com/near/cargo-near), the [near CLI](https://github.com/near/near-cli-rs), Node.js 22, and a testnet account holding about 18 NEAR whose key is in `~/.near-credentials/testnet/`.
@@ -195,6 +204,8 @@ npm run prove:privacy                 # the leak test, on the run you just made
 cd ../../web && npm install
 PARI_BACKEND=near npm run dev         # http://localhost:3000/agent
 ```
+
+The `/you` page gives each new account 0.5 test NEAR for gas from your root account (`PARI_FAUCET` names another account, `NEAR_KEY_FAUCET` its key), and stops after 20 accounts per run of the server.
 
 `npm run setup` is safe to run again: every step checks the chain first and does only what is missing. `npm run setup -- --fresh` starts a new deal with new books. The faucet starts a new account with 10 NEAR, so top it up before running setup: from [near-faucet.io](https://near-faucet.io), or make a second faucet account the same way and send its balance over (`near tokens OTHER.testnet send-near YOU.testnet '9.5 NEAR' network-config testnet sign-with-legacy-keychain send`).
 
@@ -411,7 +422,8 @@ Next on NEAR: withdrawals through NEAR's confidential intents, so that even thos
 | Intel TDX, and OutLayer's attested workers and keystore | The books are private only if the enclave is, and the random bytes that blind the fingerprint and salt the commitments come from the worker. Each run has a TDX attestation you can fetch: `https://testnet-api.outlayer.ai/attestations/by-tx/<transaction hash>`. |
 | The one enclave build the contract pins | The contract calls one build, named by its sha256, and no other. A deal names its build in the public arguments of the transaction that starts it, and `state` on the contract returns it as `version_key`. The live deal and both recorded runs pin `edef73c7a53ee924982553f96886efab8bc2cb1d000d51e74f9026118d0c705d`. Build it yourself with `near/build.sh` and compare (the build is not yet bit-for-bit reproducible across machines). |
 | Whoever holds the contract account's key | In this demo the contract account still has its full-access key, which setup uses to deploy. Its holder could replace the contract, or start a new deal pinned to another enclave build. The same person owns the OutLayer project. In production that key is deleted or handed to a DAO. |
-| The demo server | It holds a testnet key for every party, so one browser can play the whole deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope. When the agent is a DAO, the server holds all three operators' keys as well. In production each party, and each operator, holds its own. |
+| The demo server | It holds a testnet key for every party, so one browser can play the whole deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope. When the agent is a DAO, the server holds all three operators' keys as well. In production each party, and each operator, holds its own. The one exception is `/you`: there the visitor's browser holds the signing key and the view key, and the server plays only the other side. |
+| Privy, if you sign in with it | Privy's embedded wallet keeps your account's key and signs when you approve. The browser-key option keeps the key in the browser's own storage instead. |
 
 **What the public chain shows, on purpose or by inference**
 
@@ -495,7 +507,7 @@ near/
 └── build.sh      builds all three programs
 web/
 ├── lib/near/         reads the contract, opens envelopes, signs actions
-└── components/near/  the agent, borrower, lender, auditor and visibility screens
+└── components/near/  the agent, borrower, lender, auditor and visibility screens, and the visitor's own account
 ```
 
 The web app serves both builds. `PARI_BACKEND=near` switches every screen to NEAR; without it the app is the Canton build, unchanged.
@@ -503,9 +515,9 @@ The web app serves both builds. `PARI_BACKEND=near` switches every screen to NEA
 ## NEAR HACKATHON
 
 - **Tracks:** privacy (primary), realworld.
-- **Built during the hackathon:** everything under [`near/`](near), plus [`web/lib/near`](web/lib/near) and [`web/components/near`](web/components/near): the contract, the enclave program, the test token, the scripts and the app's NEAR data layer and screens. The full diff from the earlier build is [`pre-hackathon...main`](https://github.com/martinvibes/pari/compare/pre-hackathon...main).
+- **Built during the hackathon:** everything under [`near/`](near), plus [`web/lib/near`](web/lib/near), [`web/components/near`](web/components/near) and the [`/you`](web/app/(app)/you) page: the contract, the enclave program, the test token, the scripts and the app's NEAR data layer and screens. The full diff from the earlier build is [`pre-hackathon...main`](https://github.com/martinvibes/pari/compare/pre-hackathon...main).
 - **Existed before:** Pari was first designed for Canton at HackCanton Season 3. That build is tagged [`pre-hackathon`](https://github.com/martinvibes/pari/tree/pre-hackathon) (commit `392e45c`, the build as of 7 October 2026) and described in [docs/canton.md](docs/canton.md). The NEAR version reuses its idea, its demo deal, its test names and numbers, and the web app's visual layer. The `daml/` folder is untouched.
-- **Libraries:** near-sdk and near-contract-standards 5.30, cargo-near 0.23, the OutLayer SDK 0.2, crypto_box 0.9 (libsodium-compatible sealed boxes), sha2, hmac, serde, base64 and getrandom in Rust; near-api-js 7.5, libsodium-wrappers 0.8, Next.js 14 and React 18 in TypeScript.
+- **Libraries:** near-sdk and near-contract-standards 5.30, cargo-near 0.23, the OutLayer SDK 0.2, crypto_box 0.9 (libsodium-compatible sealed boxes), sha2, hmac, serde, base64 and getrandom in Rust; near-api-js 7.5, libsodium-wrappers 0.8, @privy-io/react-auth 3.51, Next.js 14 and React 18 in TypeScript.
 - **AI tools:** the code was written with Claude Code (Anthropic) as a coding agent, directed and reviewed by the builder.
 - **The builder's other entry:** [Selkie](https://github.com/SelkieLabs/Selkie).
 - **Credit:** the web app's visual layer is derived from [sidereal-hedera](https://github.com/guha-rahul/sidereal-hedera) (Apache-2.0). See [NOTICE](NOTICE).
