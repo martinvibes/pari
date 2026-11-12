@@ -2,7 +2,7 @@
 
 import "server-only";
 import { Account, JsonRpcProvider, teraToGas, type KeyPairString } from "near-api-js";
-import { accountOf, NEAR, signingKey } from "@/lib/near/config";
+import { accountOf, FAUCET, faucetKey, NEAR, signingKey } from "@/lib/near/config";
 
 // Reads from and writes to NEAR. A read is a view call anyone can make. A
 // write is one function call signed by the persona entitled to it.
@@ -105,6 +105,32 @@ export function send<T>(
     return { hash: tx.transaction.hash, result: decoded(status.SuccessValue) as T, returned };
   });
   queue = sent.catch(() => undefined);
+  return sent;
+}
+
+/** An account's NEAR, in yocto. An account nobody has funded yet holds none. */
+export async function nearBalance(account: string): Promise<bigint> {
+  try {
+    return (await provider.viewAccount({ accountId: account })).amount;
+  } catch (error) {
+    if (/does not exist/.test((error as Error).message)) return 0n;
+    throw new ChainError(`Could not read ${account}: ${reason(error)}`);
+  }
+}
+
+// The faucet's transactions do not touch the deal, so they keep their own line.
+let faucetQueue: Promise<unknown> = Promise.resolve();
+
+/** One transaction signed by the faucet account. Returns its hash. */
+export function fromFaucet(work: (faucet: Account) => Promise<{ transaction: { hash: string } }>): Promise<string> {
+  const sent = faucetQueue.then(async () => {
+    try {
+      return (await work(new Account(FAUCET, provider, faucetKey() as KeyPairString))).transaction.hash;
+    } catch (error) {
+      throw new ChainError(reason(error));
+    }
+  });
+  faucetQueue = sent.catch(() => undefined);
   return sent;
 }
 

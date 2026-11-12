@@ -59,14 +59,26 @@ function fromEnv(prefix: string, personaId: string): string | undefined {
   return process.env[`${prefix}_${personaId.toUpperCase()}`];
 }
 
-/** The key a persona signs with: `NEAR_KEY_<PERSONA>` in the environment, or
- *  the near CLI keychain, where `near/scripts` setup writes it. */
-export function signingKey(personaId: string): string {
-  const key = fromEnv("NEAR_KEY", personaId);
-  if (key) return key;
-  const file = join(homedir(), ".near-credentials", "testnet", `${accountOf(personaId)}.json`);
-  if (!existsSync(file)) throw new KeyMissingError(`No signing key for ${accountOf(personaId)} on this server.`);
+/** An account's key in the near CLI keychain, where `near/scripts` setup writes it. */
+function keychainKey(account: string): string {
+  const file = join(homedir(), ".near-credentials", "testnet", `${account}.json`);
+  if (!existsSync(file)) throw new KeyMissingError(`No signing key for ${account} on this server.`);
   return (JSON.parse(readFileSync(file, "utf8")) as { private_key: string }).private_key;
+}
+
+/** The key a persona signs with: `NEAR_KEY_<PERSONA>` in the environment, or
+ *  the near CLI keychain. */
+export function signingKey(personaId: string): string {
+  return fromEnv("NEAR_KEY", personaId) ?? keychainKey(accountOf(personaId));
+}
+
+/** The account that gives a visitor's own account its first test NEAR and test
+ *  USDC: `PARI_FAUCET`, or the root the cast's accounts sit under. */
+export const FAUCET = process.env.PARI_FAUCET ?? root;
+
+/** The faucet's key: `NEAR_KEY_FAUCET` in the environment, or the near CLI keychain. */
+export function faucetKey(): string {
+  return process.env.NEAR_KEY_FAUCET ?? keychainKey(FAUCET);
 }
 
 /** The private half of a persona's view key (X25519, base64), which opens its
