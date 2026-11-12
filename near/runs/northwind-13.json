@@ -1,0 +1,329 @@
+{
+  "deal_id": "northwind-13",
+  "ledger": "ledger.paridesk.testnet",
+  "transactions": [
+    {
+      "step": "new",
+      "signer": "ledger.paridesk.testnet",
+      "hash": "ELyWVntD7tgbMg5zfLMLTA1rhhPk1pNRv4qsypUBq9Z3"
+    },
+    {
+      "step": "sweep",
+      "signer": "ledger.paridesk.testnet",
+      "hash": "7j9YA6Rf8etsWt3vY9u891ziMpdRMpGmdDxZVfTMGBTE"
+    },
+    {
+      "step": "fetch_enclave_key",
+      "signer": "paridesk.testnet",
+      "hash": "Ey7LuGgKiJrLfaCEnugAuZXtEHaVzpckUezd1ip9Kgph"
+    },
+    {
+      "step": "init_deal",
+      "signer": "paridesk.testnet",
+      "hash": "3XQ8BBVmUPgg4BjAbQYiSuKXbaUeK3MbmaUDYwRWbp9X"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "2YjGyzPEEY5URYedC7jTUQ3zong17tc7tZoVakdKjp7j"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "2qSuCkyAvHk48LsTPybCbwcxzY5xxqvkdsAcEMhPgGzA"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "A2bkPMTqwWWxk8fD6nAtq4uCE642FyJAN7asjpyp7LFV",
+      "ran": "register_view_key"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "8ZNXWUG1nrDq8Pfj3TGPjb3pJwm8yAxwDAnRtnYFTtfa"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "alder.paridesk.testnet",
+      "hash": "BfDFaEVgLgrRZWPjDuXwNYcVnr4LZjqKQKDxwyTgwk6Z"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "birch.paridesk.testnet",
+      "hash": "H91KC7bj1dKiSAEH2MnmeXBRcWk69YB3HefjdZ7JANTo"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "cedar.paridesk.testnet",
+      "hash": "Ej3GViYzPs2CtQFt2nRjqd72y6TBrNeb2C7hgBFmdbbL"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "delta.paridesk.testnet",
+      "hash": "85tKasWELV5o3XdDVTaXAZQMvN8UH1WQNY451KC1dpFp"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "rival.paridesk.testnet",
+      "hash": "G2BA4UYd7YCTWhEjCLQp2zfKoyagwnJeCtZQ17o7Yoyr"
+    },
+    {
+      "step": "register_view_key",
+      "signer": "auditor.paridesk.testnet",
+      "hash": "7wRu6ZoagJiiTJS19DvXGr7kx568twYsW3qZY5BHGo7p"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "G2MjLUTvh4WBmgTvDC5V1rW2JjZAW9WxdoNy7nTugYRo"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "SXF5TwzMwhvWPCFhNaTzXcd7gUBXFgMxFcDFJ5innp3"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "CnBDNTuTT1NQgaLyvM7Z28D78TW8BMhGZN2YUV6Pfk7s",
+      "ran": "fix_rate"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "FwiTj2aoitx3Pznvysotv7FrTfA967RiK2xNuiMKpGRn"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "GWDL9DyrusDDtP858sA8mdDpjSMvDFYSXM4Ha61oZZpw"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "Dubr3TBc9sQGM9xBwzASpMQqY4aZiQpRwoVU45CMHQux",
+      "ran": "request_interest"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "43D1uqbXbHG86BJyswXS336hFW3yUVC4kCFFLWLWGuV9"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "AA4oN8FH3i4aefNJQAQw5KVUCDUg8pwjDvFdxR6gjLGF"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "88DwCkSNq9Nh6T5QeZYbDaxJVH9HNuFTc8dwTJHutVW6",
+      "ran": "request_interest"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "G85EuHUzP7WMTLVjxj7JDxNkRxE28sAiPUe1S8hhvTs7"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "DV7rjHqd5UgJwwQQLqRudzEpc7tDHo7N3v65kC9XDko9"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "GcGWLS8LUHRo3d4LXkVe2nnyzY87Vi3qm1pUSuhgM89L"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "3zDwMAgBqobDbDhi1hBdLVVEvtvXcaHjHbz2UvBNqjcF",
+      "ran": "settle"
+    },
+    {
+      "step": "withdraw",
+      "signer": "alder.paridesk.testnet",
+      "hash": "6mHK2gKeuQ2jwVAuYCU8zDUo1KB1Pu6xxTZM36ZrqdJb"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "F6od5ctxPqWnbwzTMFU6awsqxkfjdEdCcQpk7yXQ3zLG"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "64fWEab9zs4qN7aYDoiRwApgsdjKPbpMVrGiykJndJ5U"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "Brdk3zw3TFgg2XHzb67NCXsRyuStrg5N2kEHhBcyE1rL",
+      "ran": "fix_rate"
+    },
+    {
+      "step": "set_dq",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "ESw2PFx8ATHzi2eWNCRtnLnRRHveRae5ePXxAYurAVon"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "rival.paridesk.testnet",
+      "hash": "4pcWg5G9TGafnxeoeAwhDGbNN6PTvEm9GVV8Shsdr7mp"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "delta.paridesk.testnet",
+      "hash": "AoveJa6uV5LErtcv1Rims1VitCkxY82NwvGkHLhYYXw8"
+    },
+    {
+      "step": "offer_trade",
+      "signer": "alder.paridesk.testnet",
+      "hash": "3snpNaXZyDZjnNy44Z54yuGApUu4AxKhQqPdiqYCiUQQ"
+    },
+    {
+      "step": "accept_trade",
+      "signer": "rival.paridesk.testnet",
+      "hash": "9F9kuebn59DA27aA9VMSNrBhCWx9r9Gpf9mRZtnhSBWw"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "4PeejJi8ZbMAyp6c8vQd2ssWeur7PAphZgC79zYzwBfq"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "G1hsHgg3qznn51zWK6BAeBzgQvdemwn9qfZMSxFfdES9"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "26YgS5vWKPjnaeUHgyL7PaWPsBzQL7Fn5g2CYc6weEe9",
+      "ran": "settle_trade"
+    },
+    {
+      "step": "offer_trade",
+      "signer": "alder.paridesk.testnet",
+      "hash": "HTEhCYTZZHsvV3N58YyFjvWajtdGjsfCCZU8Lr3CDnqC"
+    },
+    {
+      "step": "accept_trade",
+      "signer": "delta.paridesk.testnet",
+      "hash": "EogT3dst8QQerEDUipqR9UmW1eWnWCCbkJPdWhFrkcai"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "63y9pDjzUR7mBjk4m1A9x4vZP4ticXCsGTTuQuxsqQnd"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "857BG9hNDMVjKvLE7Qb1xH3yhrYHhw4rVromY4mhRxr8"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "6Lp7nZoqpL7zCnC3voBqV1h6jtaaXki9ay8T2FjVTMip",
+      "ran": "settle_trade"
+    },
+    {
+      "step": "offer_trade",
+      "signer": "birch.paridesk.testnet",
+      "hash": "6X64VPdhw8nsahFxyKehnHHoYTmE85CBVCAqTqetD4XN"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "2WDiVcLZ97kmxHbeRX6tnniJrobNHg1rANccYsskQjXP"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "CRHXbx48iJJipomLtxRDKhRz7HRVmHtg4xZ7AXKp5sG9"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "A8c94qo4Pc6EHEvdt4d39Twi6CGf96nnvRWUfRtb88MM",
+      "ran": "request_interest"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "9pqsFVmmoaRCumeKqoKyH2Ekh8ZxKChidbyuhHYPH2WK"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "EgCyUC3eq6g9BmMkVqWzYTpeUGyjDDPT3GT7CaMHZ1sb"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "8CgtGPkLJnt18UB1UH6fiShKf4YyBHXtcBsfJupC2ppF"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "whwMQ8ae8EugEW499599KhK61rwDdwCzVNFmLBdUhc6",
+      "ran": "settle"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "92CsoGuAHwGDZ67SesSmNXCAJbqXQnSrbYwTdgjGN2ff"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "77kAEf1gw45smixqxV58VN3N6FKnvzGuRH5nwdx2bNtZ"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "DuE5Wy9oJcpvQxbc43gzRyNqB5Dmo1PPGZSnD6Nrtjgz",
+      "ran": "fix_rate"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "2BFGdXzomvt2wJ1pNwFoXCxyfempX3TVEZ9CnUpgpwfo"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "FTEcQ5xddjRAUB1GVjHkcVi8YTvbxe9etp9VBaZXSDgC"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "BoV2Gsj4AbdVT6yzSSDCjUYcREA2gh3VbVhsSCQfm1h",
+      "ran": "request_interest"
+    },
+    {
+      "step": "ft_transfer_call",
+      "signer": "northwind.paridesk.testnet",
+      "hash": "C6Ng9KoCxmZbdJG9FAo9p8T5tC9iBFuiZbz9CxPdLit4"
+    },
+    {
+      "step": "add_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "42HB29KmFpaEjaU2KkZSHGpEMqyZhctZLjBJ6dAb7qwH"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op1.paridesk.testnet",
+      "hash": "3QZrUvKQWR322sCJgT2CqJo2MMsPP53kv4Fo5PRrMDMv"
+    },
+    {
+      "step": "act_proposal",
+      "signer": "op2.paridesk.testnet",
+      "hash": "7Vcf7jDEXZ5fL7oGXj2pEQwUziqmjCMSM179PUSBLsMR",
+      "ran": "settle"
+    }
+  ]
+}

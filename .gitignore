@@ -46,9 +46,12 @@ target/
 # NEAR testnet keys written by near/scripts/setup-testnet.ts
 /near/.keys/
 
-# Logs of deals played on NEAR testnet, and the proof each run leaves. Those
-# the leak test and the proof check read by default are kept.
+# Logs of deals played on NEAR testnet, and the proof each run leaves. The two
+# recorded runs the README names are kept: the leak test and the proof check
+# read the newer one by default.
 /near/runs/*
-!/near/runs/northwind-4.json
-!/near/runs/northwind-5.json
+!/near/runs/northwind-13.json
+!/near/runs/northwind-14.json
 /near/proofs/*
+!/near/proofs/northwind-13.json
+!/near/proofs/northwind-14.json

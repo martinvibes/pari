@@ -1,0 +1,21 @@
+{
+  "ledger": "ledger.paridesk.testnet",
+  "block": 277320067,
+  "fact": "{\"deal\":\"northwind-14\",\"item\":\"position\",\"party\":\"alder.paridesk.testnet\",\"seq\":30,\"value\":{\"accrual_start\":\"2027-06-15\",\"carried\":\"0\",\"principal\":\"4000000000\"}}",
+  "salt": "6d4b3a88bfe32bad380741877402c66ddadea26ef17e0411cf8cbd77e33db139",
+  "hashes": [
+    "cb58eb2f55249c4bf52945ab561a9f6fad572d9c0e71aeb1abf70c6395dcc07e",
+    "906702572a6b2c82a7525fd36e653467720cfe1c41a6e642c53477dd88d73845",
+    "f627cb8a8f5a86d7c623bd56a5da917ac31844cc16c4803ccf01e8bd1223dd7e",
+    "a7b1b5349635236fbd5a0a1de04af4188441e5fec36d34c44a4aa003e464395b",
+    "eb53e188ca2685efeacc0276063a17f586c0009e64a0e67c6cc8eb88525ab7bf",
+    "2de7fa57072591007bf468f82802268485aaa1eab23fc766f5c3743148234e94",
+    "b0a61530baf9daf3b485108fa94773a5457648e5e9692d236102f7de042574f0",
+    "638296ea4ab9de05e3ccea7c9802f1a17dbb11bdbf2ebe97d9c4b1c7cc6bfcf4",
+    "f88413e9f28fc6f769134644018665a04e6a4bef428569e9400769b1a4dea8db",
+    "0152213359df4d0a5206cabdada3f3d91ff24c4d83e031ef3e47b737586296e3",
+    "72912c416a78fd8e663322414aae32bf0d7f2e137e87e07ac49c01dd81682537",
+    "6a5680aeb33b4c5b2c8869143b079ad1e96c28484551f8fc07126aa1823033e5"
+  ],
+  "index": 8
+}
