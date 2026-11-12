@@ -2,6 +2,7 @@
 
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResult } from "@/app/(app)/actions";
 import { LedgerId } from "@/components/app/LedgerId";
@@ -49,9 +50,14 @@ const CANTON: FeedWording = {
   unchanged: "Nothing was committed: the ledger is as it was.",
 };
 
+/** The last action a rule refused, kept for the screen it was pressed on: the
+ *  reason in the books' own words, and the transaction that carries it. */
+export type Refusal = { label: string; message: string; href?: string };
+
 type Feed = {
   begin: (label: string) => number;
   settle: (id: number, result: ActionResult) => void;
+  refusal: Refusal | null;
 };
 
 const FeedContext = createContext<Feed | null>(null);
@@ -135,7 +141,7 @@ function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWordi
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <p className={`text-[12px] font-semibold uppercase tracking-[0.12em] ${look.text}`}>{heading}</p>
+            <p className={`text-[13px] font-medium ${look.text}`}>{heading}</p>
             <span className="flex items-center gap-3">
               <span className="font-mono text-[12px] tabular-nums text-ash">
                 {pending ? <Elapsed since={entry.startedAt} /> : seconds(entry.took ?? 0)}
@@ -155,7 +161,7 @@ function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWordi
             </span>
           </div>
 
-          <p className="mt-1.5 text-[15px] font-semibold text-paper">{entry.label}</p>
+          <p className="mt-1.5 text-[15px] font-medium text-paper">{entry.label}</p>
           <p className="mt-1 text-[14px] leading-relaxed text-smoke">
             {pending ? wording.waiting : entry.message}
           </p>
@@ -196,10 +202,18 @@ function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWordi
 
 export function ActionFeed({ children, wording = CANTON }: { children: React.ReactNode; wording?: FeedWording }) {
   const [entry, setEntry] = useState<Entry | null>(null);
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
   const nextId = useRef(0);
+  const labels = useRef(new Map<number, string>());
+
+  // A refusal belongs to the screen it happened on.
+  const pathname = usePathname();
+  useEffect(() => setRefusal(null), [pathname]);
 
   const begin = useCallback((label: string) => {
     const id = ++nextId.current;
+    labels.current.set(id, label);
+    setRefusal(null);
     setEntry({ id, label, state: "pending", message: label, startedAt: Date.now() });
     return id;
   }, []);
@@ -208,6 +222,9 @@ export function ActionFeed({ children, wording = CANTON }: { children: React.Rea
     const refused = !ok && message.startsWith("Pari: ");
     const state = ok ? "ok" : refused ? "refused" : "failed";
     const shown = refused ? message.charAt(6).toUpperCase() + message.slice(7) : message;
+    const label = labels.current.get(id);
+    labels.current.delete(id);
+    if (refused && label) setRefusal({ label, message: shown, href: links?.[0]?.href });
     setEntry((current) =>
       current?.id === id
         ? { ...current, state, message: shown, took: Date.now() - current.startedAt, updateIds, links }
@@ -215,7 +232,7 @@ export function ActionFeed({ children, wording = CANTON }: { children: React.Rea
     );
   }, []);
 
-  const feed = useMemo(() => ({ begin, settle }), [begin, settle]);
+  const feed = useMemo(() => ({ begin, settle, refusal }), [begin, settle, refusal]);
   const close = useCallback(() => setEntry(null), []);
 
   return (
@@ -224,7 +241,7 @@ export function ActionFeed({ children, wording = CANTON }: { children: React.Rea
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex justify-end sm:inset-x-auto sm:bottom-6 sm:right-6"
+        className="pointer-events-none fixed inset-x-4 bottom-[4.5rem] z-40 flex justify-end sm:inset-x-auto sm:right-6 lg:bottom-6"
       >
         {entry ? <Receipt key={entry.id} entry={entry} wording={wording} onClose={close} /> : null}
       </div>
