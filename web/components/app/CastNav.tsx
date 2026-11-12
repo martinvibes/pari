@@ -125,6 +125,25 @@ export function CastNav() {
   );
 }
 
+/** The visitor's own account: the one screen the demo server does not sign
+ *  for. It sits in the status line, next to the sentence it is the exception to. */
+export function YouLink() {
+  const on = usePathname() === "/you";
+  return (
+    <Link
+      href="/you"
+      aria-current={on ? "page" : undefined}
+      title="Sign in and buy into the loan with an account only you control"
+      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-pill border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${GLIDE} ${
+        on ? "border-mint/60 bg-mint/15 text-paper" : "border-mint/30 bg-mint/[0.06] text-mint hover:border-mint/60 hover:text-paper"
+      }`}
+    >
+      Use your own account
+      <span aria-hidden>→</span>
+    </Link>
+  );
+}
+
 /** The privacy matrix, as a lens over the whole cast. */
 export function LensLink() {
   const on = usePathname() === LENS.href;

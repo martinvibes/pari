@@ -5,7 +5,7 @@ import { AppBackground } from "@/components/AppBackground";
 import { Wordmark } from "@/components/Logo";
 import { PageTransition } from "@/components/PageTransition";
 import { ActionFeed, type FeedWording } from "@/components/app/ActionFeed";
-import { CastNav, LensLink } from "@/components/app/CastNav";
+import { CastNav, LensLink, YouLink } from "@/components/app/CastNav";
 import { BACKEND } from "@/lib/backend";
 import { LEDGER } from "@/lib/ledger/config";
 import { holdsKeysFor, NEAR } from "@/lib/near/config";
@@ -67,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     ? "This server holds a testnet key for every party, so one browser walks the deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope."
                     : "One server signs for every party, so one browser walks the deal; each screen still reads the ledger as its own party."}
               </p>
+              {near ? <YouLink /> : null}
               <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-[12px] text-ash lg:inline-flex">
                 Keys <kbd className="kbd">1</kbd>
                 <span aria-hidden>to</span>
