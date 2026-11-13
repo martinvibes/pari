@@ -251,6 +251,8 @@ The inner app was laid out again so each screen has one thing to do and the publ
 
 Checked in headless Chrome against the live deal `northwind-14` on testnet: the agent's, Alder's, Rival's, the borrower's and the auditor's desks, Who sees what, Check a proof and Your own account at 1440 pixels wide, and the agent's desk at 390 pixels wide with no sideways scroll. One action was sent: the agent typed 900,000,000.00 and was refused, "You entered 900,000,000.00; the register says 1,993,333.32." ([7ddCcw4P…](https://testnet.nearblocks.io/txns/7ddCcw4PoyAPxmLgMFyQu3PteiDLbMaC4JVqa1b7gHkd), line 44 of the record). `npm run build` and the linter pass, and with no `PARI_BACKEND` the Canton screens render inside the same frame.
 
+The hosted demo was uploaded again with this build on 13 November. All seven pages came back with the new frame, and the agent's desk was looked at there in a browser.
+
 Not run on the new screens: Pay, Settle, Accept and the other action buttons (their server actions are unchanged), and the DAO card **Waiting for a second operator**, because the live deal's agent is a plain account. Some labels changed, so the older notes above quote the old ones: **It holds** now reads **Holds**, **It does not hold** reads **Does not hold**, and **Prove what you hold** and **Prove your cash** are **What it holds** and **Its cash** in the chain's column.
 
 ## The repository's history (12 November)
