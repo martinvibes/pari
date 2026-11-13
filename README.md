@@ -116,7 +116,7 @@ Each of these has a test and a longer explanation in the [full guide](docs/guide
 - **Keys that nobody holds.** OutLayer's keystore derives the storage key for this program *and* the contract that called it. The developer has no copy.
 - **Named accounts for every role.** `agent.paridesk.testnet`, `alder.paridesk.testnet`: role checks and views are keyed by names a person can read.
 - **One token transfer that also runs the books.** The borrower pays with `ft_transfer_call`; if the books refuse, the tokens go back.
-- **An agent that is two of three.** Name a [Sputnik DAO](https://github.com/near-daos/sputnik-dao-contract) as the deal's agent and every agent action needs two of three operators. Two operators can approve a request for 900,000,000.00 and the enclave still refuses it.
+- **An agent that is two of three.** Name a [Sputnik DAO](https://github.com/near-daos/sputnik-dao-contract) as the deal's agent and every agent action needs two of three operators. Two operator can approve a request for 900,000,000.00 and the enclave still refuses it.
 
 ## Proof on testnet
 
