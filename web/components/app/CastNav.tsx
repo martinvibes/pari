@@ -4,16 +4,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { hueOf } from "@/components/app/party";
-import { PERSONAS, SEATS } from "@/lib/pari/personas";
-import { useSlideRect } from "@/lib/useSlideRect";
+import { PERSONAS, SEATS, type Seat } from "@/lib/pari/personas";
 
 // The privacy matrix is a lens on every party, not a party, so it sits apart
 // from the cast and wears the privacy colour (iris).
 const LENS = { href: "/visibility", label: "Who sees what", hue: "#A78BFA", key: "9" };
 
-// Each party keeps its place in the rail as its number key: 1 is the agent.
+// Each party keeps its place at the table as its number key: 1 is the agent.
 const CAST = PERSONAS.map((p, i) => ({ ...p, hue: hueOf(p.id), key: String(i + 1) }));
 
 const GLIDE = "duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
@@ -40,59 +39,48 @@ function useSeatKeys(pathname: string) {
   }, [pathname, router]);
 }
 
-/** The deal's cast as one rail, seated by role: the agent, the borrower, the
- *  lenders, the buyers and the auditor, each group set off by a hairline and
- *  named where its parties go by their own names. A single pill in the active
- *  party's hue glides to whichever screen is open, with a static pill before
- *  measurement (server render, no JS). */
-export function CastNav() {
+// What each group does in the deal, said over its seats.
+const CAPTION: Record<Seat, string> = {
+  agent: "Runs the loan",
+  borrower: "Borrower",
+  lender: "Lenders",
+  buyer: "Buyers",
+  auditor: "Checks the books",
+};
+
+/** The deal's cast as place cards at a table, seated by role: who runs the
+ *  loan, the borrower, the lenders, the buyers and the auditor. Each card is
+ *  one party, with its disc in its own hue. The card of the open screen is lit
+ *  in that hue and says what the party is; the others carry the name alone. */
+export function CastNav({ near }: { near: boolean }) {
   const pathname = usePathname();
-  const { containerRef, rect } = useSlideRect<HTMLDivElement>('[aria-current="page"]', pathname);
-  const active = CAST.find((p) => p.href === pathname);
+  const table = useRef<HTMLDivElement>(null);
+  const seated = CAST.some((p) => p.href === pathname);
   useSeatKeys(pathname);
 
-  // On a narrow rail, bring the open party into view.
+  // On a narrow table, bring the open seat into view.
   useEffect(() => {
-    const rail = containerRef.current;
-    const current = rail?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!rail || !current || rail.scrollWidth <= rail.clientWidth) return;
-    rail.scrollTo({ left: current.offsetLeft - (rail.clientWidth - current.offsetWidth) / 2, behavior: "smooth" });
-  }, [pathname, containerRef]);
+    const row = table.current;
+    const current = row?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!row || !current || row.scrollWidth <= row.clientWidth) return;
+    row.scrollTo({ left: current.offsetLeft - (row.clientWidth - current.offsetWidth) / 2, behavior: "smooth" });
+  }, [pathname]);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex max-w-full items-center overflow-x-auto rounded-pill border border-white/10 bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {rect && active ? (
-        <span
-          aria-hidden
-          className={`absolute rounded-pill transition-all ${GLIDE}`}
-          style={{
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            background: `${active.hue}24`,
-            boxShadow: `inset 0 0 0 1px ${active.hue}66, 0 0 22px ${active.hue}2E`,
-          }}
-        />
-      ) : null}
-
-      {SEATS.map((group, index) => {
-        const members = CAST.filter((p) => p.seat === group.seat);
-        // "Agent" and "Auditor" are their own role; proper names need one.
-        const named = members.some((p) => p.name !== group.label);
-        return (
-          <Fragment key={group.seat}>
-            {index > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-white/10" /> : null}
-            <div role="group" aria-label={group.label} className="flex shrink-0 items-center">
-              {named ? (
-                <span className="hidden pl-2.5 pr-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-graphite xl:inline">
-                  {group.label}
-                </span>
-              ) : null}
-              {members.map((p) => {
+    <nav aria-label="Seats at the deal" className="mx-auto flex max-w-[1280px] items-end gap-7 px-4 sm:px-6">
+      <div className="hidden w-[150px] shrink-0 pb-3.5 xl:block">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-paper">{seated ? "Sitting as" : "Take a seat"}</p>
+        <p className="mt-1 text-[12.5px] leading-snug text-ash">Each seat sees only its own side of the deal.</p>
+      </div>
+      <div
+        ref={table}
+        className="flex min-w-0 flex-1 items-end gap-5 overflow-x-auto py-3.5 [scrollbar-width:none] xl:justify-between [&::-webkit-scrollbar]:hidden"
+      >
+        {SEATS.map((group) => (
+          <div key={group.seat} role="group" aria-label={group.label} className="shrink-0">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-graphite">{CAPTION[group.seat]}</p>
+            <div className="flex gap-1.5">
+              {CAST.filter((p) => p.seat === group.seat).map((p) => {
                 const on = p.href === pathname;
                 return (
                   <Link
@@ -100,28 +88,55 @@ export function CastNav() {
                     href={p.href}
                     aria-current={on ? "page" : undefined}
                     aria-keyshortcuts={p.key}
-                    title={`${p.blurb} · press ${p.key}`}
-                    className={`group relative flex items-center gap-2 whitespace-nowrap rounded-pill px-3 py-1.5 text-[14px] font-medium transition-colors ${GLIDE} ${
-                      on ? "text-paper" : "text-ash hover:text-paper"
+                    title={`Sit as ${p.name} · press ${p.key}`}
+                    className={`group relative flex h-12 shrink-0 items-center gap-2.5 border pl-2 pr-4 transition ${GLIDE} ${
+                      on ? "text-paper" : "border-white/10 bg-white/[0.025] text-smoke hover:-translate-y-0.5 hover:border-white/30 hover:text-paper"
                     }`}
-                    style={on && !rect ? { background: `${p.hue}24`, boxShadow: `inset 0 0 0 1px ${p.hue}66` } : undefined}
+                    style={
+                      on
+                        ? {
+                            borderColor: `${p.hue}8C`,
+                            background: `linear-gradient(180deg, ${p.hue}2B, ${p.hue}0F)`,
+                            boxShadow: `0 0 28px ${p.hue}2E, inset 0 1px 0 ${p.hue}40`,
+                          }
+                        : undefined
+                    }
                   >
                     <span
                       aria-hidden
-                      className={`h-1.5 w-1.5 shrink-0 rounded-pill transition ${GLIDE} ${
-                        on ? "scale-125" : "opacity-60 group-hover:opacity-100"
-                      }`}
-                      style={{ background: p.hue, boxShadow: on ? `0 0 10px ${p.hue}` : undefined }}
-                    />
-                    {p.name}
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-pill text-[13px] font-semibold transition ${GLIDE}`}
+                      style={
+                        on
+                          ? { background: p.hue, color: "#000000", boxShadow: `0 0 16px ${p.hue}99` }
+                          : { background: `${p.hue}1F`, color: p.hue, boxShadow: `inset 0 0 0 1px ${p.hue}59` }
+                      }
+                    >
+                      {p.name.charAt(0)}
+                    </span>
+                    <span className="flex flex-col">
+                      <span className="whitespace-nowrap text-[14px] font-medium leading-[18px]">{p.name}</span>
+                      <span
+                        className={`overflow-hidden whitespace-nowrap text-[11.5px] leading-4 text-smoke transition-all ${GLIDE} ${
+                          on ? "max-h-4 max-w-[180px] opacity-100" : "max-h-0 max-w-0 opacity-0"
+                        }`}
+                      >
+                        {near && p.seat === "lender" ? "Lender" : p.blurb}
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className={`absolute right-1.5 top-1 text-[9.5px] font-semibold leading-none tabular-nums ${on ? "text-paper/70" : "text-graphite group-hover:text-ash"}`}
+                    >
+                      {p.key}
+                    </span>
                   </Link>
                 );
               })}
             </div>
-          </Fragment>
-        );
-      })}
-    </div>
+          </div>
+        ))}
+      </div>
+    </nav>
   );
 }
 

@@ -30,9 +30,10 @@ const NEAR_WORDING: FeedWording = {
   unchanged: "Nothing changed: the books and the money are as they were.",
 };
 
-// Chrome for the working app: a top bar with the deal's cast seated by role
-// and the privacy lens apart from it, a slim status line with the network and
-// the demo-mode disclosure, and a quiet footer.
+// Chrome for the working app: a top bar with the privacy lens, the deal's cast
+// as place cards seated by role (they stay in view as the page scrolls), a
+// slim status line with the network and the demo-mode disclosure, and a quiet
+// footer.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const near = BACKEND === "near";
   const readOnly = near && !PERSONAS.every((persona) => holdsKeysFor(persona.id));
@@ -40,17 +41,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <ActionFeed wording={near ? NEAR_WORDING : undefined}>
       <div className="relative flex min-h-screen flex-col bg-ink text-paper">
         <AppBackground />
-        <header className="sticky top-0 z-40 border-b border-white/10 bg-ink/80 backdrop-blur-xl">
-          <nav className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-x-5 gap-y-3 px-4 py-3 sm:px-6">
+        <header className="relative z-10 border-b border-white/[0.07] bg-ink/80">
+          <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-4 py-3 sm:px-6">
             <Link href="/" className="shrink-0" aria-label="Back to home">
               <Wordmark />
             </Link>
-            <div className="order-last flex w-full min-w-0 justify-center xl:order-none xl:w-auto xl:flex-1">
-              <CastNav />
-            </div>
             <LensLink />
-          </nav>
+          </div>
         </header>
+        <div className="sticky top-0 z-40 border-b border-white/10 bg-ink/80 backdrop-blur-xl">
+          <CastNav near={near} />
+        </div>
         <div className="relative z-10 flex flex-1 flex-col overflow-x-clip">
           <div className="border-b border-white/[0.07] bg-carbon/80">
             <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-[13px] leading-relaxed sm:flex-nowrap sm:px-6">
