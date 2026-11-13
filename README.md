@@ -138,7 +138,7 @@ You should see the page titled **Who sees what** with a panel **You are reading 
 
 This needs the demo's keys. The [hosted demo](https://pari-web-production-5ff7e57a.up.railway.app) holds them and plays the builder's live deal on NEAR testnet; it is wherever the last visitor left it, so its numbers differ from the ones below. For the exact walk, use [your own deployment](#3-your-own-deployment-on-testnet). Each action usually takes 10 to 30 seconds on testnet, because the contract waits for the enclave. When OutLayer's testnet workers are busy it can take a minute or more (measured on 11 November 2026: 6 to 16 seconds in the afternoon, 60 to 80 in the evening, and for about an hour that night [no answer at all](docs/hackathon/PROGRESS.md#the-outlayer-outage-of-11-november)). If the enclave misses NEAR's two-minute wait, the app says *The enclave did not answer within NEAR's two-minute wait. Press it again: an answer that comes late counts for nothing.* Nothing has changed when you see that, so press the button again.
 
-The numbers below are for a fresh deal. Every screen is one party's own view: pick the party's seat from the place cards under the top bar, or press its number key (1 to 8).
+The numbers below are for a fresh deal. Every screen is one party's own view: pick the party's seat from the place cards down the left side (along the top in a window under 1440 pixels wide), or press its number key (1 to 8; 9 opens Who sees what, 0 your own seat).
 
 **Interest, and the Revlon mistake**
 
@@ -179,7 +179,7 @@ The numbers below are for a fresh deal. Every screen is one party's own view: pi
 
 **With an account only you control**
 
-17. Open `/you` (**Use your own account**, in the status line). Sign in with Privy, or press **Use a key made in this browser**.
+17. Open `/you` (the **You** seat, last of the place cards, or press 0). Sign in with Privy, or press **Use a key made in this browser**.
     You see: a NEAR testnet account named by a key. The demo server never holds that key.
 18. Press the six buttons in order: **Get test funds**, **Register view key**, **Pay in**, **Ask Alder for an offer**, **Accept**, **Ask the agent to settle**. Each step says whose account signs it. The faucet, Alder and the agent sign on the demo server. Your three are signed in your browser and sent to NEAR from there.
     You see: *Trade settled. Your cash went to Alder and the loan came to you in one step.* You hold 250,000.00 of the loan, bought at 99.50 for 248,750.00, with 1,250.00 of cash left in the books. **What the chain holds about you** shows your envelope as ciphertext. **What you alone can open** shows the same envelope, opened in your browser with a view key that never leaves it.
