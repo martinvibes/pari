@@ -6,6 +6,7 @@ import { Wordmark } from "@/components/Logo";
 import { Atmosphere } from "@/components/Atmosphere";
 import { Grain } from "@/components/Grain";
 import { DocsSidebar } from "@/components/DocsSidebar";
+import { DOCS_NAV } from "@/components/docsNav";
 import { SITE } from "@/lib/site";
 import { BACKEND } from "@/lib/backend";
 
@@ -15,7 +16,9 @@ export const metadata: Metadata = {
     default: "Documentation · Pari",
   },
   description:
-    "How Pari runs a syndicated loan on Canton: parties, the facility lifecycle, CIP-56 settlement, trading, privacy and the authority matrix.",
+    BACKEND === "near"
+      ? "How Pari runs a syndicated loan on NEAR: the rules contract, the books in a TDX enclave, sealed envelopes, the leak test, one-fact proofs and the trust model."
+      : "How Pari runs a syndicated loan on Canton: parties, the facility lifecycle, CIP-56 settlement, trading, privacy and the authority matrix.",
 };
 
 // Docs chrome: the marketing route's star-chart atmosphere (gradient sky,
@@ -57,18 +60,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       </header>
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-0 px-6 lg:flex-row lg:gap-12">
-        <DocsSidebar />
+        <DocsSidebar nav={DOCS_NAV} />
         <main className="min-w-0 max-w-3xl flex-1 py-10 lg:py-14">
-          {BACKEND === "near" && (
-            <p className="mb-10 border border-amber/30 bg-amber/[0.06] px-4 py-3 text-[14px] leading-relaxed text-smoke">
-              These pages describe Pari&rsquo;s Canton build. This app is running the NEAR build, which is
-              documented in{" "}
-              <a href={`${SITE.repo}#readme`} className="text-paper underline underline-offset-4">
-                the README
-              </a>
-              .
-            </p>
-          )}
           {children}
         </main>
       </div>

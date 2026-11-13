@@ -2,6 +2,8 @@
 
 import type { Metadata } from "next";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Governance } from "@/components/near/docs/Governance";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "The agent, two of three" };
 
@@ -43,6 +45,7 @@ const GUARANTEES = [
 ];
 
 export default function GovernancePage() {
+  if (BACKEND === "near") return <Governance />;
   return (
     <article>
       <DocsHeader

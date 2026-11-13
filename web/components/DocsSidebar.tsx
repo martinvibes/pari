@@ -5,14 +5,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { DOCS_NAV } from "@/components/docsNav";
+import type { DocsNavGroup } from "@/components/docsNav";
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ nav, onNavigate }: { nav: DocsNavGroup[]; onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Documentation" className="flex flex-col gap-8">
-      {DOCS_NAV.map((group) => (
+      {nav.map((group) => (
         <div key={group.label}>
           <p className="label-data mb-3 flex items-center gap-2.5">
             <span aria-hidden className="h-1.5 w-1.5 rounded-pill" style={{ background: group.hue }} />
@@ -49,14 +49,15 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 // Desktop: a sticky rail. Mobile: a disclosure bar above the content, closed
-// after each navigation so the reader lands on the page, not the menu.
-export function DocsSidebar() {
+// after each navigation so the reader lands on the page, not the menu. The
+// layout passes `nav`, because only the server knows which build's pages to list.
+export function DocsSidebar({ nav }: { nav: DocsNavGroup[] }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <aside className="sticky top-[81px] hidden max-h-[calc(100vh-81px)] w-60 shrink-0 overflow-y-auto border-r border-white/10 py-10 pr-8 lg:block">
-        <NavList />
+        <NavList nav={nav} />
       </aside>
 
       <div className="border-b border-white/10 lg:hidden">
@@ -73,7 +74,7 @@ export function DocsSidebar() {
         </button>
         {open ? (
           <div className="pb-6">
-            <NavList onNavigate={() => setOpen(false)} />
+            <NavList nav={nav} onNavigate={() => setOpen(false)} />
           </div>
         ) : null}
       </div>

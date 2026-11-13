@@ -3,10 +3,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Roles } from "@/components/near/docs/Roles";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "Parties and roles" };
 
 export default function RolesPage() {
+  if (BACKEND === "near") return <Roles />;
   return (
     <article>
       <DocsHeader

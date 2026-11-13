@@ -2,6 +2,8 @@
 
 import type { Metadata } from "next";
 import { DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { WhoSeesWhat } from "@/components/near/docs/WhoSeesWhat";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "Who sees what" };
 
@@ -13,6 +15,7 @@ const TRADE_VIEWS = [
 ];
 
 export default function PrivacyPage() {
+  if (BACKEND === "near") return <WhoSeesWhat />;
   return (
     <article>
       <DocsHeader

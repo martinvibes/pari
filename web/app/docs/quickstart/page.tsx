@@ -3,10 +3,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { CheckIt } from "@/components/near/docs/CheckIt";
+import { BACKEND } from "@/lib/backend";
 
-export const metadata: Metadata = { title: "Quickstart" };
+export const metadata: Metadata = { title: BACKEND === "near" ? "Check it yourself" : "Quickstart" };
 
 export default function QuickstartPage() {
+  if (BACKEND === "near") return <CheckIt />;
   return (
     <article>
       <DocsHeader

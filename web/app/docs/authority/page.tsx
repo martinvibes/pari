@@ -2,6 +2,8 @@
 
 import type { Metadata } from "next";
 import { DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Authority } from "@/components/near/docs/Authority";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "Authority matrix" };
 
@@ -35,6 +37,7 @@ const CHOICES = [
 ];
 
 export default function AuthorityPage() {
+  if (BACKEND === "near") return <Authority />;
   return (
     <article>
       <DocsHeader

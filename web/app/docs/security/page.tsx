@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
 import { Tag } from "@/components/Tag";
+import { Limits } from "@/components/near/docs/Limits";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "Limits and status" };
 
@@ -20,6 +22,7 @@ const STATUS = [
 ];
 
 export default function SecurityPage() {
+  if (BACKEND === "near") return <Limits />;
   return (
     <article>
       <DocsHeader

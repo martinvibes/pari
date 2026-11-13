@@ -2,8 +2,10 @@
 
 import type { Metadata } from "next";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Payments } from "@/components/near/docs/Payments";
+import { BACKEND } from "@/lib/backend";
 
-export const metadata: Metadata = { title: "CIP-56 settlement" };
+export const metadata: Metadata = { title: BACKEND === "near" ? "Payments and the two guards" : "CIP-56 settlement" };
 
 const FLOWS = [
   { flow: "Closing", request: "Commitment", legs: "lender → borrower, the commitment", by: "Facility_Close" },
@@ -13,6 +15,7 @@ const FLOWS = [
 ];
 
 export default function SettlementPage() {
+  if (BACKEND === "near") return <Payments />;
   return (
     <article>
       <DocsHeader

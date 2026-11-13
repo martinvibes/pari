@@ -3,10 +3,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { HowItRuns } from "@/components/near/docs/HowItRuns";
+import { BACKEND } from "@/lib/backend";
 
-export const metadata: Metadata = { title: "Facility lifecycle" };
+export const metadata: Metadata = { title: BACKEND === "near" ? "How an action runs" : "Facility lifecycle" };
 
 export default function LifecyclePage() {
+  if (BACKEND === "near") return <HowItRuns />;
   return (
     <article>
       <DocsHeader

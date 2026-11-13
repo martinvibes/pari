@@ -3,10 +3,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Trading } from "@/components/near/docs/Trading";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "Trading and screening" };
 
 export default function TradingPage() {
+  if (BACKEND === "near") return <Trading />;
   return (
     <article>
       <DocsHeader

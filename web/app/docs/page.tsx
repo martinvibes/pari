@@ -3,10 +3,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, DocsHeader, DocsPager } from "@/components/DocsBlocks";
+import { Introduction } from "@/components/near/docs/Introduction";
+import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = { title: "Introduction" };
 
 export default function IntroductionPage() {
+  if (BACKEND === "near") return <Introduction />;
   return (
     <article>
       <DocsHeader
