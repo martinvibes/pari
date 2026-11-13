@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Party } from "@/components/app/party";
 import { PageHeader, Panel, Tag } from "@/components/app/ui";
 import { Explore, NearUnavailable, short } from "@/components/near/parts";
-import { BACKEND } from "@/lib/backend";
 import { accountUrl, NEAR } from "@/lib/near/config";
 import { checkProof, decodeProof, type Verdict } from "@/lib/near/disclosure";
 import type { Fact, Proof } from "@/lib/near/proofs";
@@ -77,7 +75,6 @@ function when(at: Date): string {
 }
 
 export default async function VerifyPage({ searchParams }: { searchParams: { proof?: string | string[] } }) {
-  if (BACKEND !== "near") notFound();
   const given = typeof searchParams.proof === "string" ? searchParams.proof.trim() : "";
   const proof = given ? decodeProof(given) : null;
   let verdict: Verdict | null = null;

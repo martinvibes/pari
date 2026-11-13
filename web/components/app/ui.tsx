@@ -4,7 +4,6 @@ import { LiveValue } from "@/components/LiveValue";
 import { Tag, type Tone } from "@/components/Tag";
 import { LedgerId } from "@/components/app/LedgerId";
 import { hueOfName } from "@/components/app/party";
-import type { Status } from "@/lib/pari/types";
 
 // Presentational building blocks for the app screens, in the darkroom system:
 // sharp carbon panels, tracked labels, tabular figures, and colour only where
@@ -118,8 +117,6 @@ export function Panel({
 }
 
 /** A facility's lifecycle, as a status: live once closed, done once repaid. */
-export const FACILITY_TONE: Record<Status, Tone> = { Syndicating: "wait", Active: "ok", Repaid: "info" };
-
 /** Nothing here yet, framed as a gap the deal will fill. */
 export function Empty({ children }: { children: React.ReactNode }) {
   return (

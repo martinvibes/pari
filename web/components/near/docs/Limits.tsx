@@ -99,7 +99,7 @@ export function Limits() {
         <ul>
           <li>
             Prepayments, inside-information documents and a hundred-lender scale test exist in{" "}
-            <a href={repoUrl("docs/canton.md")}>the Canton build</a> and were left out of this one.
+            <a href={`${SITE.repo}/tree/pre-hackathon`}>the Canton build</a> and were left out of this one.
           </li>
           <li>
             A production deal would have the agent admit an account before it can call; that is not

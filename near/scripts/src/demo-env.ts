@@ -23,7 +23,7 @@ if (!haveViewKeys(cast.map(({ viewer }) => viewer))) {
   throw new Error("this machine does not hold the cast's view keys: run `npm run setup` first");
 }
 
-const lines = ["PARI_BACKEND=near", `PARI_ROOT=${ROOT}`];
+const lines = [`PARI_ROOT=${ROOT}`];
 for (const { persona, viewer } of cast) {
   lines.push(`NEAR_KEY_${persona.toUpperCase()}=${keyFor(accountOf(persona))}`);
   lines.push(`VIEW_KEY_${persona.toUpperCase()}=${(await viewKeyFor(viewer)).privateKey}`);

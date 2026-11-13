@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionResult } from "@/app/(app)/actions";
+import type { ActionResult } from "@/lib/action";
 import { useActionFeed } from "@/components/app/ActionFeed";
 
 type ServerAction = (previous: ActionResult | null, form: FormData) => Promise<ActionResult>;

@@ -3,7 +3,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { ActionResult } from "@/app/(app)/actions";
+import type { ActionResult } from "@/lib/action";
 import { txUrl } from "@/lib/near/config";
 import { Refused } from "@/lib/near/operations";
 import * as cast from "@/lib/near/visitor/cast";

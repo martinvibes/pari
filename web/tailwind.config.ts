@@ -33,7 +33,7 @@ const config: Config = {
         mint: "#3DDC97", // committed, settled, holds
         rose: "#FF5C72", // refused, disqualified, broken
         sky: "#5AC8FA", // information, shared, agreed
-        iris: "#A78BFA", // private: MNPI, private side
+        iris: "#A78BFA", // private: sealed, one party's own
       },
       fontFamily: {
         // Inter everywhere, wired through next/font's CSS variable.

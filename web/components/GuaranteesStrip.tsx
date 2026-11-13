@@ -4,7 +4,6 @@
 
 import { useEffect, useState } from "react";
 import { KickerWipe } from "@/components/KickerWipe";
-import { Term } from "@/components/Term";
 import { WordReveal } from "@/components/WordReveal";
 import { prefersReducedMotion, useInView } from "@/lib/useInView";
 
@@ -12,17 +11,17 @@ const GUARANTEES = [
   {
     index: "01",
     title: "The agent holds no money",
-    body: (
-      <>
-        Every payment is a <Term>CIP-56</Term> allocation funded by the payer, and settles only
-        with the payer, the payee and the agent together.
-      </>
-    ),
+    body: <>The rules contract holds the money. The agent can ask for a settlement; it cannot send a token anywhere.</>,
   },
   {
     index: "02",
     title: "No one is overpaid",
-    body: <>Each allocation must equal its lender&rsquo;s leg to the cent. No settlement can pay anyone more than it is owed.</>,
+    body: (
+      <>
+        The enclave refuses a total that differs from the register, and the contract never credits
+        lenders more than the borrower paid in.
+      </>
+    ),
   },
   {
     index: "03",
@@ -32,22 +31,9 @@ const GUARANTEES = [
   {
     index: "04",
     title: "Every claim is a test",
-    body: <>Each guarantee is a Daml Script test in the open-source repo, published under Apache-2.0.</>,
+    body: <>Each guarantee is a Rust test in the open-source repo, published under Apache-2.0.</>,
   },
 ];
-
-// The same four guarantees as the NEAR build keeps them: the money sits in the
-// rules contract, and the tests are Rust.
-const NEAR_BODIES: Record<string, React.ReactNode> = {
-  "01": <>The rules contract holds the money. The agent can ask for a settlement; it cannot send a token anywhere.</>,
-  "02": (
-    <>
-      The enclave refuses a total that differs from the register, and the contract never credits
-      lenders more than the borrower paid in.
-    </>
-  ),
-  "04": <>Each guarantee is a Rust test in the open-source repo, published under Apache-2.0.</>,
-};
 
 // One guarantee, ticking on as it crosses the viewport: the numeral brightens,
 // the marker dot swells, the title lifts to full paper. Rows stay lit once
@@ -56,12 +42,10 @@ function GuaranteeRow({
   guarantee,
   index,
   stripHidden,
-  near,
 }: {
   guarantee: (typeof GUARANTEES)[number];
   index: number;
   stripHidden: boolean;
-  near: boolean;
 }) {
   const { ref, inView } = useInView<HTMLDivElement>(0.6);
   const lit = inView && !stripHidden;
@@ -105,13 +89,13 @@ function GuaranteeRow({
         >
           {guarantee.title}
         </h3>
-        <p className="mt-2 max-w-2xl text-lg leading-relaxed text-smoke">{(near && NEAR_BODIES[guarantee.index]) || guarantee.body}</p>
+        <p className="mt-2 max-w-2xl text-lg leading-relaxed text-smoke">{guarantee.body}</p>
       </div>
     </div>
   );
 }
 
-export function GuaranteesStrip({ near = false }: { near?: boolean }) {
+export function GuaranteesStrip() {
   const { ref, inView } = useInView<HTMLDivElement>(0.15);
   const [armed, setArmed] = useState(false);
 
@@ -142,7 +126,6 @@ export function GuaranteesStrip({ near = false }: { near?: boolean }) {
               guarantee={guarantee}
               index={index}
               stripHidden={hidden}
-              near={near}
             />
           ))}
         </div>

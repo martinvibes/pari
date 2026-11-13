@@ -3,8 +3,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { ActionResult } from "@/app/(app)/actions";
-import { LedgerId } from "@/components/app/LedgerId";
+import type { ActionResult } from "@/lib/action";
 
 // The ledger's verdict on the last action, as a receipt in one place. It lives
 // in the app layout, so it survives the re-render that often removes the form
@@ -12,8 +11,8 @@ import { LedgerId } from "@/components/app/LedgerId";
 //
 // While the action runs, the receipt names it and counts the seconds. When the
 // ledger answers it says what happened, in its colour: committed (mint), with
-// the update id of each transaction the ledger wrote; or refused (rose), with
-// the model's `Pari: …` reason, which names the rule that must hold. A refused
+// a link to each transaction; or refused (rose), with
+// the books' `Pari: …` reason, which names the rule that must hold. A refused
 // or failed action commits nothing, and the receipt says so. A settled receipt
 // drains away on its own; hovering it holds it.
 
@@ -27,7 +26,6 @@ type Entry = {
   startedAt: number;
   /** Milliseconds from submit to the ledger's answer. */
   took?: number;
-  updateIds?: string[];
   links?: Array<{ label: string; href: string }>;
 };
 
@@ -40,13 +38,6 @@ export type FeedWording = {
   refused: string;
   /** What a refused or failed action left behind. */
   unchanged: string;
-};
-
-const CANTON: FeedWording = {
-  pending: "Submitting to Canton",
-  waiting: "Waiting for Canton to confirm and commit the transaction.",
-  refused: "Ledger rule not met",
-  unchanged: "Nothing was committed: the ledger is as it was.",
 };
 
 type Feed = {
@@ -107,7 +98,6 @@ function Elapsed({ since }: { since: number }) {
 function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWording; onClose: () => void }) {
   const look = LOOK[entry.state];
   const pending = entry.state === "pending";
-  const ids = entry.updateIds ?? [];
   const links = entry.links ?? [];
   const heading = look.heading ?? (pending ? wording.pending : wording.refused);
 
@@ -160,15 +150,6 @@ function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWordi
             {pending ? wording.waiting : entry.message}
           </p>
 
-          {entry.state === "ok" && ids.length > 0 ? (
-            <div className="mt-4 space-y-1.5 border-t border-white/[0.08] pt-3">
-              <p className="label-data text-[11px]">{ids.length === 1 ? "Update id" : `${ids.length} transactions`}</p>
-              {ids.map((id) => (
-                <LedgerId key={id} id={id} />
-              ))}
-            </div>
-          ) : null}
-
           {entry.state === "refused" || entry.state === "failed" ? (
             <p className="mt-3 border-t border-white/[0.08] pt-3 text-[13px] text-pewter">{wording.unchanged}</p>
           ) : null}
@@ -194,7 +175,7 @@ function Receipt({ entry, wording, onClose }: { entry: Entry; wording: FeedWordi
   );
 }
 
-export function ActionFeed({ children, wording = CANTON }: { children: React.ReactNode; wording?: FeedWording }) {
+export function ActionFeed({ children, wording }: { children: React.ReactNode; wording: FeedWording }) {
   const [entry, setEntry] = useState<Entry | null>(null);
   const nextId = useRef(0);
 
@@ -204,13 +185,13 @@ export function ActionFeed({ children, wording = CANTON }: { children: React.Rea
     return id;
   }, []);
 
-  const settle = useCallback((id: number, { ok, message, updateIds, links }: ActionResult) => {
+  const settle = useCallback((id: number, { ok, message, links }: ActionResult) => {
     const refused = !ok && message.startsWith("Pari: ");
     const state = ok ? "ok" : refused ? "refused" : "failed";
     const shown = refused ? message.charAt(6).toUpperCase() + message.slice(7) : message;
     setEntry((current) =>
       current?.id === id
-        ? { ...current, state, message: shown, took: Date.now() - current.startedAt, updateIds, links }
+        ? { ...current, state, message: shown, took: Date.now() - current.startedAt, links }
         : current,
     );
   }, []);

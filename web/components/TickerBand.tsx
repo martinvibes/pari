@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { BACKEND } from "@/lib/backend";
 
 // Highlight the main statements; render supporting facts in muted text. The
 // separators cycle through the signal hues, a quiet thread of colour.
 const HUES = ["#3DDC97", "#5AC8FA", "#A78BFA", "#FFAC2E"];
 const FACTS: Array<{ text: string; statement?: boolean }> = [
   { text: "Every lender paid in one transaction", statement: true },
-  { text: BACKEND === "near" ? "Rules in a NEAR contract" : "CIP-56 settlement" },
+  { text: "Rules in a NEAR contract" },
   { text: "Private positions", statement: true },
   { text: "Secret DQ screening" },
-  { text: BACKEND === "near" ? "Books in a TDX enclave" : "MNPI walls", statement: true },
+  { text: "Books in a TDX enclave", statement: true },
   { text: "ACT/360 to the cent" },
   { text: "Delivery versus payment" },
 ];

@@ -39,7 +39,7 @@ export function NearUnavailable({ problem }: { problem: Unavailable }) {
           {`cd near && ./build.sh                # the contracts and the enclave program
 cd scripts && npm install
 npm run setup                        # accounts, contracts and the sealed deal
-cd ../../web && PARI_BACKEND=near npm run dev`}
+cd ../../web && npm run dev`}
         </pre>
       </Panel>
     </div>
@@ -51,9 +51,9 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-/** A party's seat in one line. The Canton build's public and private sides are not part of the NEAR build. */
+/** A party's seat in one line. */
 export function seatOf(persona: Persona): string {
-  return persona.seat === "lender" ? "Lender" : persona.blurb;
+  return persona.blurb;
 }
 
 export function short(hash: string | null): string {

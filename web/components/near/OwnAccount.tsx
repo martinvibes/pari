@@ -6,7 +6,7 @@ import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet, useSignRawHash } from "@privy-io/react-auth/extended-chains";
 import { yoctoToNear } from "near-api-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActionResult } from "@/app/(app)/actions";
+import type { ActionResult } from "@/lib/action";
 import * as cast from "@/app/(app)/you/actions";
 import { useActionFeed } from "@/components/app/ActionFeed";
 import { Empty, PageHeader, Panel, Stats, TableScroll, Tag } from "@/components/app/ui";

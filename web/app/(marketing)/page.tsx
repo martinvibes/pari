@@ -16,31 +16,21 @@ import { AudienceCards } from "@/components/AudienceCards";
 import { GuaranteesStrip } from "@/components/GuaranteesStrip";
 import { Spotlight } from "@/components/Spotlight";
 import { TickerBand } from "@/components/TickerBand";
-import { Term } from "@/components/Term";
 import { WordReveal } from "@/components/WordReveal";
-import { BACKEND } from "@/lib/backend";
 
-// Every claim on this page is a test: a Daml Script test in daml/pari-tests on
-// Canton, a Rust test in near/enclave and near/contract on NEAR. The page says
-// which ledger it runs on, and words the three places where the two differ.
-const NEAR = BACKEND === "near";
+// Every claim on this page is a test: a Rust test in near/enclave or
+// near/contract.
 
-// Contract and standard names carry the mono Term voice so they read as objects.
 const STEPS = [
   {
     n: "01",
-    title: NEAR ? "Seal the books" : "Syndicate and close",
+    title: "Seal the books",
     kicker: "Action / Commit",
     hue: "#3DDC97",
-    body: NEAR ? (
+    body: (
       <>
         The closed deal is loaded once, with every lender&rsquo;s position sealed to the enclave.
         From then on the chain holds a fingerprint of the books, never the register.
-      </>
-    ) : (
-      <>
-        Each lender commits and funds its own <Term>CIP-56</Term> allocation. Closing pays the
-        borrower from every lender in one transaction, or not at all.
       </>
     ),
     band: "ink" as const,
@@ -50,15 +40,10 @@ const STEPS = [
     title: "Pay every lender",
     kicker: "Mechanism / Distribute",
     hue: "#5AC8FA",
-    body: NEAR ? (
+    body: (
       <>
         The agent fixes the rate and requests interest. The borrower pays once, and one settlement
         credits every lender, to the cent. A mistyped total is refused.
-      </>
-    ) : (
-      <>
-        The agent fixes the rate and requests interest. The borrower funds one leg per lender, and
-        every leg settles together, to the cent.
       </>
     ),
     band: "carbon" as const,
@@ -99,11 +84,11 @@ const FACTS = [
   {
     value: "00",
     label: "Funds held by the agent",
-    note: NEAR ? "The contract holds them and caps every payout" : "Payers fund their own allocations",
+    note: "The contract holds them and caps every payout",
     hue: "#FFAC2E",
   },
   { value: "00", label: "Rival positions visible", note: "A lender sees only its own", hue: "#A78BFA" },
-  { value: "03", label: "Information walls", note: NEAR ? "Positions · prices · DQ list" : "Positions · DQ list · MNPI", hue: "#5AC8FA" },
+  { value: "03", label: "Information walls", note: "Positions · prices · DQ list", hue: "#5AC8FA" },
 ];
 
 export default function LandingPage() {
@@ -135,7 +120,7 @@ export default function LandingPage() {
               className="mb-8 inline-flex items-center gap-2.5 rounded-pill border border-mint/30 bg-mint/[0.08] px-3.5 py-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-mint"
             >
               <span className="h-1.5 w-1.5 animate-pulse rounded-pill bg-mint shadow-[0_0_8px_rgba(61,220,151,0.8)] motion-reduce:animate-none" />
-              {NEAR ? "Running on NEAR testnet" : "Running on the Canton DevNet"}
+              Running on NEAR testnet
             </p>
             <h1
               data-exit="headline"
@@ -158,15 +143,7 @@ export default function LandingPage() {
                 Open App
               </Link>
               <span className="font-mono text-sm tracking-[0.2em] text-pewter">
-                {NEAR ? (
-                  <>
-                    NEAR · books in a <span className="text-amber">TDX</span> enclave
-                  </>
-                ) : (
-                  <>
-                    Canton · <span className="text-amber">CIP-56</span> settlement
-                  </>
-                )}
+                NEAR · books in a <span className="text-amber">TDX</span> enclave
               </span>
             </div>
           </Parallax>
@@ -218,8 +195,8 @@ export default function LandingPage() {
       </section>
 
       <TickerBand />
-      <AudienceCards near={NEAR} />
-      <GuaranteesStrip near={NEAR} />
+      <AudienceCards />
+      <GuaranteesStrip />
 
       {/* Overview: design facts as numerals in an enclosed panel, not invented
           market metrics. */}
@@ -231,7 +208,7 @@ export default function LandingPage() {
             <h2 className="text-4xl font-medium tracking-tight sm:text-5xl">
               <WordReveal brightWords={[0]}>Pari overview</WordReveal>
             </h2>
-            <span className="label-data">{NEAR ? "NEAR testnet" : "Canton Network"}</span>
+            <span className="label-data">NEAR testnet</span>
           </div>
           <div className="mt-12 grid grid-cols-2 border border-white/10 lg:grid-cols-4">
             {FACTS.map((fact, i) => (

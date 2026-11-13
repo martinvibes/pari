@@ -8,7 +8,6 @@ import { Grain } from "@/components/Grain";
 import { DocsSidebar } from "@/components/DocsSidebar";
 import { DOCS_NAV } from "@/components/docsNav";
 import { SITE } from "@/lib/site";
-import { BACKEND } from "@/lib/backend";
 
 export const metadata: Metadata = {
   title: {
@@ -16,9 +15,7 @@ export const metadata: Metadata = {
     default: "Documentation · Pari",
   },
   description:
-    BACKEND === "near"
-      ? "How Pari runs a syndicated loan on NEAR: the rules contract, the books in a TDX enclave, sealed envelopes, the leak test, one-fact proofs and the trust model."
-      : "How Pari runs a syndicated loan on Canton: parties, the facility lifecycle, CIP-56 settlement, trading, privacy and the authority matrix.",
+    "How Pari runs a syndicated loan on NEAR: the rules contract, the books in a TDX enclave, sealed envelopes, the leak test, one-fact proofs and the trust model.",
 };
 
 // Docs chrome: the marketing route's star-chart atmosphere (gradient sky,

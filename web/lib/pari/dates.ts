@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Daml Dates are ISO `YYYY-MM-DD` strings, so they compare and sort as text.
-
-export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+// Deal dates are ISO `YYYY-MM-DD` strings, so they compare and sort as text.
 
 export function addMonths(date: string, months: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -30,11 +26,4 @@ export function formatDate(date: string): string {
     year: "numeric",
     timeZone: "UTC",
   });
-}
-
-/** A ledger timestamp as "2 Oct 2026, 14:03 UTC". */
-export function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-  return `${formatDate(d.toISOString())}, ${time} UTC`;
 }

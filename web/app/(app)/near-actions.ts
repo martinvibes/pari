@@ -4,7 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { ActionResult } from "@/app/(app)/actions";
+import type { ActionResult } from "@/lib/action";
 import { accountOf, OPERATORS, txUrl } from "@/lib/near/config";
 import { cutProof, encodeProof } from "@/lib/near/disclosure";
 import { parseBasisPoints, parseCents, showRate } from "@/lib/near/money";

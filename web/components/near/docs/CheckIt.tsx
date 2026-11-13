@@ -61,7 +61,7 @@ npm run verify:proof                # checks one fact from a sealed view; needs 
         <p>You can also read the live deal as the public does, in the app, with no keys:</p>
         <pre>
           <code>{`cd web && npm install
-PARI_BACKEND=near npm run dev       # then open http://localhost:3000/visibility`}</code>
+npm run dev       # then open http://localhost:3000/visibility`}</code>
         </pre>
         <p>
           You should see the page titled <strong>Who sees what</strong> with a panel{" "}
@@ -239,7 +239,7 @@ npm run setup                         # accounts, contracts, the enclave build, 
 npm run e2e                           # plays the whole deal and checks every figure
 npm run prove:privacy                 # the leak test, on the run you just made
 cd ../../web && npm install
-PARI_BACKEND=near npm run dev         # http://localhost:3000/agent`}</code>
+npm run dev         # http://localhost:3000/agent`}</code>
         </pre>
         <p>
           <code>npm run setup</code> is safe to run again: every step checks the chain first and

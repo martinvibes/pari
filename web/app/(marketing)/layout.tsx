@@ -12,7 +12,6 @@ import { Conductor } from "@/components/Conductor";
 import { MaturityRail } from "@/components/MaturityRail";
 import { WorldForeground } from "@/components/WorldForeground";
 import { SITE } from "@/lib/site";
-import { BACKEND } from "@/lib/backend";
 
 // Marketing chrome for the "cinematic darkroom" landing: a fixed atmospheric
 // canvas, a quiet top bar that inverts on scroll, and the existing reveal
@@ -52,7 +51,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               >
                 Docs
               </RollingLink>
-              <span className="label-data">{BACKEND === "near" ? "Built on NEAR" : "Built on Canton"}</span>
+              <span className="label-data">Built on NEAR</span>
             </div>
           </div>
           <p className="border-t border-white/10 pt-6 text-[13px] text-ash">

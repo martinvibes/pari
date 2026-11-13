@@ -142,13 +142,12 @@ export function Introduction() {
           See <Link href="/docs/security">Limits and status</Link>.
         </Callout>
         <Callout label="The earlier Canton build">
-          Pari was first designed for Canton at HackCanton Season 3. That build is tagged{" "}
+          Pari was first designed for Canton at HackCanton Season 3. That build is kept at the tag{" "}
           <a href={`${SITE.repo}/tree/pre-hackathon`}>
             <code>pre-hackathon</code>
-          </a>{" "}
-          and described in <a href={repoUrl("docs/canton.md")}>docs/canton.md</a>. The NEAR version
-          reuses its idea, its demo deal, its test names and numbers, and the web app&rsquo;s visual
-          layer.
+          </a>
+          . The NEAR version reuses its idea, its demo deal, its test names and numbers, and the web
+          app&rsquo;s visual layer.
         </Callout>
       </div>
 

@@ -35,7 +35,7 @@ const CAPTION_CLASS = "text-[10px] font-semibold uppercase tracking-[0.18em]";
  *  the visitor's own seat where there is one. Typing in a form, or any chord
  *  with a modifier, is left alone. Mounted once, whichever way the table is
  *  laid out. */
-export function SeatKeys({ near }: { near: boolean }) {
+export function SeatKeys() {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -49,12 +49,12 @@ export function SeatKeys({ near }: { near: boolean }) {
       const target = event.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       const href =
-        event.key === LENS.key ? LENS.href : near && event.key === YOU.key ? YOU.href : CAST.find((p) => p.key === event.key)?.href;
+        event.key === LENS.key ? LENS.href : event.key === YOU.key ? YOU.href : CAST.find((p) => p.key === event.key)?.href;
       if (href && href !== pathname) router.push(href);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pathname, router, near]);
+  }, [pathname, router]);
 
   return null;
 }
@@ -148,11 +148,11 @@ function Person() {
 }
 
 /** The deal's cast as place cards at a table, seated by role: who runs the
- *  loan, the borrower, the lenders, the buyers and the auditor. On NEAR one
+ *  loan, the borrower, the lenders, the buyers and the auditor. One
  *  more chair stands open: the visitor's own account, the only seat the demo
  *  server does not sign for. The table runs down the side of a wide page
  *  (`column`) and along the top of a narrow one (`row`). */
-export function CastNav({ near, layout = "row" }: { near: boolean; layout?: "row" | "column" }) {
+export function CastNav({ layout = "row" }: { layout?: "row" | "column" }) {
   const pathname = usePathname();
   const table = useRef<HTMLDivElement>(null);
   const column = layout === "column";
@@ -174,7 +174,7 @@ export function CastNav({ near, layout = "row" }: { near: boolean; layout?: "row
             key={p.id}
             href={p.href}
             name={p.name}
-            role={near && p.seat === "lender" ? "Lender" : p.blurb}
+            role={p.blurb}
             hue={p.hue}
             hint={p.key}
             title={`Sit as ${p.name} · press ${p.key}`}
@@ -188,7 +188,7 @@ export function CastNav({ near, layout = "row" }: { near: boolean; layout?: "row
     </div>
   ));
 
-  const you = near ? (
+  const you = (
     <div role="group" aria-label="Your own account" className={column ? "shrink-0" : "ml-auto shrink-0 border-l border-white/10 pl-5"}>
       <p className={`${CAPTION_CLASS} text-mint/80 ${column ? "mb-1" : "mb-2"}`}>An open seat</p>
       <PlaceCard
@@ -205,7 +205,7 @@ export function CastNav({ near, layout = "row" }: { near: boolean; layout?: "row
         <Person />
       </PlaceCard>
     </div>
-  ) : null;
+  );
 
   if (column) {
     return (

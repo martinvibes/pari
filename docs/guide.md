@@ -107,7 +107,7 @@ You can also read the live deal as the public does, in the app, with no keys:
 
 ```bash
 cd web && npm install
-PARI_BACKEND=near npm run dev       # then open http://localhost:3000/visibility
+npm run dev       # then open http://localhost:3000/visibility
 ```
 
 You should see the page titled **Who sees what** with a panel **You are reading as the public**: the contract's facts, one total per interest request, the record of every action, and eight sealed envelopes that this server cannot open, each beside its commitment.
@@ -180,7 +180,7 @@ npm run setup                         # accounts, contracts, the enclave build, 
 npm run e2e                           # plays the whole deal and checks every figure
 npm run prove:privacy                 # the leak test, on the run you just made
 cd ../../web && npm install
-PARI_BACKEND=near npm run dev         # http://localhost:3000/agent
+npm run dev         # http://localhost:3000/agent
 ```
 
 The `/you` page gives each new account 0.5 test NEAR for gas from your root account (`PARI_FAUCET` names another account, `NEAR_KEY_FAUCET` its key), and stops after 20 accounts per run of the server.
@@ -487,8 +487,6 @@ web/
 ├── lib/near/         reads the contract, opens envelopes, signs actions
 └── components/near/  the agent, borrower, lender, auditor and visibility screens, and the visitor's own account
 ```
-
-The web app serves both builds. `PARI_BACKEND=near` switches every screen to NEAR; without it the app is the Canton build, unchanged.
 
 ## NEAR HACKATHON
 
