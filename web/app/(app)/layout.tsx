@@ -5,7 +5,7 @@ import { AppBackground } from "@/components/AppBackground";
 import { Wordmark } from "@/components/Logo";
 import { PageTransition } from "@/components/PageTransition";
 import { ActionFeed, type FeedWording } from "@/components/app/ActionFeed";
-import { CastNav, LensLink, YouLink } from "@/components/app/CastNav";
+import { CastNav, LensLink, SeatKeys } from "@/components/app/CastNav";
 import { BACKEND } from "@/lib/backend";
 import { LEDGER } from "@/lib/ledger/config";
 import { holdsKeysFor, NEAR } from "@/lib/near/config";
@@ -30,53 +30,67 @@ const NEAR_WORDING: FeedWording = {
   unchanged: "Nothing changed: the books and the money are as they were.",
 };
 
-// Chrome for the working app: a top bar with the privacy lens, the deal's cast
-// as place cards seated by role (they stay in view as the page scrolls), a
-// slim status line with the network and the demo-mode disclosure, and a quiet
-// footer.
+// Chrome for the working app. On a wide page everything that is not the
+// party's own screen sits in one column down the side: the deal's cast as
+// place cards seated by role, the privacy lens, and the network with the
+// demo-mode disclosure. A narrower page carries the same along its top.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const near = BACKEND === "near";
   const readOnly = near && !PERSONAS.every((persona) => holdsKeysFor(persona.id));
+  const note = readOnly
+    ? "This server holds no party's key, so it shows the deal as the public reads it. Open Who sees what."
+    : near
+      ? "The server holds a testnet key for every party. Each action is still signed by the one account entitled to it."
+      : "One server signs for every party; each screen still reads the ledger as its own party.";
+
+  const live = (
+    <span className="inline-flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-mint">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-pill bg-mint shadow-[0_0_8px_rgba(61,220,151,0.8)] motion-reduce:animate-none" />
+      {near ? NEAR.network : LEDGER.network}
+    </span>
+  );
+  const mode = <span className="font-semibold text-amber">{readOnly ? "Read only." : "Demo mode."}</span>;
+
   return (
     <ActionFeed wording={near ? NEAR_WORDING : undefined}>
-      <div className="relative flex min-h-screen flex-col bg-ink text-paper">
+      <div className="relative min-h-screen bg-ink text-paper seated:grid seated:grid-cols-[224px_minmax(0,1fr)]">
         <AppBackground />
-        <header className="relative z-10 border-b border-white/[0.07] bg-ink/80">
-          <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-4 py-3 sm:px-6">
-            <Link href="/" className="shrink-0" aria-label="Back to home">
-              <Wordmark />
-            </Link>
-            <LensLink />
+        <SeatKeys near={near} />
+        <aside className="sticky top-0 z-40 hidden h-screen flex-col overflow-y-auto border-r border-white/10 bg-ink/75 px-4 pb-4 backdrop-blur-xl [scrollbar-width:none] seated:flex [&::-webkit-scrollbar]:hidden">
+          <Link href="/" className="flex h-[52px] shrink-0 items-center" aria-label="Back to home">
+            <Wordmark />
+          </Link>
+          <CastNav near={near} layout="column" />
+          <div className="mt-3 border-t border-white/10 pt-3">
+            <LensLink wide />
           </div>
-        </header>
-        <div className="sticky top-0 z-40 border-b border-white/10 bg-ink/80 backdrop-blur-xl">
-          <CastNav near={near} />
-        </div>
-        <div className="relative z-10 flex flex-1 flex-col overflow-x-clip">
-          <div className="border-b border-white/[0.07] bg-carbon/80">
-            <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-[13px] leading-relaxed sm:flex-nowrap sm:px-6">
-              <span className="inline-flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-mint">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-pill bg-mint shadow-[0_0_8px_rgba(61,220,151,0.8)] motion-reduce:animate-none" />
-                {near ? NEAR.network : LEDGER.network}
-              </span>
-              <span aria-hidden className="hidden h-3.5 w-px shrink-0 bg-white/15 sm:block" />
-              <p className="min-w-0 flex-1 basis-full text-pewter sm:basis-auto">
-                <span className="font-semibold text-amber">{readOnly ? "Read only." : "Demo mode."}</span>{" "}
-                {readOnly
-                  ? "This server holds no party's key, so it shows the deal as the public reads it. Open Who sees what."
-                  : near
-                    ? "This server holds a testnet key for every party, so one browser walks the deal. Each action is still signed by the one account entitled to it, and each screen opens only its own party's envelope."
-                    : "One server signs for every party, so one browser walks the deal; each screen still reads the ledger as its own party."}
+          <div className="mt-auto space-y-1.5 pt-4">
+            {live}
+            <p className="text-[11.5px] leading-[17px] text-ash">
+              {mode} {note}
+            </p>
+          </div>
+        </aside>
+        <div className="relative z-10 flex min-h-screen min-w-0 flex-col overflow-x-clip">
+          <header className="border-b border-white/[0.07] bg-ink/80 seated:hidden">
+            <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
+              <Link href="/" className="shrink-0" aria-label="Back to home">
+                <Wordmark />
+              </Link>
+              <span aria-hidden className="h-3.5 w-px shrink-0 bg-white/15" />
+              {live}
+              <p className="order-last min-w-0 basis-full text-[12.5px] leading-relaxed text-pewter lg:order-none lg:flex-1 lg:basis-auto lg:truncate">
+                {mode} {note}
               </p>
-              {near ? <YouLink /> : null}
-              <span className="ml-auto hidden shrink-0 items-center gap-1.5 text-[12px] text-ash lg:inline-flex">
-                Keys <kbd className="kbd">1</kbd>
-                <span aria-hidden>to</span>
-                <kbd className="kbd">9</kbd>
+              <span className="ml-auto lg:ml-0">
+                <LensLink />
               </span>
             </div>
+          </header>
+          <div className="sticky top-0 z-40 border-b border-white/10 bg-ink/80 backdrop-blur-xl seated:hidden">
+            <CastNav near={near} />
           </div>
-          <main className="mx-auto w-full max-w-[1280px] flex-1 px-6 py-12 sm:py-16">
+          <main className="beside-cast mx-auto w-full max-w-[1280px] flex-1 px-6 py-12 sm:py-16">
             <PageTransition>{children}</PageTransition>
           </main>
           <footer className="border-t border-white/10">

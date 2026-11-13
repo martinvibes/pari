@@ -15,6 +15,8 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Wide enough to seat the cast in a column beside the app's screens.
+      screens: { seated: "1440px" },
       colors: {
         paper: "#FFFFFF",
         ink: "#000000",

@@ -120,6 +120,15 @@ body {
   .table-data tbody tr {
     @apply transition-colors hover:bg-white/[0.025];
   }
+  /* The app seats its cast in a 224px column from 1440 wide, and until the
+     window is 1504 wide that leaves the screens less than the 1280 they were
+     drawn for. Close the tables up for that stretch so none is cut off. */
+  @media (min-width: 1440px) and (max-width: 1503px) {
+    .beside-cast .table-data th,
+    .beside-cast .table-data td {
+      @apply pr-3;
+    }
+  }
   .table-data th:last-child,
   .table-data td:last-child {
     @apply pr-0;
