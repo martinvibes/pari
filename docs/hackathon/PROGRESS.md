@@ -15,7 +15,7 @@ Baseline: tag `pre-hackathon` = 392e45c (the Canton build as of 2026-10-07, its 
 | P0-c web NEAR mode | **done**: the whole acceptance flow played in a real browser against testnet |
 | P0-d leak test | **done**: `npm run prove:privacy` passes on both recorded runs (figures below) |
 | P0-e trade with DQ screening | **done**: in the end-to-end script and in the browser |
-| README and submission drafts | **done**: `README.md`, `docs/hackathon/SUBMISSION.md` |
+| README and submission | **done**: `README.md`, with the full guide in `docs/guide.md`. The form was submitted on 13 November 2026 |
 | P1: two-of-three agent | **done**: the deal's agent can be a Sputnik DAO; played by `npm run e2e` and in the browser |
 | P1: second period | **done**: a short payment and the period that pays the rest, played by `npm run e2e` on testnet and in the browser |
 | Late answers | **done**: an enclave answer that misses NEAR's two-minute wait changes nothing, and the action can be sent again. Tested in Rust; the resend ran on testnet during the outage's recovery |
@@ -211,7 +211,6 @@ https://pari-web-production-5ff7e57a.up.railway.app runs the web app alone on Ra
 - **Not run yet:** no action button has been pressed on the hosted copy, and nobody has completed a Privy sign-in on it.
 - **What the host carries:** only the web app, so the upload also holds a copy of `near/runs` (`PARI_RUNS=runs`) and of the server's own transaction notes (`web/.pari/near-activity.json`). After a fresh deal, upload again so the new deal's setup transactions are linked.
 - **13 November:** uploaded again, twice. The cast is now place cards, one per party and grouped by role, in place of the pill row; the card of the open screen is lit and says what the party is. In a window 1440 pixels wide or more the cards sit in a column down the left side, with the lens and the demo-mode note, and there is no top bar; in a narrower window they run along the top. The visitor's own account is a ninth seat, **You** (key 0), in place of the "Use your own account" link. Checked in a browser at 1504, 1470, 1440, 1100 and 390 pixels wide: no table cut off, no sideways scroll of the page, and the number keys work. No action button has been pressed since this change. An account named by a key (a visitor's, from `/you`) is now shown shortened, so the register and trade tables keep their width.
-- `near/Dockerfile` has still not been built.
 
 ## Cut
 
@@ -309,4 +308,4 @@ github.com/out-layer/outlayer (main @ 2d50bfa, 2026-11-11).
 - **A recorded run outlives the contract's current deal.** The leak test compared each run's attested build with the build the contract pins now, so it failed on the recorded runs as soon as the contract moved to a new enclave build. It now reads the build from the public arguments of the deal's own first transaction (`new`).
 - **OutLayer, from its docs and source, read on 2026-11-11.** Limits per run: `max_instructions` 1 billion by default and 500 billion at most, `max_memory_mb` 128 and 4,096, `max_execution_seconds` 60 and 180. The docs name no priority option and no queue-status endpoint. Views on the contract (`contract/src/views.rs`): `is_paused()`, `get_stats()` (total executions, total fees), `get_request(request_id)`, `get_pending_request_ids(from_index, limit)`. On testnet at 21:53 UTC `is_paused` returned `false` and `get_pending_request_ids` ran out of gas as a view call, even with a limit of 3. Mainnet, not used by Pari: contract `outlayer.near`, API `https://api.outlayer.ai`.
 - **near-api-js 7.5.3 declares Node 22.22.2 or later** but ran correctly here on Node 20.20.2, 22.16.0 and 22.23.2 (a view call, key generation, libsodium).
-- **The submission form** (`POST https://nearhackathon.com/api/applications`): the exact fields are in `SUBMISSION.md`. The X post is the `demoUrl`.
+- **The submission form** (`POST https://nearhackathon.com/api/applications`) was sent on 13 November 2026. The X post is its `demoUrl`.
