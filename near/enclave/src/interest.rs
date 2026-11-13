@@ -1,4 +1,4 @@
-//! Interest arithmetic, ported from `daml/pari/daml/Pari/Interest.daml`.
+//! Interest arithmetic, ported from `daml/pari/daml/Pari/Interest.daml` (Canton build, tag `pre-hackathon`).
 //! Pure functions, so every number a lender receives can be recomputed from
 //! the terms and the register.
 

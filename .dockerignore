@@ -1,9 +1,0 @@
-.git
-**/node_modules
-**/.next
-**/.daml
-**/.pari
-.localnet
-web/.env*
-**/target
-near/.keys

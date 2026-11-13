@@ -1,5 +1,5 @@
 //! The guards against a Revlon-style mistaken payment.
-//! Ported from `daml/pari-tests/daml/Pari/Test/Principal.daml` (prepayment is
+//! Ported from `daml/pari-tests/daml/Pari/Test/Principal.daml` (Canton build, tag `pre-hackathon`) (prepayment is
 //! not part of the NEAR build).
 
 mod common;

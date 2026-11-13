@@ -1,6 +1,6 @@
 //! Secondary trading: cash against loan in one step, interest split on the
 //! trade date, DQ screening, and what each party can see.
-//! Ported from `daml/pari-tests/daml/Pari/Test/Trading.daml`.
+//! Ported from `daml/pari-tests/daml/Pari/Test/Trading.daml` (Canton build, tag `pre-hackathon`).
 
 mod common;
 

@@ -416,7 +416,7 @@ Next on NEAR: withdrawals through NEAR's confidential intents, so that even thos
 
 **What an outsider can do.** A buyer has to register a view key before it holds anything, so the contract lets any account register one, offer or accept a trade, pay test USDC in, or ask for a withdrawal. The contract vouches for who called, and the enclave decides whether the caller is entitled. An account outside the deal can't read the books or move anyone's money: its offers and acceptances are refused, a withdrawal pays out only test USDC it paid in itself, and its envelope holds the deal's public terms and nothing of anyone else's. It can slow the deal down. Each of its calls holds the one-at-a-time lock until the enclave answers, the contract pays OutLayer for that run, and a registered key adds one envelope slot to every later answer. A production deal would have the agent admit an account before it can call; that is not built.
 
-**Not built.** Prepayments, inside-information documents and a hundred-lender scale test exist in [the Canton build](canton.md) and were left out of this one.
+**Not built.** Prepayments, inside-information documents and a hundred-lender scale test exist in [the Canton build](https://github.com/martinvibes/pari/tree/pre-hackathon) and were left out of this one.
 
 ## Tests
 
@@ -494,7 +494,7 @@ The web app serves both builds. `PARI_BACKEND=near` switches every screen to NEA
 
 - **Tracks:** privacy (primary), realworld.
 - **Built during the hackathon:** everything under [`near/`](../near), plus [`web/lib/near`](../web/lib/near), [`web/components/near`](../web/components/near) and the [`/you`](../web/app/(app)/you) page: the contract, the enclave program, the test token, the scripts and the app's NEAR data layer and screens. The full diff from the earlier build is [`pre-hackathon...main`](https://github.com/martinvibes/pari/compare/pre-hackathon...main).
-- **Existed before:** Pari was first designed for Canton at HackCanton Season 3. That build is tagged [`pre-hackathon`](https://github.com/martinvibes/pari/tree/pre-hackathon) (commit `392e45c`, the build as of 7 October 2026) and described in [docs/canton.md](canton.md). The NEAR version reuses its idea, its demo deal, its test names and numbers, and the web app's visual layer. The `daml/` folder is untouched.
+- **Existed before:** Pari was first designed for Canton at HackCanton Season 3. That build is tagged [`pre-hackathon`](https://github.com/martinvibes/pari/tree/pre-hackathon) (commit `392e45c`, the build as of 7 October 2026), and it stays there whole. The NEAR version reuses its idea, its demo deal, its test names and numbers, and the web app's visual layer. The Canton code was removed from `main` on 13 November 2026, so `main` holds the NEAR build alone.
 - **Libraries:** near-sdk and near-contract-standards 5.30, cargo-near 0.23, the OutLayer SDK 0.2, crypto_box 0.9 (libsodium-compatible sealed boxes), sha2, hmac, serde, base64 and getrandom in Rust; near-api-js 7.5, libsodium-wrappers 0.8, @privy-io/react-auth 3.51, Next.js 14 and React 18 in TypeScript.
 - **AI tools:** the code was written with Claude Code (Anthropic) as a coding agent, directed and reviewed by the builder.
 - **The builder's other entry:** [Selkie](https://github.com/SelkieLabs/Selkie).

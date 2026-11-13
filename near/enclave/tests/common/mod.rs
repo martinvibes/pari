@@ -1,4 +1,4 @@
-//! The demo deal from `daml/pari-tests/daml/Pari/Test/Setup.daml`: Northwind
+//! The demo deal from `daml/pari-tests/daml/Pari/Test/Setup.daml` (Canton build, tag `pre-hackathon`): Northwind
 //! Logistics Term Loan B, 100m across Alder (50m), Birch (30m) and Cedar (20m),
 //! base 4.30% + 350 bp, first period 2026-09-15 to 2026-12-15 (91 days).
 #![allow(dead_code)]

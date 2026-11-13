@@ -240,7 +240,7 @@ Found on the way: a call to the deal prepays 300 TGas, which is about 0.3 NEAR a
 
 ## The repository's history (12 November)
 
-At the builder's request the history was rebuilt on 12 November 2026, and `main` on GitHub was replaced with it the same day. `main` now holds one commit with the Canton build as it stood on 7 October 2026 (`392e45c`, tag `pre-hackathon`), then the commits made during the hackathon, each with its original message, author and date. The files are the same as before the rebuild. The `near` branch is gone, and the README's Canton half moved to `docs/canton.md`, so the README is the NEAR build alone with its disclosure and diff link.
+At the builder's request the history was rebuilt on 12 November 2026, and `main` on GitHub was replaced with it the same day. `main` now holds one commit with the Canton build as it stood on 7 October 2026 (`392e45c`, tag `pre-hackathon`), then the commits made during the hackathon, each with its original message, author and date. The files are the same as before the rebuild. The `near` branch is gone, and the README's Canton half moved to `docs/canton.md`, so the README is the NEAR build alone with its disclosure and diff link. On 13 November 2026, again at the builder's request, the Canton code was removed from `main` (`daml/`, `deploy/`, `scripts/`, the Makefile and the Canton docs, `docs/canton.md` among them). It stays whole at the tag `pre-hackathon`.
 
 ## Next (the builder's steps)
 

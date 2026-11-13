@@ -1,4 +1,4 @@
-// The demo deal and its cast, from daml/pari-tests/daml/Pari/Test/Setup.daml.
+// The demo deal and its cast, from daml/pari-tests/daml/Pari/Test/Setup.daml (Canton build, tag pre-hackathon).
 // Money is always whole cents in a bigint.
 
 export const ROOT = process.env.PARI_ROOT ?? "paridesk.testnet";

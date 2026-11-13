@@ -1,5 +1,5 @@
 //! Authority: each command runs only for the party entitled to it.
-//! Mirrors `daml/pari-tests/daml/Pari/Test/Authority.daml`.
+//! Mirrors `daml/pari-tests/daml/Pari/Test/Authority.daml` (Canton build, tag `pre-hackathon`).
 
 mod common;
 

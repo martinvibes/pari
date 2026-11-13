@@ -1,6 +1,6 @@
 //! Interest: ACT/360 maths, one payment to every lender in one step, and
 //! short payments that cannot favour any lender.
-//! Ported from `daml/pari-tests/daml/Pari/Test/Interest.daml`.
+//! Ported from `daml/pari-tests/daml/Pari/Test/Interest.daml` (Canton build, tag `pre-hackathon`).
 
 mod common;
 
