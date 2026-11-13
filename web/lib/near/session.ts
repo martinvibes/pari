@@ -30,10 +30,11 @@ export function isUnavailable<T extends object>(v: T | Unavailable): v is Unavai
   return "unavailable" in v;
 }
 
-/** A party's display name: the persona's, or the account itself. */
+/** A party's display name: the persona's, or the account itself, shortened
+ *  when it is a key-derived account of 64 characters. */
 export function nameOf(account: string): string {
   const id = personaIdOf(account);
-  return (id && personaById(id)?.name) || account;
+  return (id && personaById(id)?.name) || (account.length > 24 ? `${account.slice(0, 4)}…${account.slice(-4)}` : account);
 }
 
 export async function viewAs(persona: Persona): Promise<Seen | Unavailable> {
