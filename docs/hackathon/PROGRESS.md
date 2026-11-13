@@ -209,6 +209,7 @@ https://pari-web-production-5ff7e57a.up.railway.app runs the web app alone on Ra
 - **Checked:** the agent, borrower, lender, auditor, visibility, verify and `/you` pages each came back the same length as from the local server, and the visibility page carries the same 38 transaction links. On `/you`, **Sign in with Privy** opens Privy's dialog.
 - **Not run yet:** no action button has been pressed on the hosted copy, and nobody has completed a Privy sign-in on it.
 - **What the host carries:** only the web app, so the upload also holds a copy of `near/runs` (`PARI_RUNS=runs`) and of the server's own transaction notes (`web/.pari/near-activity.json`). After a fresh deal, upload again so the new deal's setup transactions are linked.
+- **13 November:** uploaded again. The cast is now a row of place cards under the top bar, one per party and grouped by role, in place of the pill row; the card of the open screen is lit and says what the party is. Checked in a browser at 1440, 1100 and 390 pixels wide, with no sideways scroll of the page, and with the number keys. An account named by a key (a visitor's, from `/you`) is now shown shortened, so the register and trade tables keep their width.
 - `near/Dockerfile` has still not been built.
 
 ## Cut

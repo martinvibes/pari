@@ -138,7 +138,7 @@ You should see the page titled **Who sees what** with a panel **You are reading 
 
 This needs the demo's keys. The [hosted demo](https://pari-web-production-5ff7e57a.up.railway.app) holds them and plays the builder's live deal on NEAR testnet; it is wherever the last visitor left it, so its numbers differ from the ones below. For the exact walk, use [your own deployment](#3-your-own-deployment-on-testnet). Each action usually takes 10 to 30 seconds on testnet, because the contract waits for the enclave. When OutLayer's testnet workers are busy it can take a minute or more (measured on 11 November 2026: 6 to 16 seconds in the afternoon, 60 to 80 in the evening, and for about an hour that night [no answer at all](docs/hackathon/PROGRESS.md#the-outlayer-outage-of-11-november)). If the enclave misses NEAR's two-minute wait, the app says *The enclave did not answer within NEAR's two-minute wait. Press it again: an answer that comes late counts for nothing.* Nothing has changed when you see that, so press the button again.
 
-The numbers below are for a fresh deal. Every screen is one party's own view: pick the party in the top bar.
+The numbers below are for a fresh deal. Every screen is one party's own view: pick the party's seat from the place cards under the top bar, or press its number key (1 to 8).
 
 **Interest, and the Revlon mistake**
 
