@@ -19,7 +19,6 @@ export function ActionForm({
   variant = "solid",
   disabled = false,
   className = "",
-  buttonClassName = "",
 }: {
   action: ServerAction;
   label: string;
@@ -28,8 +27,6 @@ export function ActionForm({
   variant?: "solid" | "ghost";
   disabled?: boolean;
   className?: string;
-  /** Extra classes for the button, e.g. to match the height of a field beside it. */
-  buttonClassName?: string;
 }) {
   const feed = useActionFeed();
   const [pending, setPending] = useState(false);
@@ -55,7 +52,7 @@ export function ActionForm({
       <button
         type="submit"
         disabled={disabled || pending}
-        className={`${variant === "solid" ? "btn-solid" : "btn-ghost"} ${buttonClassName}`}
+        className={variant === "solid" ? "btn-solid" : "btn-ghost"}
       >
         {pending ? (
           <span

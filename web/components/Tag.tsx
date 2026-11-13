@@ -21,7 +21,7 @@ const TONES: Record<Tone, { pill: string; dot: string }> = {
 export function Tag({ children, tone = "neutral" }: { children: React.ReactNode; tone?: Tone }) {
   return (
     <span
-      className={`tag inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill border px-2.5 py-1 text-[11px] font-semibold uppercase leading-none tracking-[0.12em] ${TONES[tone].pill}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill border px-2.5 py-1 text-[11px] font-semibold uppercase leading-none tracking-[0.12em] ${TONES[tone].pill}`}
     >
       <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-pill ${TONES[tone].dot}`} />
       {children}

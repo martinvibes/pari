@@ -3,7 +3,7 @@
 import { PERSONAS } from "@/lib/pari/personas";
 
 // Each party in the deal has an identity hue, so a name reads the same on
-// every screen: the seat card, the register, the trades and the privacy matrix.
+// every screen: the tabs, the register, the trades and the privacy matrix.
 // Hues are for recognition only. A status always says its state in words, in
 // the signal colours (Tag), never in a party's hue.
 const HUES: Record<string, string> = {
@@ -37,7 +37,7 @@ export function PartyDot({ name, className = "" }: { name: string; className?: s
     <span
       aria-hidden
       className={`inline-block h-2 w-2 shrink-0 rounded-pill ${className}`}
-      style={{ background: hue }}
+      style={{ background: hue, boxShadow: `0 0 10px ${hue}80` }}
     />
   );
 }

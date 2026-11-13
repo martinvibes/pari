@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Lit } from "@/components/app/Screen";
-import { Empty, Panel, Stats, Tag, type Tone } from "@/components/app/ui";
-import { Desk } from "@/components/near/Desk";
-import { LitTitle, NearUnavailable, PaymentsMade, plural, Register, registerRows, TradesTable } from "@/components/near/parts";
+import { Empty, PageHeader, Panel, Stats, TableScroll, Tag, type Tone } from "@/components/app/ui";
+import { DealFacts, NearUnavailable, PaymentsMade, plural, Register, registerRows, Sealed, Sides, TradeStatus } from "@/components/near/parts";
 import type { DealView, PublicState } from "@/lib/near/books";
 import { UNITS_PER_CENT } from "@/lib/near/config";
 import { cents, interestDue, showCents } from "@/lib/near/money";
-import { isDealView, isUnavailable, recordSoFar, viewAs } from "@/lib/near/session";
+import { isDealView, isUnavailable, viewAs } from "@/lib/near/session";
 import { formatDate } from "@/lib/pari/dates";
 import { formatCents } from "@/lib/pari/money";
 import { persona } from "@/lib/pari/personas";
@@ -71,53 +69,88 @@ function audit(view: DealView, chain: PublicState): Finding[] {
 }
 
 export async function AuditorScreen() {
-  const [seen, record] = await Promise.all([viewAs(persona("auditor")), recordSoFar()]);
+  const seen = await viewAs(persona("auditor"));
   if (isUnavailable(seen)) return <NearUnavailable problem={seen} />;
   if (!isDealView(seen)) return <NearUnavailable problem={{ unavailable: "deal", detail: "The auditor's envelope is not the auditor's view." }} />;
   const { view, chain } = seen;
   const settled = view.requests.filter((r) => r.status === "settled");
+  const paid = sum(settled.flatMap((r) => Object.values(r.paid)));
   const findings = audit(view, chain);
-  const broken = findings.filter((finding) => finding.state === "fail").length;
-  const checked = findings.filter((finding) => finding.state !== "none").length;
 
   return (
-    <Desk seen={seen} record={record}>
+    <div className="space-y-12">
+      <PageHeader
+        kicker="The borrower's auditor"
+        title="Auditor"
+        party="Auditor"
+        lede="Read-only. The auditor's envelope holds the register through every payment and trade, so each figure can be worked out again and held against the public chain. It holds no trade price and no DQ list."
+      >
+        <DealFacts chain={chain} />
+      </PageHeader>
+
       <Stats
         items={[
           { label: "Outstanding (USDC)", value: showCents(view.outstanding) },
           { label: "Lenders", value: String(registerRows(view).length) },
-          { label: "Payments settled", value: String(settled.length), note: `${formatCents(sum(settled.flatMap((r) => Object.values(r.paid))))} paid` },
+          { label: "Payments settled", value: String(settled.length) },
           { label: "Held by the contract", value: formatCents(BigInt(chain.held) / UNITS_PER_CENT) },
         ]}
       />
 
-      <Lit tone={broken > 0 ? "stop" : undefined}>
-        <div className="p-6">
-          <LitTitle title="Worked out again">
-            <Tag tone={broken > 0 ? "stop" : "ok"}>{broken > 0 ? `${broken} broken` : `${checked} of ${checked} hold`}</Tag>
-          </LitTitle>
-          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-pewter">
-            Read only. The auditor&apos;s own arithmetic over its envelope, held against what anyone can read on the chain.
-          </p>
-          <ul className="mt-4">
-            {findings.map((finding) => (
-              <li key={finding.claim} className="flex flex-col gap-1.5 border-t border-white/[0.08] py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-                <span>
-                  <span className="text-[14px] text-paper">{finding.claim}</span>
-                  <span className="mt-0.5 block text-[12.5px] text-ash">{finding.detail}</span>
-                </span>
-                <Tag tone={FINDING_TAG[finding.state].tone}>{FINDING_TAG[finding.state].text}</Tag>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </Lit>
-
-      <Register view={view} aside="As the agent keeps it" />
-      <PaymentsMade requests={view.requests} aside="The public chain shows one total per payment" />
-      <Panel title="Trades" aside="No price: that is between the seller, the buyer and the agent">
-        {view.trades.length === 0 ? <Empty>No trades yet.</Empty> : <TradesTable trades={view.trades} prices={false} />}
+      <Panel
+        title="Worked out again"
+        note={`The auditor's own arithmetic over its envelope, held against what anyone can read on the chain. Lenders have been paid ${formatCents(paid)} in all.`}
+      >
+        <ul>
+          {findings.map((finding) => (
+            <li key={finding.claim} className="flex flex-col gap-2 border-t border-white/10 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                <span className="text-paper">{finding.claim}</span>
+                <span className="mt-0.5 block text-xs text-ash">{finding.detail}</span>
+              </span>
+              <Tag tone={FINDING_TAG[finding.state].tone}>{FINDING_TAG[finding.state].text}</Tag>
+            </li>
+          ))}
+        </ul>
       </Panel>
-    </Desk>
+
+      <Register view={view} note="Every lender's principal and interest, as the agent keeps it." />
+      <PaymentsMade requests={view.requests} note="Each lender's share of every settled payment. The public chain shows one total per payment." />
+
+      <Panel title="Trades" note="Who sold to whom, how much and when. Prices are between the seller, the buyer and the agent.">
+        {view.trades.length === 0 ? (
+          <Empty>No trades yet.</Empty>
+        ) : (
+          <TableScroll>
+            <table className="table-data">
+              <thead>
+                <tr>
+                  <th>Seller → buyer</th>
+                  <th className="text-right">Par</th>
+                  <th>Trade date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...view.trades].reverse().map((trade) => (
+                  <tr key={trade.id}>
+                    <td>
+                      <Sides trade={trade} />
+                    </td>
+                    <td className="text-right">{showCents(trade.par)}</td>
+                    <td className="text-smoke">{formatDate(trade.trade_date)}</td>
+                    <td>
+                      <TradeStatus trade={trade} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+        )}
+      </Panel>
+
+      <Sealed seen={seen} />
+    </div>
   );
 }

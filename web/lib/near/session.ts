@@ -30,11 +30,10 @@ export function isUnavailable<T extends object>(v: T | Unavailable): v is Unavai
   return "unavailable" in v;
 }
 
-/** A party's display name: the persona's, or the account itself, shortened
- *  when it is a key-derived account of 64 characters. */
+/** A party's display name: the persona's, or the account itself. */
 export function nameOf(account: string): string {
   const id = personaIdOf(account);
-  return (id && personaById(id)?.name) || (account.length > 24 ? `${account.slice(0, 8)}…${account.slice(-6)}` : account);
+  return (id && personaById(id)?.name) || account;
 }
 
 export async function viewAs(persona: Persona): Promise<Seen | Unavailable> {
@@ -48,16 +47,6 @@ export async function viewAs(persona: Persona): Promise<Seen | Unavailable> {
     return { persona, account, chain, envelope, view: await openEnvelope(persona.id, account, envelope), wallet };
   } catch (error) {
     return unavailable(error);
-  }
-}
-
-/** The public record, for the chain's column beside a desk. A desk still
- *  opens when the record cannot be read; the column then shows the state alone. */
-export async function recordSoFar(): Promise<PublicRecord[] | null> {
-  try {
-    return await publicRecord();
-  } catch {
-    return null;
   }
 }
 

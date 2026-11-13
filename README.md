@@ -138,15 +138,15 @@ You should see the page titled **Who sees what** with a panel **You are reading 
 
 This needs the demo's keys. The [hosted demo](https://pari-web-production-5ff7e57a.up.railway.app) holds them and plays the builder's live deal on NEAR testnet; it is wherever the last visitor left it, so its numbers differ from the ones below. For the exact walk, use [your own deployment](#3-your-own-deployment-on-testnet). Each action usually takes 10 to 30 seconds on testnet, because the contract waits for the enclave. When OutLayer's testnet workers are busy it can take a minute or more (measured on 11 November 2026: 6 to 16 seconds in the afternoon, 60 to 80 in the evening, and for about an hour that night [no answer at all](docs/hackathon/PROGRESS.md#the-outlayer-outage-of-11-november)). If the enclave misses NEAR's two-minute wait, the app says *The enclave did not answer within NEAR's two-minute wait. Press it again: an answer that comes late counts for nothing.* Nothing has changed when you see that, so press the button again.
 
-The numbers below are for a fresh deal. Every desk is one party's own view: pick the seat in the sidebar (**Switch seat**, or keys 1 to 9). The column **What the chain saw** beside each desk is what anyone can read with no key.
+The numbers below are for a fresh deal. Every screen is one party's own view: pick the party in the top bar.
 
 **Interest, and the Revlon mistake**
 
-1. Open `/agent`. On the card **Fix the rate for the next period**, press **Fix rate**.
+1. Open `/agent`. Under **Next interest period**, press **Fix rate**.
    You see: *Base rate fixed at 4.30% to 15 Dec 2026. All-in 7.80%.*
-2. On the card **Request interest**, replace the total with `900,000,000.00` (or press **Enter 900,000,000.00**) and press **Request interest**.
-   You see: **Refused**. *You entered 900,000,000.00; the register says 1,971,666.66. Nothing changed: the books and the money are as they were.* The card turns red and reads **Nothing moved.**, with both figures and a link to the transaction.
-3. Press **Enter the register's total** (or type `1,971,666.66`) and press **Request interest**.
+2. Under **Request interest**, replace the total with `900,000,000.00` and press **Request interest**.
+   You see: **Refused**. *You entered 900,000,000.00; the register says 1,971,666.66. Nothing changed: the books and the money are as they were.*
+3. Type `1,971,666.66` (a reload prefills it) and press **Request interest**.
    You see: *Interest requested: 1,971,666.66. The chain shows the total; each lender's share stays sealed.*
 4. Open `/borrower` and press **Pay**.
    You see: *Paid 1,971,666.66 of test USDC into the deal.*
@@ -154,7 +154,7 @@ The numbers below are for a fresh deal. Every desk is one party's own view: pick
    You see: *Settled. Every lender was credited in one step. The chain shows one total, 1,971,666.66, and no lender's share.*
 6. Open `/lender/alder`. You see Alder was paid **985,833.33**, and nothing about Birch or Cedar.
    `/lender/birch` shows **591,500.00** and `/lender/cedar` shows **394,333.33**. `/auditor` shows all three.
-7. Open `/visibility` (**Who sees what**, in the sidebar). In the table **What each reader has**, the **Public chain** column has one payment total and no register line, payment leg, trade price or DQ list. The card **The public chain** shows the total 1,971,666.66, the books' fingerprint and eight sealed envelopes. Beside it is Alder's envelope, opened; press another reader's name in the table to open theirs. **The record** lists the refusal from step 2. Under **Checked live**, eight claims read **Holds**.
+7. Open `/visibility`. The **Public chain** column has one payment total and no register line, payment leg, trade price or DQ list. Under **The public chain** you see the total 1,971,666.66, the books' fingerprint, eight sealed envelopes, and the refusal from step 2 on the public record. Under **Checked live**, eight claims read **Holds**.
 
 **A trade, screened against a list the buyer never sees**
 
@@ -163,7 +163,7 @@ The numbers below are for a fresh deal. Every desk is one party's own view: pick
    You see: *DQ list updated. It went to the enclave sealed: the chain carries only ciphertext.*
 10. On `/lender/rival` press **Pay in**, then the same on `/lender/delta` (12,000,000.00 of test USDC each).
 11. On `/lender/alder`, under **Sell part of your position**, choose **Rival** and press **Offer trade**. On `/lender/rival` press **Accept**. On `/agent` press **Settle**.
-    You see: *Not settled. Nothing moved, and the buyer is told nothing more.* Rival's desk says **Not settled**, *Nothing moved.*, and gives no reason. The agent's desk says *The buyer is on the DQ list.*
+    You see: *Not settled. Nothing moved, and the buyer is told nothing more.* Rival's screen says *not settled* and gives no reason. The agent's screen says *The buyer is on the DQ list.*
 12. Do the same with **Delta** as the buyer.
     You see: *Trade settled. Cash, register and both positions moved in one step.* Delta holds 10,000,000.00 and paid 9,950,000.00. Alder holds 40,000,000.00 with 845,000.00 of interest due at period end: 780,000.00 on what it kept, plus the 65,000.00 it earned on the part it sold, up to the trade date. `/borrower` shows the trade and no price.
 
@@ -179,9 +179,9 @@ The numbers below are for a fresh deal. Every desk is one party's own view: pick
 
 **With an account only you control**
 
-17. Open `/you` (**Your own account**, in the sidebar). Sign in with Privy, or press **Use a key made in this browser**.
+17. Open `/you` (**Use your own account**, in the status line). Sign in with Privy, or press **Use a key made in this browser**.
     You see: a NEAR testnet account named by a key. The demo server never holds that key.
-18. The card offers one step at a time. Press each in turn: **Get test funds**, **Register view key**, **Pay in**, **Ask Alder for an offer**, **Accept**, **Ask the agent to settle**. Each step says whose account signs it. The faucet, Alder and the agent sign on the demo server. Your three are signed in your browser and sent to NEAR from there.
+18. Press the six buttons in order: **Get test funds**, **Register view key**, **Pay in**, **Ask Alder for an offer**, **Accept**, **Ask the agent to settle**. Each step says whose account signs it. The faucet, Alder and the agent sign on the demo server. Your three are signed in your browser and sent to NEAR from there.
     You see: *Trade settled. Your cash went to Alder and the loan came to you in one step.* You hold 250,000.00 of the loan, bought at 99.50 for 248,750.00, with 1,250.00 of cash left in the books. **What the chain holds about you** shows your envelope as ciphertext. **What you alone can open** shows the same envelope, opened in your browser with a view key that never leaves it.
 
 If no interest period is open, the agent fixes one (4.30%, three months) before it settles your trade. Privy sign-in appears when the deployment has a Privy app id (`NEXT_PUBLIC_PRIVY_APP_ID` in `web/.env.local`); without one the page offers the browser key alone.
@@ -243,9 +243,9 @@ npm run e2e                           # the same deal; every agent action takes 
 
 `--dao` needs about 11 NEAR more than the plain setup: 6 to create the DAO, and 1.5 for each operator, which covers the 1 NEAR bond the DAO holds while a proposal waits. In the browser, on a deal made with `--dao`:
 
-1. Open `/agent`. Press **Fix rate**.
-   You see: *Proposed, and approved by operator 1 of 3. Nothing has moved: proposal 1 runs when a second operator approves it.* (The number counts the DAO's proposals, so yours may differ.) The card **Waiting for a second operator** names the DAO and lists the proposal, and the rate still reads *Not fixed*.
-2. On that card, press **Approve as operator 2**.
+1. Open `/agent`. A panel **Two of three** names the DAO. Press **Fix rate**.
+   You see: *Proposed, and approved by operator 1 of 3. Nothing has moved: proposal 1 runs when a second operator approves it.* (The number counts the DAO's proposals, so yours may differ.) The panel lists the proposal, and the rate still reads *Not fixed*.
+2. In the panel, press **Approve as operator 2**.
    You see: *Two of three operators approved, so the agent acted. Base rate fixed at 4.30% to 15 Dec 2026. All-in 7.80%.*
 3. Request `900,000,000.00`, then press **Approve as operator 3**.
    You see: **Refused**. *You entered 900,000,000.00; the register says 1,971,666.66.*
@@ -359,11 +359,11 @@ The check reads the chain as it was at the proof's block, so a proof stays check
 
 **Try it**, on [your own deployment](#3-your-own-deployment-on-testnet), after step 6 of [Play the deal in the browser](#2-play-the-deal-in-the-browser):
 
-1. Open `/lender/alder`. Press **Prove this payment** on the card, or **Prove** beside the settled payment in the table **Your payments**.
-   You land on `/verify` (**Check a proof**) and see **Holds**: *Alder was paid 985,833.33 of the 985,833.33 it was owed for interest to 15 Dec 2026.* Under **How it was checked** are the two steps above, with the block and the commitment. The page's address is the proof: anyone you send it to sees the same page, and the server uses no key to draw it.
+1. Open `/lender/alder`. In the payments table, press **Prove** beside the settled payment.
+   You land on `/verify` and see **It holds**: *Alder was paid 985,833.33 of the 985,833.33 it was owed for interest to 15 Dec 2026.* Under **How it was checked** are the two steps above, with the block and the commitment. The page's address is the proof: anyone you send it to sees the same page, and the server uses no key to draw it.
 2. In the box **The proof**, change one digit of `"paid"` and press **Check against NEAR**.
-   You see **Does not hold**, **Not proved.**: *The fact, its salt and the list of hashes do not belong together.*
-3. Back on `/lender/alder`, in the column **What the chain saw**, under **Alder's envelope**, **What it holds** and **Its cash** do the same for those two facts. `/agent`, `/borrower` and `/auditor` have **The register** and **The outstanding total** there.
+   You see **It does not hold**: *The fact, its salt and the list of hashes do not belong together.*
+3. Back on `/lender/alder`, under the sealed envelope, **Prove what you hold** and **Prove your cash** do the same for those two facts. `/agent`, `/borrower` and `/auditor` have **Prove the register** and **Prove the outstanding total**.
 4. In a terminal, `npm run e2e` leaves the proof of what Alder holds in `near/proofs`, and `npm run verify:proof` checks it with no keys. It then changes one digit and shows the proof rejected, and forges the changed fact's hash into the list and shows the chain's commitment reject that too.
 
 This is `npm run verify:proof` from a fresh clone, with no keys, on the proof the recorded run of `northwind-14` left:

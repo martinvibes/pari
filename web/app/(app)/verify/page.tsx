@@ -2,9 +2,8 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Lit, Screen } from "@/components/app/Screen";
 import { Party } from "@/components/app/party";
-import { Panel, Tag } from "@/components/app/ui";
+import { PageHeader, Panel, Tag } from "@/components/app/ui";
 import { Explore, NearUnavailable, short } from "@/components/near/parts";
 import { BACKEND } from "@/lib/backend";
 import { accountUrl, NEAR } from "@/lib/near/config";
@@ -15,6 +14,8 @@ import { formatDate } from "@/lib/pari/dates";
 import { formatCents } from "@/lib/pari/money";
 
 export const metadata: Metadata = { title: "Check a proof" };
+
+const IRIS = "#A78BFA";
 
 // A proof is one fact from one party's sealed view. This page checks it the
 // way an outsider would: it uses no key, and asks NEAR what anyone can ask.
@@ -87,48 +88,40 @@ export default async function VerifyPage({ searchParams }: { searchParams: { pro
   }
 
   return (
-    <Screen title="Check a proof" context="One fact from one sealed envelope, checked against NEAR with no key">
-      {verdict ? (
-        <Checked verdict={verdict} proof={proof} />
-      ) : (
-        <Lit className="grid lg:grid-cols-[minmax(0,1fr)_340px]">
-          <Paste given={given} proof={proof} rows={7} solid />
-          <div className="border-t border-white/[0.08] p-6 lg:border-l lg:border-t-0">
-            <p className="text-[12.5px] text-pewter">Where a proof comes from</p>
-            <p className="mt-2 text-[24px] font-light leading-[1.2] tracking-[-0.015em] text-paper">A party cuts one from its own envelope.</p>
-            <p className="mt-3 text-[13px] leading-relaxed text-pewter">
-              Sit at a lender&apos;s desk and press Prove next to a payment, or in the chain&apos;s column. The proof shows that one fact and nothing
-              else from the envelope.
-            </p>
-          </div>
-        </Lit>
-      )}
-      {verdict ? (
-        <Panel title="The proof" aside="Change one digit of the fact and check again: it stops holding">
-          <Paste given={given} proof={proof} rows={12} />
-        </Panel>
-      ) : null}
-    </Screen>
-  );
-}
-
-function Paste({ given, proof, rows, solid = false }: { given: string; proof: Proof | null; rows: number; solid?: boolean }) {
-  return (
-    <form method="get" action="/verify" className={solid ? "space-y-4 p-6" : "space-y-3"}>
-      {solid ? <h2 className="text-[17px] font-medium leading-6 text-paper">Paste a proof</h2> : null}
-      <textarea
-        name="proof"
-        rows={rows}
-        defaultValue={proof ? JSON.stringify(proof, null, 2) : given}
-        spellCheck={false}
-        aria-label="The proof"
-        className="field !mt-0 font-mono !text-[12px] leading-6"
-        required
+    <div className="space-y-12">
+      <PageHeader
+        kicker="Selective disclosure"
+        title="Check a proof"
+        accent={IRIS}
+        lede="A party can hand anyone one fact from its sealed envelope: what it holds, or one payment it received. This page checks that fact against NEAR. It uses no key, and the proof shows nothing else from the envelope."
       />
-      <button type="submit" className={solid ? "btn-solid sm:w-64" : "btn-ghost h-11 px-5"}>
-        Check against NEAR
-      </button>
-    </form>
+
+      {verdict ? <Checked verdict={verdict} proof={proof} /> : null}
+
+      <Panel
+        title={verdict ? "The proof" : "Paste a proof"}
+        note={
+          verdict
+            ? "Everything the outsider was handed. Change one digit of the fact and check again: it stops holding."
+            : "A party makes one on its own screen: open a lender, and press Prove next to a payment or under its envelope."
+        }
+      >
+        <form method="get" action="/verify" className="space-y-4">
+          <textarea
+            name="proof"
+            rows={verdict ? 14 : 6}
+            defaultValue={proof ? JSON.stringify(proof, null, 2) : given}
+            spellCheck={false}
+            aria-label="The proof"
+            className="field !mt-0 font-mono !text-[12px] !font-normal leading-6"
+            required
+          />
+          <button type="submit" className="btn-ghost">
+            Check against NEAR
+          </button>
+        </form>
+      </Panel>
+    </div>
   );
 }
 
@@ -136,66 +129,73 @@ function Checked({ verdict, proof }: { verdict: Verdict; proof: Proof | null }) 
   const { fact } = verdict;
   if (!verdict.holds) {
     return (
-      <Lit tone="stop" className="p-6">
-        <Tag tone="stop">Does not hold</Tag>
-        <p className="mt-3 text-[44px] font-light leading-[1.05] tracking-[-0.025em] text-paper">Not proved.</p>
-        <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-smoke">{verdict.why}</p>
-        <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-pewter">
-          {fact ? `What it claims, unproved: ${sentence(fact)}` : "Nothing in it can be relied on."}
-        </p>
-      </Lit>
+      <Panel title="It does not hold" note={verdict.why} aside={<Tag tone="stop">Does not hold</Tag>}>
+        {fact ? (
+          <div className="space-y-4">
+            <p className="label-data">What it claims, unproved</p>
+            <p className="max-w-prose text-[17px] leading-relaxed text-pewter">{sentence(fact)}</p>
+          </div>
+        ) : (
+          <p className="text-[15px] text-pewter">Nothing in it can be relied on.</p>
+        )}
+      </Panel>
     );
   }
   const { at, latest, others } = verdict;
   const count = others + 1;
   return (
-    <Lit className="grid lg:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="p-6">
-        <Tag tone="ok">Holds</Tag>
-        <p className="mt-3 max-w-xl text-[28px] font-light leading-[1.2] tracking-[-0.02em] text-paper">{sentence(verdict.fact)}</p>
-        <dl className="mt-5 text-[13.5px]">
+    <div className="grid gap-6 lg:grid-cols-12">
+      <Panel
+        title="It holds"
+        note={`Deal ${verdict.fact.deal}, after action #${verdict.fact.seq}.`}
+        aside={<Tag tone="ok">Holds</Tag>}
+        className="lg:col-span-7"
+      >
+        <p className="max-w-prose text-2xl font-medium leading-snug tracking-tight text-paper">{sentence(verdict.fact)}</p>
+        <dl className="space-y-2">
           <Line label="Party">
-            <Party name={nameOf(verdict.fact.party)} /> <span className="fig ml-2 text-[12px] text-ash">{verdict.fact.party}</span>
+            <Party name={nameOf(verdict.fact.party)} /> <span className="ml-2 font-mono text-[12px] text-ash">{verdict.fact.party}</span>
           </Line>
           {lines(verdict.fact).map(([label, value]) => (
             <Line key={label} label={label}>
               {value}
             </Line>
           ))}
-          <Line label="Deal, and the action it follows">
-            {verdict.fact.deal}, #{verdict.fact.seq}
-          </Line>
         </dl>
-      </div>
-      <div className="border-t border-white/[0.08] p-6 lg:border-l lg:border-t-0">
-        <h3 className="text-[13.5px] font-medium text-paper">How it was checked</h3>
-        <ol className="mt-3 space-y-3 text-[13px] leading-relaxed text-smoke">
+      </Panel>
+
+      <Panel title="How it was checked" note="Two steps anyone can repeat: npm run verify:proof in near/scripts does the same." className="lg:col-span-5">
+        <ol className="space-y-4 text-[14px] leading-relaxed text-smoke">
           <li>
             <span className="text-mint">✓</span> The fact and its salt hash to entry {(proof?.index ?? 0) + 1} of the {count} in the proof.
           </li>
           <li>
             <span className="text-mint">✓</span> The hash of those {count} entries is the commitment that{" "}
             <Explore href={accountUrl(NEAR.ledger)}>{NEAR.ledger}</Explore> held for this party at block {proof?.block}, on {when(at)}:{" "}
-            <span className="fig text-[12px] text-pewter">{short(verdict.commitment)}</span>.
+            <span className="font-mono text-[12px] text-pewter">{short(verdict.commitment)}</span>.
           </li>
           <li className="text-pewter">
             {latest ? "This is still the party's latest view." : "The deal has moved on since. The proof is of that block, and stays checkable."}
           </li>
         </ol>
-        <p className="mt-4 border-t border-white/[0.08] pt-4 text-[12.5px] leading-relaxed text-ash">
-          The other {others} entries are salted hashes: they show that the view holds {others} more facts, and nothing about any of them. Anyone
-          can repeat this with npm run verify:proof in near/scripts.
-        </p>
-      </div>
-    </Lit>
+        <div className="space-y-2 border-t border-white/10 pt-5">
+          <p className="label-data">What it does not show</p>
+          <p className="text-[13px] leading-relaxed text-pewter">
+            The other {others} entries are salted hashes. They show that the party&apos;s view holds {others} more facts, and nothing about any
+            of them. The enclave draws new salts with every action, so a hash cannot be matched against an older proof or guessed from a list
+            of likely amounts.
+          </p>
+        </div>
+      </Panel>
+    </div>
   );
 }
 
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 border-t border-white/[0.08] py-2">
-      <dt className="text-pewter">{label}</dt>
-      <dd className="fig text-right text-paper">{children}</dd>
+    <div className="flex items-baseline justify-between gap-6 border-t border-white/[0.07] pt-2">
+      <dt className="label-data">{label}</dt>
+      <dd className="text-right text-[15px] tabular-nums text-smoke">{children}</dd>
     </div>
   );
 }
