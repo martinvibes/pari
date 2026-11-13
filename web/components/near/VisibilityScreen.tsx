@@ -353,7 +353,7 @@ function PublicChain({ chain, record, sealed, hashes }: { chain: PublicState; re
                       <Party name={nameOf(line.caller)} />
                     </td>
                     <td>{line.ok ? <Tag tone="ok">Ran</Tag> : <Tag tone="stop">Refused</Tag>}</td>
-                    <td className="whitespace-normal">
+                    <td className="min-w-[18rem] !whitespace-normal">
                       <span className={line.ok ? "text-smoke" : "text-rose"}>{told(line)}</span>
                       {line.ok ? <span className="block break-all font-mono text-[11px] text-ash">{line.detail}</span> : null}
                     </td>
